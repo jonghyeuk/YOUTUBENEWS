@@ -674,25 +674,25 @@ const EtchSimulator = () => {
                       <div className="text-3xl mb-2">📏</div>
                       <p className="font-semibold">Vertical</p>
                       <p className="text-gray-600">90° 프로파일</p>
-                      <p className="text-xs text-blue-600 mt-1">A ≈ 1.0</p>
+                      <p className="text-xs text-blue-600 mt-1">A ~ 1.0</p>
                     </div>
                     <div className="bg-white p-3 rounded shadow-sm">
                       <div className="text-3xl mb-2">📐</div>
                       <p className="font-semibold">Tapered</p>
                       <p className="text-gray-600">경사 프로파일</p>
-                      <p className="text-xs text-green-600 mt-1">0.7 < A < 0.9</p>
+                      <p className="text-xs text-green-600 mt-1">0.7 &lt; A &lt; 0.9</p>
                     </div>
                     <div className="bg-white p-3 rounded shadow-sm">
                       <div className="text-3xl mb-2">🌙</div>
                       <p className="font-semibold">Undercut</p>
                       <p className="text-gray-600">언더컷</p>
-                      <p className="text-xs text-orange-600 mt-1">0.3 < A < 0.7</p>
+                      <p className="text-xs text-orange-600 mt-1">0.3 &lt; A &lt; 0.7</p>
                     </div>
                     <div className="bg-white p-3 rounded shadow-sm">
                       <div className="text-3xl mb-2">⭕</div>
                       <p className="font-semibold">Isotropic</p>
                       <p className="text-gray-600">등방성</p>
-                      <p className="text-xs text-red-600 mt-1">A ≈ 0</p>
+                      <p className="text-xs text-red-600 mt-1">A ~ 0</p>
                     </div>
                   </div>
                 </div>
