@@ -57,13 +57,8 @@ const EtchSimulator = () => {
   // 탭 정의
   const tabs = [
     { id: 'overview', name: '식각 공정 개요', icon: '📋' },
-    { id: 'etch-rate', name: '식각률', icon: '⚡' },
-    { id: 'selectivity', name: '선택성', icon: '🎯' },
-    { id: 'uniformity', name: '균일성', icon: '⚖️' },
-    { id: 'anisotropy', name: '이방도', icon: '📐' },
-    { id: 'loading-effect', name: 'Loading Effect', icon: '🔄' },
-    { id: 'etch-principle', name: '식각원리', icon: '🔬' },
-    { id: 'process', name: '식각 실험', icon: '🧪' },
+    { id: 'etch-elements', name: '식각 요소', icon: '🔬' },
+    { id: 'process', name: '식각 원리', icon: '🧪' },
     { id: 'analysis', name: '영향 인자 분석', icon: '📊' },
     { id: 'quiz', name: '식각 평가', icon: '📝' }
   ];
@@ -366,11 +361,488 @@ const EtchSimulator = () => {
             <div className="bg-yellow-50 p-6 rounded-lg border-l-4 border-yellow-400">
               <h4 className="text-lg font-semibold text-yellow-800 mb-4">💡 학습 가이드</h4>
               <div className="space-y-2 text-gray-700">
-                <p>• 각 탭을 클릭하여 식각의 핵심 요소들을 자세히 학습하세요</p>
-                <p>• 실험 탭에서 실제 공정 조건을 조절해보며 결과를 관찰하세요</p>
-                <p>• 분석 탭에서 파라미터 변화가 식각 결과에 미치는 영향을 확인하세요</p>
-                <p>• 평가 탭에서 학습한 내용을 점검해보세요</p>
+                <p>• <strong>식각 요소</strong> 탭에서 5가지 핵심 요소(식각률, 선택성, 균일성, 이방도, 로딩효과)를 자세히 학습하세요</p>
+                <p>• <strong>식각 원리</strong> 탭에서 실제 공정 조건을 조절하며 화학 반응과 물리적 메커니즘을 체험하세요</p>
+                <p>• <strong>영향 인자 분석</strong> 탭에서 파라미터 변화가 식각 결과에 미치는 영향을 확인하세요</p>
+                <p>• <strong>식각 평가</strong> 탭에서 학습한 내용을 퀴즈로 점검해보세요</p>
               </div>
+            </div>
+          </div>
+        );
+
+      case 'etch-elements':
+        return (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-lg">
+              <h3 className="text-xl font-bold text-indigo-800 mb-4">🔬 식각 공정 5대 핵심 요소</h3>
+              <p className="text-gray-700 leading-relaxed">
+                반도체 식각 공정을 정확하게 제어하고 평가하기 위해서는 5가지 핵심 요소를 이해하고 관리해야 합니다.
+                각 요소는 서로 밀접하게 연관되어 있으며, 최적의 식각 결과를 얻기 위해서는 이들 간의 균형을 맞추는 것이 중요합니다.
+              </p>
+            </div>
+
+            {/* 1. 식각률 (Etch Rate) */}
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-yellow-400">
+              <h4 className="text-2xl font-bold text-yellow-800 mb-4">⚡ 1. 식각률 (Etch Rate)</h4>
+
+              <div className="space-y-4">
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-yellow-900 mb-2">정의</h5>
+                  <p className="text-gray-700">단위 시간당 식각되는 물질의 두께 또는 깊이를 나타내는 지표</p>
+                  <div className="mt-3 p-3 bg-white rounded border-2 border-yellow-300">
+                    <p className="font-mono text-center text-lg">E/R = 식각 깊이(Å) / 식각 시간(min)</p>
+                    <p className="text-sm text-gray-600 text-center mt-2">단위: Å/min 또는 nm/min</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-blue-800 mb-3">영향 인자</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>RF 파워:</strong> 파워 ↑ → 식각률 ↑</li>
+                      <li>• <strong>압력:</strong> 최적 압력 존재 (물질마다 다름)</li>
+                      <li>• <strong>가스 유량:</strong> 반응 가스 ↑ → 식각률 ↑</li>
+                      <li>• <strong>온도:</strong> 온도 ↑ → 화학 반응 ↑</li>
+                      <li>• <strong>바이어스:</strong> 이온 에너지 ↑ → 식각률 ↑</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-red-800 mb-3">공정 고려사항</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• 생산성: 높은 식각률 → 짧은 공정 시간</li>
+                      <li>• 제어성: 너무 빠르면 정밀 제어 어려움</li>
+                      <li>• 손상: 과도한 식각률 → 플라즈마 데미지</li>
+                      <li>• 균일성: 식각률과 균일성은 trade-off</li>
+                      <li>• 선택비: 식각률 증가 시 선택비 감소 가능</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">물질별 일반적인 식각률 (ICP 기준)</h5>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center text-sm">
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <p className="font-semibold text-blue-700">Si</p>
+                      <p className="text-2xl font-bold text-blue-900">100-300</p>
+                      <p className="text-gray-600">nm/min</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <p className="font-semibold text-green-700">SiO₂</p>
+                      <p className="text-2xl font-bold text-green-900">50-150</p>
+                      <p className="text-gray-600">nm/min</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <p className="font-semibold text-purple-700">Si₃N₄</p>
+                      <p className="text-2xl font-bold text-purple-900">40-120</p>
+                      <p className="text-gray-600">nm/min</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <p className="font-semibold text-orange-700">PR</p>
+                      <p className="text-2xl font-bold text-orange-900">200-500</p>
+                      <p className="text-gray-600">nm/min</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. 선택성 (Selectivity) */}
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-400">
+              <h4 className="text-2xl font-bold text-green-800 mb-4">🎯 2. 선택성 (Selectivity)</h4>
+
+              <div className="space-y-4">
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-green-900 mb-2">정의</h5>
+                  <p className="text-gray-700">타겟 물질과 다른 물질(마스크, 하부층) 사이의 식각률 비율</p>
+                  <div className="mt-3 p-3 bg-white rounded border-2 border-green-300">
+                    <p className="font-mono text-center text-lg">Selectivity = 타겟 물질 식각률 / 기준 물질 식각률</p>
+                    <p className="text-sm text-gray-600 text-center mt-2">예: Si:SiO₂ = 20:1 (Si가 SiO₂보다 20배 빠르게 식각)</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-blue-800 mb-3">선택비가 중요한 이유</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>마스크 보호:</strong> 높은 선택비로 PR 손실 최소화</li>
+                      <li>• <strong>하부층 보호:</strong> 언더층 손상 방지</li>
+                      <li>• <strong>공정 마진:</strong> End-point 여유 확보</li>
+                      <li>• <strong>프로파일 제어:</strong> 측벽 손상 최소화</li>
+                      <li>• <strong>수율 향상:</strong> 공정 안정성 증가</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-purple-800 mb-3">선택비 향상 방법</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>가스 조성 최적화:</strong> HBr 첨가 (Si 식각)</li>
+                      <li>• <strong>폴리머 형성:</strong> 측벽 보호막 생성</li>
+                      <li>• <strong>온도 제어:</strong> 저온에서 선택비 향상</li>
+                      <li>• <strong>압력 조절:</strong> 화학적 반응 우세 조건</li>
+                      <li>• <strong>바이어스 최적화:</strong> 이온 에너지 제어</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">일반적인 선택비 예시</h5>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-200">
+                        <tr>
+                          <th className="p-2 text-left">식각 조합</th>
+                          <th className="p-2 text-center">선택비</th>
+                          <th className="p-2 text-left">주요 가스</th>
+                          <th className="p-2 text-left">응용</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        <tr className="bg-white">
+                          <td className="p-2">Si : SiO₂</td>
+                          <td className="p-2 text-center font-bold text-blue-700">10-20 : 1</td>
+                          <td className="p-2">Cl₂ + HBr</td>
+                          <td className="p-2">Gate 식각</td>
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <td className="p-2">SiO₂ : Si</td>
+                          <td className="p-2 text-center font-bold text-green-700">15-30 : 1</td>
+                          <td className="p-2">CF₄ + CHF₃</td>
+                          <td className="p-2">STI, Contact</td>
+                        </tr>
+                        <tr className="bg-white">
+                          <td className="p-2">Si₃N₄ : SiO₂</td>
+                          <td className="p-2 text-center font-bold text-purple-700">8-15 : 1</td>
+                          <td className="p-2">CHF₃ + O₂</td>
+                          <td className="p-2">Spacer</td>
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <td className="p-2">PR : Si</td>
+                          <td className="p-2 text-center font-bold text-orange-700">∞ : 1</td>
+                          <td className="p-2">O₂</td>
+                          <td className="p-2">Ashing</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. 균일성 (Uniformity) */}
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-400">
+              <h4 className="text-2xl font-bold text-blue-800 mb-4">⚖️ 3. 균일성 (Uniformity)</h4>
+
+              <div className="space-y-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-blue-900 mb-2">정의</h5>
+                  <p className="text-gray-700">웨이퍼 전체 영역에서 식각 특성(깊이, 프로파일)이 얼마나 일관적인지 나타내는 지표</p>
+                  <div className="mt-3 p-3 bg-white rounded border-2 border-blue-300">
+                    <p className="font-mono text-center text-lg">Uniformity (%) = ± [(Max - Min) / (2 × Average)] × 100</p>
+                    <p className="text-sm text-gray-600 text-center mt-2">목표: ±3% 이내 (선단 공정)</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-red-800 mb-3">불균일성의 원인</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>플라즈마 분포:</strong> 중심/가장자리 밀도 차이</li>
+                      <li>• <strong>가스 흐름:</strong> 불균일한 가스 공급</li>
+                      <li>• <strong>온도 분포:</strong> 웨이퍼 온도 불균일</li>
+                      <li>• <strong>전기장:</strong> RF 전력 분포 불균일</li>
+                      <li>• <strong>챔버 형상:</strong> 기하학적 비대칭</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-green-800 mb-3">균일성 개선 방법</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>압력 최적화:</strong> 충분히 높은 압력</li>
+                      <li>• <strong>가스 주입 설계:</strong> 다중 주입구</li>
+                      <li>• <strong>온도 제어:</strong> ESC 정밀 제어</li>
+                      <li>• <strong>전극 설계:</strong> 대칭적 전극 구조</li>
+                      <li>• <strong>회전:</strong> 웨이퍼 회전으로 평균화</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">균일성 측정 및 평가</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-white p-4 rounded shadow-sm text-center">
+                      <div className="text-3xl mb-2">📊</div>
+                      <p className="font-semibold text-gray-800">측정 방법</p>
+                      <p className="text-sm text-gray-600 mt-2">웨이퍼 49점/121점 측정</p>
+                    </div>
+                    <div className="bg-white p-4 rounded shadow-sm text-center">
+                      <div className="text-3xl mb-2">🎯</div>
+                      <p className="font-semibold text-gray-800">목표 균일성</p>
+                      <p className="text-sm text-gray-600 mt-2">Logic: ±2%, Memory: ±3%</p>
+                    </div>
+                    <div className="bg-white p-4 rounded shadow-sm text-center">
+                      <div className="text-3xl mb-2">⚡</div>
+                      <p className="font-semibold text-gray-800">Trade-off</p>
+                      <p className="text-sm text-gray-600 mt-2">속도 vs 균일성</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400">
+                  <h5 className="font-semibold text-yellow-800 mb-2">💡 실무 Tip</h5>
+                  <p className="text-sm text-gray-700">
+                    압력을 높이면 평균 자유 행정이 짧아져 이온-분자 충돌이 증가하므로 균일성이 개선되지만,
+                    대신 식각 속도가 감소하고 등방성 식각이 증가하여 프로파일이 나빠질 수 있습니다.
+                    따라서 공정 목표에 따라 최적점을 찾아야 합니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. 이방도 (Anisotropy) */}
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-pink-400">
+              <h4 className="text-2xl font-bold text-pink-800 mb-4">📐 4. 이방도 (Anisotropy)</h4>
+
+              <div className="space-y-4">
+                <div className="bg-pink-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-pink-900 mb-2">정의</h5>
+                  <p className="text-gray-700">마스크 패턴의 충실도를 나타내는 지표. 수직 방향과 수평 방향의 식각 속도 차이</p>
+                  <div className="mt-3 p-3 bg-white rounded border-2 border-pink-300">
+                    <p className="font-mono text-center text-lg">Anisotropy = 1 - (수평 식각률 / 수직 식각률)</p>
+                    <p className="text-sm text-gray-600 text-center mt-2">A = 1 (완전 이방성), A = 0 (완전 등방성)</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-blue-800 mb-3">이방성 식각 (Anisotropic)</h5>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <p className="font-semibold text-blue-900">특징:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• 수직 방향으로만 식각</li>
+                        <li>• 마스크 패턴 그대로 전사</li>
+                        <li>• 수직 프로파일 (90°)</li>
+                        <li>• 물리적 스퍼터링 우세</li>
+                      </ul>
+                      <p className="font-semibold text-blue-900 mt-3">조건:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• 저압력 (10-50 mTorr)</li>
+                        <li>• 고 바이어스 전압</li>
+                        <li>• 방향성 이온 충격</li>
+                        <li>• ICP 장비 사용</li>
+                      </ul>
+                      <p className="font-semibold text-blue-900 mt-3">응용:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• Gate 식각</li>
+                        <li>• Contact/Via 형성</li>
+                        <li>• MEMS, TSV</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-orange-800 mb-3">등방성 식각 (Isotropic)</h5>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <p className="font-semibold text-orange-900">특징:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• 모든 방향으로 균일하게 식각</li>
+                        <li>• 언더컷(undercut) 발생</li>
+                        <li>• 둥근 프로파일</li>
+                        <li>• 화학적 반응 우세</li>
+                      </ul>
+                      <p className="font-semibold text-orange-900 mt-3">조건:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• 고압력 (>100 mTorr)</li>
+                        <li>• 저 바이어스 전압</li>
+                        <li>• 라디칼 반응 우세</li>
+                        <li>• 습식 식각</li>
+                      </ul>
+                      <p className="font-semibold text-orange-900 mt-3">응용:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• Spacer 형성</li>
+                        <li>• Recess 식각</li>
+                        <li>• 클리닝</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">프로파일 제어</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-center text-sm">
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-3xl mb-2">📏</div>
+                      <p className="font-semibold">Vertical</p>
+                      <p className="text-gray-600">90° 프로파일</p>
+                      <p className="text-xs text-blue-600 mt-1">A ≈ 1.0</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-3xl mb-2">📐</div>
+                      <p className="font-semibold">Tapered</p>
+                      <p className="text-gray-600">경사 프로파일</p>
+                      <p className="text-xs text-green-600 mt-1">0.7 < A < 0.9</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-3xl mb-2">🌙</div>
+                      <p className="font-semibold">Undercut</p>
+                      <p className="text-gray-600">언더컷</p>
+                      <p className="text-xs text-orange-600 mt-1">0.3 < A < 0.7</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-3xl mb-2">⭕</div>
+                      <p className="font-semibold">Isotropic</p>
+                      <p className="text-gray-600">등방성</p>
+                      <p className="text-xs text-red-600 mt-1">A ≈ 0</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Loading Effect */}
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-400">
+              <h4 className="text-2xl font-bold text-purple-800 mb-4">🔄 5. Loading Effect (로딩 효과)</h4>
+
+              <div className="space-y-4">
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-purple-900 mb-2">정의</h5>
+                  <p className="text-gray-700">
+                    패턴 밀도(open area ratio)에 따라 식각 속도가 달라지는 현상.
+                    식각되는 면적이 클수록 반응 가스가 빠르게 소모되어 식각 속도가 감소합니다.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-red-800 mb-3">발생 원인</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>Reactant Depletion:</strong> 반응 가스의 국부적 소모</li>
+                      <li>• <strong>Product Accumulation:</strong> 반응 부산물의 축적</li>
+                      <li>• <strong>Ion Shadowing:</strong> 이온 플럭스 불균일</li>
+                      <li>• <strong>Radical Loss:</strong> 라디칼 재결합/확산</li>
+                      <li>• <strong>Temperature Rise:</strong> 고밀도 영역 온도 상승</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-blue-800 mb-3">Loading Effect 종류</h5>
+                    <div className="space-y-3 text-sm">
+                      <div className="bg-white p-2 rounded">
+                        <p className="font-semibold text-blue-900">Macro Loading</p>
+                        <p className="text-gray-700">웨이퍼 간 또는 웨이퍼 내 대면적 차이</p>
+                      </div>
+                      <div className="bg-white p-2 rounded">
+                        <p className="font-semibold text-blue-900">Micro Loading</p>
+                        <p className="text-gray-700">미세 패턴 간 밀도 차이 (수십 μm)</p>
+                      </div>
+                      <div className="bg-white p-2 rounded">
+                        <p className="font-semibold text-blue-900">ARDE Effect</p>
+                        <p className="text-gray-700">Aspect Ratio에 따른 식각률 변화</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-green-800 mb-3">개선 방법</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="font-semibold text-green-900 mb-2">공정 조건 최적화:</p>
+                      <ul className="space-y-1 text-gray-700 ml-4">
+                        <li>• 가스 유량 증가 (충분한 공급)</li>
+                        <li>• 압력 최적화</li>
+                        <li>• Over-etch 시간 조절</li>
+                        <li>• 다단계 식각 (main + soft)</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-green-900 mb-2">설계 최적화:</p>
+                      <ul className="space-y-1 text-gray-700 ml-4">
+                        <li>• Dummy pattern 추가</li>
+                        <li>• 패턴 밀도 균일화</li>
+                        <li>• OPC (Optical Proximity Correction)</li>
+                        <li>• 레이아웃 최적화</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">실제 영향 예시</h5>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-200">
+                        <tr>
+                          <th className="p-2 text-left">패턴 밀도</th>
+                          <th className="p-2 text-center">상대 식각률</th>
+                          <th className="p-2 text-left">문제점</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        <tr className="bg-white">
+                          <td className="p-2">High Density (80%)</td>
+                          <td className="p-2 text-center font-bold text-red-700">0.7-0.8×</td>
+                          <td className="p-2">Under-etch, Residue</td>
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <td className="p-2">Medium Density (50%)</td>
+                          <td className="p-2 text-center font-bold text-green-700">1.0×</td>
+                          <td className="p-2">기준 (정상)</td>
+                        </tr>
+                        <tr className="bg-white">
+                          <td className="p-2">Low Density (20%)</td>
+                          <td className="p-2 text-center font-bold text-blue-700">1.1-1.3×</td>
+                          <td className="p-2">Over-etch, 손상</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400">
+                  <h5 className="font-semibold text-yellow-800 mb-2">💡 실무에서</h5>
+                  <p className="text-sm text-gray-700">
+                    Loading Effect는 특히 대면적 DRAM이나 고밀도 Logic 소자에서 심각한 문제가 됩니다.
+                    예를 들어, DRAM의 Cell Array(고밀도)와 Periphery(저밀도) 사이에 20-30%의 식각률 차이가 발생할 수 있어,
+                    Dummy Pattern을 삽입하거나 다단계 식각 공정을 사용하여 보상해야 합니다.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 요약 */}
+            <div className="bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 p-6 rounded-lg border-2 border-indigo-200">
+              <h4 className="text-xl font-bold text-indigo-900 mb-4">🎯 5대 요소 종합 정리</h4>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm text-center">
+                <div className="bg-white p-3 rounded-lg shadow">
+                  <div className="text-2xl mb-2">⚡</div>
+                  <p className="font-semibold text-yellow-800">식각률</p>
+                  <p className="text-xs text-gray-600 mt-1">생산성</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg shadow">
+                  <div className="text-2xl mb-2">🎯</div>
+                  <p className="font-semibold text-green-800">선택성</p>
+                  <p className="text-xs text-gray-600 mt-1">공정 마진</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg shadow">
+                  <div className="text-2xl mb-2">⚖️</div>
+                  <p className="font-semibold text-blue-800">균일성</p>
+                  <p className="text-xs text-gray-600 mt-1">수율</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg shadow">
+                  <div className="text-2xl mb-2">📐</div>
+                  <p className="font-semibold text-pink-800">이방도</p>
+                  <p className="text-xs text-gray-600 mt-1">패턴 충실도</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg shadow">
+                  <div className="text-2xl mb-2">🔄</div>
+                  <p className="font-semibold text-purple-800">로딩효과</p>
+                  <p className="text-xs text-gray-600 mt-1">밀도 보상</p>
+                </div>
+              </div>
+              <p className="text-center text-gray-700 mt-4">
+                이 5가지 요소는 서로 연관되어 있으며, 최적의 공정을 위해서는 trade-off를 고려한 균형 잡힌 설정이 필요합니다.
+              </p>
             </div>
           </div>
         );
@@ -379,10 +851,10 @@ const EtchSimulator = () => {
         return (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg">
-              <h3 className="text-xl font-bold text-green-800 mb-4">🔬 식각 실험 시뮬레이션</h3>
+              <h3 className="text-xl font-bold text-green-800 mb-4">🧪 식각 원리 시뮬레이션</h3>
               <p className="text-gray-700">
-                실제 식각 장비를 조작하여 다양한 물질의 식각 공정을 체험해보세요.
-                가스 조성, 압력, 파워 등을 조절하여 최적의 식각 조건을 찾아보세요.
+                실제 식각 장비를 조작하여 다양한 물질의 식각 원리를 체험해보세요.
+                가스 조성, 압력, 파워 등을 조절하며 화학 반응과 물리적 메커니즘을 이해해보세요.
               </p>
             </div>
 
