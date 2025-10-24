@@ -375,25 +375,6 @@ const EtchSimulator = () => {
           </div>
         );
 
-      case 'etch-rate':
-      case 'selectivity':
-      case 'uniformity':
-      case 'anisotropy':
-      case 'loading-effect':
-      case 'etch-principle':
-        return (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg">
-              <h3 className="text-xl font-bold text-blue-800 mb-4">
-                {tabs.find(t => t.id === activeTab)?.icon} {tabs.find(t => t.id === activeTab)?.name}
-              </h3>
-              <p className="text-gray-700">
-                이 섹션은 개발 중입니다. '식각 실험' 탭에서 실제 시뮬레이션을 체험해보세요.
-              </p>
-            </div>
-          </div>
-        );
-
       case 'process':
         return (
           <div className="space-y-6">
@@ -1130,6 +1111,206 @@ const EtchSimulator = () => {
                 </div>
               </div>
             </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h4 className="text-lg font-semibold mb-4">식각 장비별 특성 및 응용</h4>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div className="bg-blue-50 p-5 rounded-lg border-l-4 border-blue-400">
+                  <h5 className="text-lg font-semibold text-blue-800 mb-3">CCP (Capacitively Coupled Plasma)</h5>
+                  <div className="space-y-2 text-sm">
+                    <p><strong>특성:</strong></p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700">
+                      <li>낮은 플라즈마 밀도 (10⁹-10¹⁰ cm⁻³)</li>
+                      <li>높은 바이어스 전압 (500-1000V)</li>
+                      <li>물리적 스퍼터링 위주</li>
+                      <li>단순한 구조, 상대적 저비용</li>
+                    </ul>
+                    <p><strong>주요 응용:</strong></p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700">
+                      <li>Metal 식각 (Al, Cu 등)</li>
+                      <li>PR Ashing</li>
+                      <li>Chamber Cleaning</li>
+                      <li>Oxide 거친 식각</li>
+                    </ul>
+                    <p><strong>대표 업체:</strong> Applied Materials (DPS), Lam Research (2300)</p>
+                  </div>
+                </div>
+
+                <div className="bg-purple-50 p-5 rounded-lg border-l-4 border-purple-400">
+                  <h5 className="text-lg font-semibold text-purple-800 mb-3">ICP (Inductively Coupled Plasma)</h5>
+                  <div className="space-y-2 text-sm">
+                    <p><strong>특성:</strong></p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700">
+                      <li>높은 플라즈마 밀도 (10¹¹-10¹² cm⁻³)</li>
+                      <li>낮은 바이어스 전압 (50-200V)</li>
+                      <li>화학적 반응 위주</li>
+                      <li>독립적인 플라즈마 밀도/에너지 제어</li>
+                    </ul>
+                    <p><strong>주요 응용:</strong></p>
+                    <ul className="list-disc list-inside space-y-1 text-gray-700">
+                      <li>Si Deep Etch (MEMS, TSV)</li>
+                      <li>Oxide/Nitride 정밀 식각</li>
+                      <li>Poly-Si Gate 식각</li>
+                      <li>고선택비 요구 공정</li>
+                    </ul>
+                    <p><strong>대표 업체:</strong> Lam Research (Kiyo, Versys), TEL (Tactras)</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-5 rounded-lg border border-gray-200">
+                <h5 className="text-lg font-semibold text-gray-800 mb-3">왜 장비가 다른가?</h5>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                  <div className="bg-white p-3 rounded shadow">
+                    <h6 className="font-semibold text-blue-700 mb-1">플라즈마 밀도</h6>
+                    <p className="text-gray-600">ICP는 RF 코일로 높은 밀도 달성 → 더 많은 라디칼 생성 → 화학적 식각 유리</p>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow">
+                    <h6 className="font-semibold text-purple-700 mb-1">이온 에너지</h6>
+                    <p className="text-gray-600">CCP는 높은 바이어스 → 강한 물리적 충격 → 금속 식각에 적합</p>
+                  </div>
+                  <div className="bg-white p-3 rounded shadow">
+                    <h6 className="font-semibold text-green-700 mb-1">제어성</h6>
+                    <p className="text-gray-600">ICP는 밀도/에너지 독립 제어 → 정밀한 프로파일 제어 가능</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <h4 className="text-lg font-semibold mb-4">글로벌 Dry Etch 산업 동향 및 이슈</h4>
+
+              <div className="space-y-6">
+                <div className="bg-red-50 p-5 rounded-lg border-l-4 border-red-400">
+                  <h5 className="text-lg font-semibold text-red-800 mb-3">기술적 도전과제</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <h6 className="font-semibold text-gray-800 mb-2">극미세화 (3nm 이하)</h6>
+                      <ul className="list-disc list-inside space-y-1 text-gray-700">
+                        <li>Critical Dimension (CD) &lt; 10nm</li>
+                        <li>Aspect Ratio &gt; 50:1</li>
+                        <li>Line Edge Roughness (LER) &lt; 1nm</li>
+                        <li>Plasma Damage 최소화</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h6 className="font-semibold text-gray-800 mb-2">새로운 재료 도입</h6>
+                      <ul className="list-disc list-inside space-y-1 text-gray-700">
+                        <li>EUV Resist (CAR → Metal Resist)</li>
+                        <li>High-k/Metal Gate Stack</li>
+                        <li>2D Materials (MoS₂, Graphene)</li>
+                        <li>Atomic Layer Etching (ALE) 필요</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 p-5 rounded-lg border-l-4 border-green-400">
+                  <h5 className="text-lg font-semibold text-green-800 mb-3">글로벌 시장 현황</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="bg-white p-4 rounded shadow">
+                      <h6 className="font-semibold text-blue-700 mb-2">시장 점유율 (2024)</h6>
+                      <ul className="space-y-1 text-gray-700">
+                        <li>Lam Research: ~45%</li>
+                        <li>Applied Materials: ~25%</li>
+                        <li>Tokyo Electron: ~20%</li>
+                        <li>Others: ~10%</li>
+                      </ul>
+                    </div>
+                    <div className="bg-white p-4 rounded shadow">
+                      <h6 className="font-semibold text-purple-700 mb-2">주요 고객사</h6>
+                      <ul className="space-y-1 text-gray-700">
+                        <li>TSMC (Taiwan)</li>
+                        <li>Samsung (Korea)</li>
+                        <li>Intel (USA)</li>
+                        <li>SK Hynix (Korea)</li>
+                      </ul>
+                    </div>
+                    <div className="bg-white p-4 rounded shadow">
+                      <h6 className="font-semibold text-orange-700 mb-2">시장 규모</h6>
+                      <ul className="space-y-1 text-gray-700">
+                        <li>2024: $15B+</li>
+                        <li>연평균 성장률: 8-10%</li>
+                        <li>Logic &gt; Memory &gt; Others</li>
+                        <li>아시아 시장 주도</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 p-5 rounded-lg border-l-4 border-yellow-400">
+                  <h5 className="text-lg font-semibold text-yellow-800 mb-3">환경 및 규제 이슈</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <h6 className="font-semibold text-gray-800 mb-2">PFC 가스 규제</h6>
+                      <ul className="list-disc list-inside space-y-1 text-gray-700">
+                        <li>GWP (Global Warming Potential) 높음</li>
+                        <li>CF₄: 7,390배, SF₆: 22,800배</li>
+                        <li>EU REACH, 미국 EPA 규제 강화</li>
+                        <li>대체 가스 개발 필요</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h6 className="font-semibold text-gray-800 mb-2">Abatement 기술</h6>
+                      <ul className="list-disc list-inside space-y-1 text-gray-700">
+                        <li>Thermal/Plasma Abatement</li>
+                        <li>90%+ 제거 효율 요구</li>
+                        <li>운영비 증가 요인</li>
+                        <li>In-situ Cleaning 기술 개발</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 p-5 rounded-lg border-l-4 border-blue-400">
+                  <h5 className="text-lg font-semibold text-blue-800 mb-3">미래 기술 동향</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <h6 className="font-semibold text-gray-800 mb-2">Atomic Layer Processing</h6>
+                      <ul className="list-disc list-inside space-y-1 text-gray-700">
+                        <li>ALE (Atomic Layer Etching)</li>
+                        <li>Self-limiting 반응</li>
+                        <li>단원자층 정밀도 제어</li>
+                        <li>Damage-free Processing</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h6 className="font-semibold text-gray-800 mb-2">AI/ML 적용</h6>
+                      <ul className="list-disc list-inside space-y-1 text-gray-700">
+                        <li>Real-time Process Control</li>
+                        <li>Predictive Maintenance</li>
+                        <li>Recipe Optimization</li>
+                        <li>Virtual Metrology</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 p-6 rounded-lg border-l-4 border-yellow-400">
+              <h4 className="text-lg font-semibold text-yellow-800 mb-4">🤔 생각해 보기</h4>
+              <div className="space-y-4 text-gray-700">
+                <div className="bg-white p-4 rounded-lg">
+                  <p><strong>장비 기술 관련:</strong></p>
+                  <p><strong>Q1:</strong> 왜 Deep Si 식각에는 ICP를, Metal 식각에는 CCP를 주로 사용할까요?</p>
+                  <p><strong>Q2:</strong> ICP에서 플라즈마 밀도와 바이어스 전압을 독립적으로 제어할 수 있는 장점은 무엇일까요?</p>
+                </div>
+
+                <div className="bg-white p-4 rounded-lg">
+                  <p><strong>산업 동향 관련:</strong></p>
+                  <p><strong>Q3:</strong> 3nm 이하 공정에서 ALE(Atomic Layer Etching)가 필요한 이유는 무엇일까요?</p>
+                  <p><strong>Q4:</strong> PFC 가스 규제가 강화되면서 식각 공정에 어떤 변화가 필요할까요?</p>
+                </div>
+
+                <div className="bg-white p-4 rounded-lg">
+                  <p><strong>실험 관련:</strong></p>
+                  <p><strong>Q5:</strong> 같은 Si 식각이라도 Logic 소자와 Memory 소자에서 요구사항이 다른 이유는?</p>
+                  <p><strong>Q6:</strong> AI/ML을 식각 공정에 적용한다면 어떤 부분에서 가장 효과적일까요?</p>
+                </div>
+              </div>
+            </div>
           </div>
         );
 
@@ -1489,12 +1670,12 @@ const EtchSimulator = () => {
     <div className="flex-1 flex flex-col min-h-screen bg-gray-50">
       {/* 탭 네비게이션 */}
       <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="flex space-x-1 p-1 overflow-x-auto">
+        <div className="flex space-x-1 p-1">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all whitespace-nowrap ${
+              className={`flex items-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all ${
                 activeTab === tab.id
                   ? 'bg-blue-100 text-blue-800 shadow-sm'
                   : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50'
