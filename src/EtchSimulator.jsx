@@ -54,6 +54,41 @@ const EtchSimulator = () => {
   const [analysisGasRatio, setAnalysisGasRatio] = useState(50);
   const [showAnalysisResult, setShowAnalysisResult] = useState(false);
 
+  // Overview 탭 애니메이션 상태들
+  const [isAnimationPlaying, setIsAnimationPlaying] = useState(false);
+  const [activeElementIndex, setActiveElementIndex] = useState(-1);
+  const [typingText, setTypingText] = useState('');
+  const [fullText, setFullText] = useState('');
+
+  // 5대 요소 설명 데이터
+  const elementsData = [
+    {
+      name: '식각률 (Etch Rate)',
+      description: '단위시간당 식각되는 물질의 양을 나타냅니다. 식각률이 높을수록 공정 시간이 단축되지만, 제어가 어려워질 수 있습니다. 일반적으로 E/R = x/t (Å/min) 공식으로 계산합니다.',
+      position: { cx: 200, cy: 80 }
+    },
+    {
+      name: '선택성 (Selectivity)',
+      description: '서로 다른 물질의 식각률 비율입니다. 타겟 물질을 선택적으로 식각하고 마스크나 하부층을 보호하는데 중요합니다. 높은 선택비는 공정 마진을 증가시킵니다.',
+      position: { cx: 310, cy: 140 }
+    },
+    {
+      name: '균일성 (Uniformity)',
+      description: '웨이퍼 전체 영역에서 식각 특성이 얼마나 일관적인지 나타냅니다. 균일성이 좋을수록 수율이 향상되며, 일반적으로 ±3% 이내를 목표로 합니다.',
+      position: { cx: 310, cy: 260 }
+    },
+    {
+      name: '이방도 (Anisotropy)',
+      description: '마스크 패턴의 충실도를 나타내는 지표입니다. 수직 방향 식각이 우세할수록 이방성이 높으며, 미세 패턴 구현에 필수적입니다. A = 1 - (RL/RV) 공식으로 계산합니다.',
+      position: { cx: 90, cy: 260 }
+    },
+    {
+      name: 'Loading Effect',
+      description: '패턴 밀도에 따라 식각 속도가 달라지는 현상입니다. 고밀도 영역에서는 가스 소모가 빨라 식각률이 감소하며, Dummy Pattern 등으로 보상할 수 있습니다.',
+      position: { cx: 90, cy: 140 }
+    }
+  ];
+
   // 탭 정의
   const tabs = [
     { id: 'overview', name: '식각 공정 개요', icon: '📋' },
@@ -244,6 +279,54 @@ const EtchSimulator = () => {
     setShowResults(false);
   };
 
+  // Overview 애니메이션 제어
+  const toggleAnimation = () => {
+    if (isAnimationPlaying) {
+      setIsAnimationPlaying(false);
+      setActiveElementIndex(-1);
+      setTypingText('');
+    } else {
+      setIsAnimationPlaying(true);
+      setActiveElementIndex(0);
+      setFullText(elementsData[0].description);
+      setTypingText('');
+    }
+  };
+
+  // 애니메이션 자동 진행
+  useEffect(() => {
+    if (!isAnimationPlaying || activeElementIndex === -1) return;
+
+    const timer = setTimeout(() => {
+      const nextIndex = (activeElementIndex + 1) % elementsData.length;
+      setActiveElementIndex(nextIndex);
+      setFullText(elementsData[nextIndex].description);
+      setTypingText('');
+    }, 5000); // 5초마다 다음 요소로
+
+    return () => clearTimeout(timer);
+  }, [isAnimationPlaying, activeElementIndex, elementsData]);
+
+  // 타이핑 효과
+  useEffect(() => {
+    if (!isAnimationPlaying || activeElementIndex === -1) return;
+
+    let currentIndex = 0;
+    const text = fullText;
+    setTypingText('');
+
+    const typingInterval = setInterval(() => {
+      if (currentIndex < text.length) {
+        setTypingText(text.substring(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+      }
+    }, 30); // 30ms마다 한 글자씩
+
+    return () => clearInterval(typingInterval);
+  }, [fullText, isAnimationPlaying, activeElementIndex]);
+
   // 가스 조합 프리셋
   const gasPresets = {
     'Si': { Cl2: 30, HBr: 15, CF4: 0, CHF3: 0, O2: 0, Ar: 90 },
@@ -267,56 +350,154 @@ const EtchSimulator = () => {
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h4 className="text-lg font-semibold mb-4 text-center">식각 공정 관리 5대 핵심 요소</h4>
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-semibold">식각 공정 관리 5대 핵심 요소</h4>
+                <button
+                  onClick={toggleAnimation}
+                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
+                    isAnimationPlaying
+                      ? 'bg-red-500 hover:bg-red-600 text-white'
+                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                  }`}
+                >
+                  {isAnimationPlaying ? '⏸ 정지' : '▶ 재생'}
+                </button>
+              </div>
 
-              {/* 중앙의 순환 다이어그램 */}
-              <div className="flex justify-center mb-6">
-                <svg width="400" height="400" viewBox="0 0 400 400">
-                  {/* 중앙 원 */}
-                  <circle cx="200" cy="200" r="50" fill="#e0f2fe" stroke="#0284c7" strokeWidth="3"/>
-                  <text x="200" y="195" textAnchor="middle" className="text-sm font-bold" fill="#0284c7">식각</text>
-                  <text x="200" y="210" textAnchor="middle" className="text-sm font-bold" fill="#0284c7">공정</text>
+              {/* 다이어그램과 설명 영역 */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 중앙의 순환 다이어그램 */}
+                <div className="flex justify-center items-center">
+                  <svg width="400" height="400" viewBox="0 0 400 400">
+                    {/* 중앙 원 */}
+                    <circle cx="200" cy="200" r="50" fill="#e0f2fe" stroke="#0284c7" strokeWidth="3"/>
+                    <text x="200" y="195" textAnchor="middle" className="text-sm font-bold" fill="#0284c7">식각</text>
+                    <text x="200" y="210" textAnchor="middle" className="text-sm font-bold" fill="#0284c7">공정</text>
 
-                  {/* 5개 요소 원들 */}
-                  <g>
-                    {/* 1. 식각률 (12시) */}
-                    <circle cx="200" cy="80" r="40" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2"/>
-                    <text x="200" y="75" textAnchor="middle" className="text-xs font-semibold">Etch Rate</text>
-                    <text x="200" y="88" textAnchor="middle" className="text-xs">식각률</text>
-                    <line x1="200" y1="150" x2="200" y2="120" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                    {/* 5개 요소 원들 - 애니메이션 적용 */}
+                    <g>
+                      {/* 1. 식각률 (12시) */}
+                      <g transform={`translate(200, 80)`}>
+                        <circle
+                          cx="0" cy="0" r="40"
+                          fill="#fef3c7"
+                          stroke="#f59e0b"
+                          strokeWidth={activeElementIndex === 0 ? "4" : "2"}
+                          style={{
+                            transform: activeElementIndex === 0 ? 'scale(1.2)' : 'scale(1)',
+                            transformOrigin: 'center',
+                            transition: 'all 0.3s ease-in-out'
+                          }}
+                        />
+                        <text x="0" y="-5" textAnchor="middle" className="text-xs font-semibold">Etch Rate</text>
+                        <text x="0" y="8" textAnchor="middle" className="text-xs">식각률</text>
+                      </g>
+                      <line x1="200" y1="150" x2="200" y2="120" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
-                    {/* 2. 선택성 (2시) */}
-                    <circle cx="310" cy="140" r="40" fill="#dcfce7" stroke="#22c55e" strokeWidth="2"/>
-                    <text x="310" y="135" textAnchor="middle" className="text-xs font-semibold">Selectivity</text>
-                    <text x="310" y="148" textAnchor="middle" className="text-xs">선택성</text>
-                    <line x1="245" y1="165" x2="275" y2="155" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                      {/* 2. 선택성 (2시) */}
+                      <g transform={`translate(310, 140)`}>
+                        <circle
+                          cx="0" cy="0" r="40"
+                          fill="#dcfce7"
+                          stroke="#22c55e"
+                          strokeWidth={activeElementIndex === 1 ? "4" : "2"}
+                          style={{
+                            transform: activeElementIndex === 1 ? 'scale(1.2)' : 'scale(1)',
+                            transformOrigin: 'center',
+                            transition: 'all 0.3s ease-in-out'
+                          }}
+                        />
+                        <text x="0" y="-5" textAnchor="middle" className="text-xs font-semibold">Selectivity</text>
+                        <text x="0" y="8" textAnchor="middle" className="text-xs">선택성</text>
+                      </g>
+                      <line x1="245" y1="165" x2="275" y2="155" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
-                    {/* 3. 균일성 (4시) */}
-                    <circle cx="310" cy="260" r="40" fill="#e0e7ff" stroke="#6366f1" strokeWidth="2"/>
-                    <text x="310" y="255" textAnchor="middle" className="text-xs font-semibold">Uniformity</text>
-                    <text x="310" y="268" textAnchor="middle" className="text-xs">균일성</text>
-                    <line x1="245" y1="235" x2="275" y2="245" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                      {/* 3. 균일성 (4시) */}
+                      <g transform={`translate(310, 260)`}>
+                        <circle
+                          cx="0" cy="0" r="40"
+                          fill="#e0e7ff"
+                          stroke="#6366f1"
+                          strokeWidth={activeElementIndex === 2 ? "4" : "2"}
+                          style={{
+                            transform: activeElementIndex === 2 ? 'scale(1.2)' : 'scale(1)',
+                            transformOrigin: 'center',
+                            transition: 'all 0.3s ease-in-out'
+                          }}
+                        />
+                        <text x="0" y="-5" textAnchor="middle" className="text-xs font-semibold">Uniformity</text>
+                        <text x="0" y="8" textAnchor="middle" className="text-xs">균일성</text>
+                      </g>
+                      <line x1="245" y1="235" x2="275" y2="245" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
-                    {/* 4. 이방도 (8시) */}
-                    <circle cx="90" cy="260" r="40" fill="#fce7f3" stroke="#ec4899" strokeWidth="2"/>
-                    <text x="90" y="255" textAnchor="middle" className="text-xs font-semibold">Anisotropy</text>
-                    <text x="90" y="268" textAnchor="middle" className="text-xs">이방도</text>
-                    <line x1="155" y1="235" x2="125" y2="245" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                      {/* 4. 이방도 (8시) */}
+                      <g transform={`translate(90, 260)`}>
+                        <circle
+                          cx="0" cy="0" r="40"
+                          fill="#fce7f3"
+                          stroke="#ec4899"
+                          strokeWidth={activeElementIndex === 3 ? "4" : "2"}
+                          style={{
+                            transform: activeElementIndex === 3 ? 'scale(1.2)' : 'scale(1)',
+                            transformOrigin: 'center',
+                            transition: 'all 0.3s ease-in-out'
+                          }}
+                        />
+                        <text x="0" y="-5" textAnchor="middle" className="text-xs font-semibold">Anisotropy</text>
+                        <text x="0" y="8" textAnchor="middle" className="text-xs">이방도</text>
+                      </g>
+                      <line x1="155" y1="235" x2="125" y2="245" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
-                    {/* 5. Loading Effect (10시) */}
-                    <circle cx="90" cy="140" r="40" fill="#f3e8ff" stroke="#a855f7" strokeWidth="2"/>
-                    <text x="90" y="135" textAnchor="middle" className="text-xs font-semibold">Loading</text>
-                    <text x="90" y="148" textAnchor="middle" className="text-xs">로딩효과</text>
-                    <line x1="155" y1="165" x2="125" y2="155" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                  </g>
+                      {/* 5. Loading Effect (10시) */}
+                      <g transform={`translate(90, 140)`}>
+                        <circle
+                          cx="0" cy="0" r="40"
+                          fill="#f3e8ff"
+                          stroke="#a855f7"
+                          strokeWidth={activeElementIndex === 4 ? "4" : "2"}
+                          style={{
+                            transform: activeElementIndex === 4 ? 'scale(1.2)' : 'scale(1)',
+                            transformOrigin: 'center',
+                            transition: 'all 0.3s ease-in-out'
+                          }}
+                        />
+                        <text x="0" y="-5" textAnchor="middle" className="text-xs font-semibold">Loading</text>
+                        <text x="0" y="8" textAnchor="middle" className="text-xs">로딩효과</text>
+                      </g>
+                      <line x1="155" y1="165" x2="125" y2="155" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                    </g>
 
-                  {/* 화살표 마커 정의 */}
-                  <defs>
-                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
-                    </marker>
-                  </defs>
-                </svg>
+                    {/* 화살표 마커 정의 */}
+                    <defs>
+                      <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+                      </marker>
+                    </defs>
+                  </svg>
+                </div>
+
+                {/* 설명 영역 */}
+                <div className="flex items-center">
+                  {activeElementIndex >= 0 ? (
+                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-lg border-2 border-indigo-200 shadow-lg min-h-[300px]">
+                      <h5 className="text-xl font-bold text-indigo-900 mb-4">
+                        {elementsData[activeElementIndex].name}
+                      </h5>
+                      <p className="text-gray-700 leading-relaxed text-lg">
+                        {typingText}
+                        <span className="inline-block w-0.5 h-5 bg-indigo-600 ml-1 animate-pulse"></span>
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 p-6 rounded-lg border-2 border-gray-200 min-h-[300px] flex items-center justify-center">
+                      <p className="text-gray-500 text-center">
+                        ▶ 재생 버튼을 눌러<br />
+                        5대 핵심 요소를<br />
+                        자세히 알아보세요
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
