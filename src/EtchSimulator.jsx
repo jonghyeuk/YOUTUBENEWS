@@ -64,27 +64,27 @@ const EtchSimulator = () => {
   const elementsData = [
     {
       name: '식각률 (Etch Rate)',
-      description: '단위시간당 식각되는 물질의 양을 나타냅니다. 식각률이 높을수록 공정 시간이 단축되지만, 제어가 어려워질 수 있습니다. 일반적으로 E/R = x/t (Å/min) 공식으로 계산합니다.',
+      description: '단위 시간당 식각되는 물질의 두께를 나타내는 핵심 지표입니다. 식각률은 E/R = 식각 깊이(Å) / 식각 시간(min) 공식으로 계산되며, 일반적으로 Å/min 또는 nm/min 단위를 사용합니다. 높은 식각률은 공정 시간을 단축시켜 생산성을 향상시키지만, 너무 빠른 식각은 정밀한 제어가 어렵고 플라즈마 데미지를 유발할 수 있습니다. RF 파워, 압력, 가스 유량, 온도 등이 주요 영향 인자이며, 물질마다 최적의 식각률이 다릅니다. 예를 들어, ICP 장비로 Si를 식각할 경우 100-300 nm/min, SiO₂는 50-150 nm/min 정도의 식각률을 나타냅니다.',
       position: { cx: 200, cy: 80 }
     },
     {
       name: '선택성 (Selectivity)',
-      description: '서로 다른 물질의 식각률 비율입니다. 타겟 물질을 선택적으로 식각하고 마스크나 하부층을 보호하는데 중요합니다. 높은 선택비는 공정 마진을 증가시킵니다.',
+      description: '타겟 물질과 다른 물질(마스크, 하부층) 사이의 식각률 비율을 나타냅니다. Selectivity = 타겟 물질 식각률 / 기준 물질 식각률로 계산되며, 높은 선택비는 마스크나 하부층을 보호하면서 타겟만 선택적으로 식각할 수 있게 합니다. 예를 들어 Si:SiO₂ = 20:1의 선택비는 Si가 SiO₂보다 20배 빠르게 식각됨을 의미합니다. 선택비는 공정 마진을 증가시키고 End-point 검출에 여유를 주며, 측벽 손상을 최소화합니다. HBr 첨가(Si 식각 시), 폴리머 형성, 저온 공정 등으로 선택비를 향상시킬 수 있으며, 실제 공정에서는 10:1 이상의 선택비를 목표로 합니다.',
       position: { cx: 310, cy: 140 }
     },
     {
       name: '균일성 (Uniformity)',
-      description: '웨이퍼 전체 영역에서 식각 특성이 얼마나 일관적인지 나타냅니다. 균일성이 좋을수록 수율이 향상되며, 일반적으로 ±3% 이내를 목표로 합니다.',
+      description: '웨이퍼 전체 영역에서 식각 깊이와 프로파일이 얼마나 일관적인지를 나타내는 지표입니다. Uniformity(%) = ±[(Max-Min)/(2×Average)]×100 공식으로 계산하며, ±3% 이내를 목표로 합니다(선단 공정에서는 ±2% 이내). 불균일성은 플라즈마 밀도 분포, 가스 흐름, 웨이퍼 온도 분포, RF 전력 분포 등이 원인이 됩니다. 균일성이 좋지 않으면 웨이퍼의 어떤 부분은 과도하게 식각되고(over-etch) 다른 부분은 부족하게 식각되어(under-etch) 수율이 크게 감소합니다. 압력 최적화, 다중 가스 주입구, ESC 온도 제어, 웨이퍼 회전 등으로 균일성을 개선할 수 있습니다.',
       position: { cx: 310, cy: 260 }
     },
     {
       name: '이방도 (Anisotropy)',
-      description: '마스크 패턴의 충실도를 나타내는 지표입니다. 수직 방향 식각이 우세할수록 이방성이 높으며, 미세 패턴 구현에 필수적입니다. A = 1 - (RL/RV) 공식으로 계산합니다.',
+      description: '식각이 수직 방향으로 진행되는 정도를 나타내며, 마스크 패턴을 얼마나 충실하게 전사하는지의 지표입니다. Anisotropy = 1 - (수평 식각률/수직 식각률)로 계산되며, A=1은 완전 이방성(수직 식각), A=0은 완전 등방성(모든 방향 균일)을 의미합니다. 미세 패턴 형성을 위해서는 높은 이방성이 필수적이며, 특히 Gate, Contact/Via, MEMS, TSV 등에서 중요합니다. 저압력(10-50 mTorr), 고 바이어스 전압, 방향성 이온 충격을 통해 이방성을 높일 수 있습니다. 반대로 고압력, 저 바이어스에서는 화학적 반응이 우세하여 등방성 식각이 일어나며, Spacer 형성이나 Recess 식각에 활용됩니다.',
       position: { cx: 90, cy: 260 }
     },
     {
-      name: 'Loading Effect',
-      description: '패턴 밀도에 따라 식각 속도가 달라지는 현상입니다. 고밀도 영역에서는 가스 소모가 빨라 식각률이 감소하며, Dummy Pattern 등으로 보상할 수 있습니다.',
+      name: 'Loading Effect (로딩 효과)',
+      description: '패턴 밀도(open area ratio)에 따라 식각 속도가 달라지는 현상으로, 대면적 소자에서 심각한 문제가 됩니다. 식각되는 면적이 클수록 반응 가스가 빠르게 소모되고 부산물이 축적되어 식각률이 감소합니다. Macro Loading(웨이퍼 간/내 대면적 차이), Micro Loading(미세 패턴 간 밀도 차이), ARDE(Aspect Ratio Dependent Etch) 효과로 구분됩니다. 예를 들어 DRAM의 Cell Array(고밀도)와 Periphery(저밀도) 사이에 20-30%의 식각률 차이가 발생할 수 있습니다. 가스 유량 증가, Dummy Pattern 삽입, 다단계 식각(main+soft), OPC 적용 등으로 보상할 수 있으며, 설계 단계부터 패턴 밀도를 균일화하는 것이 중요합니다.',
       position: { cx: 90, cy: 140 }
     }
   ];
@@ -279,33 +279,34 @@ const EtchSimulator = () => {
     setShowResults(false);
   };
 
-  // Overview 애니메이션 제어
-  const toggleAnimation = () => {
-    if (isAnimationPlaying) {
-      setIsAnimationPlaying(false);
-      setActiveElementIndex(-1);
+  // Overview 애니메이션 제어 - 다음 요소로 진행
+  const proceedToNextElement = () => {
+    if (activeElementIndex === -1) {
+      // 첫 시작
+      setIsAnimationPlaying(true);
+      setActiveElementIndex(0);
+      setFullText(elementsData[0].description);
+      setTypingText('');
+    } else if (activeElementIndex < elementsData.length - 1) {
+      // 다음 요소로
+      const nextIndex = activeElementIndex + 1;
+      setActiveElementIndex(nextIndex);
+      setFullText(elementsData[nextIndex].description);
       setTypingText('');
     } else {
-      setIsAnimationPlaying(true);
+      // 마지막 요소 완료 - 처음으로
       setActiveElementIndex(0);
       setFullText(elementsData[0].description);
       setTypingText('');
     }
   };
 
-  // 애니메이션 자동 진행
-  useEffect(() => {
-    if (!isAnimationPlaying || activeElementIndex === -1) return;
-
-    const timer = setTimeout(() => {
-      const nextIndex = (activeElementIndex + 1) % elementsData.length;
-      setActiveElementIndex(nextIndex);
-      setFullText(elementsData[nextIndex].description);
-      setTypingText('');
-    }, 5000); // 5초마다 다음 요소로
-
-    return () => clearTimeout(timer);
-  }, [isAnimationPlaying, activeElementIndex, elementsData]);
+  // 애니메이션 정지
+  const stopAnimation = () => {
+    setIsAnimationPlaying(false);
+    setActiveElementIndex(-1);
+    setTypingText('');
+  };
 
   // 타이핑 효과
   useEffect(() => {
@@ -352,16 +353,23 @@ const EtchSimulator = () => {
             <div className="bg-white p-6 rounded-lg shadow-md">
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-lg font-semibold">식각 공정 관리 5대 핵심 요소</h4>
-                <button
-                  onClick={toggleAnimation}
-                  className={`px-6 py-2 rounded-lg font-semibold transition-all ${
-                    isAnimationPlaying
-                      ? 'bg-red-500 hover:bg-red-600 text-white'
-                      : 'bg-blue-500 hover:bg-blue-600 text-white'
-                  }`}
-                >
-                  {isAnimationPlaying ? '⏸ 정지' : '▶ 재생'}
-                </button>
+                <div className="flex gap-2">
+                  {isAnimationPlaying && (
+                    <button
+                      onClick={stopAnimation}
+                      className="px-6 py-2 rounded-lg font-semibold transition-all bg-red-500 hover:bg-red-600 text-white"
+                    >
+                      ⏸ 정지
+                    </button>
+                  )}
+                  <button
+                    onClick={proceedToNextElement}
+                    className="px-6 py-2 rounded-lg font-semibold transition-all bg-blue-500 hover:bg-blue-600 text-white"
+                  >
+                    {activeElementIndex === -1 ? '▶ 재생' :
+                     activeElementIndex === elementsData.length - 1 ? '🔄 처음부터' : '▶ 계속 재생'}
+                  </button>
+                </div>
               </div>
 
               {/* 다이어그램과 설명 영역 */}
@@ -377,92 +385,97 @@ const EtchSimulator = () => {
                     {/* 5개 요소 원들 - 애니메이션 적용 */}
                     <g>
                       {/* 1. 식각률 (12시) */}
-                      <g transform={`translate(200, 80)`}>
-                        <circle
-                          cx="0" cy="0" r="40"
-                          fill="#fef3c7"
-                          stroke="#f59e0b"
-                          strokeWidth={activeElementIndex === 0 ? "4" : "2"}
-                          style={{
-                            transform: activeElementIndex === 0 ? 'scale(1.2)' : 'scale(1)',
-                            transformOrigin: 'center',
-                            transition: 'all 0.3s ease-in-out'
-                          }}
-                        />
-                        <text x="0" y="-5" textAnchor="middle" className="text-xs font-semibold">Etch Rate</text>
-                        <text x="0" y="8" textAnchor="middle" className="text-xs">식각률</text>
+                      <g>
+                        {/* 외곽 강조 링 (활성화 시) */}
+                        {activeElementIndex === 0 && (
+                          <>
+                            <circle cx="200" cy="80" r="48" fill="none" stroke="#f59e0b" strokeWidth="3" opacity="0.6">
+                              <animate attributeName="r" values="48;52;48" dur="1.5s" repeatCount="indefinite"/>
+                              <animate attributeName="opacity" values="0.6;0.3;0.6" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle cx="200" cy="80" r="45" fill="none" stroke="#f59e0b" strokeWidth="2" opacity="0.4"/>
+                          </>
+                        )}
+                        {/* 기본 원 */}
+                        <circle cx="200" cy="80" r="40" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2"/>
+                        <text x="200" y="75" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 0 ? "bold" : "600"}>Etch Rate</text>
+                        <text x="200" y="88" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 0 ? "bold" : "normal"}>식각률</text>
                       </g>
                       <line x1="200" y1="150" x2="200" y2="120" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
                       {/* 2. 선택성 (2시) */}
-                      <g transform={`translate(310, 140)`}>
-                        <circle
-                          cx="0" cy="0" r="40"
-                          fill="#dcfce7"
-                          stroke="#22c55e"
-                          strokeWidth={activeElementIndex === 1 ? "4" : "2"}
-                          style={{
-                            transform: activeElementIndex === 1 ? 'scale(1.2)' : 'scale(1)',
-                            transformOrigin: 'center',
-                            transition: 'all 0.3s ease-in-out'
-                          }}
-                        />
-                        <text x="0" y="-5" textAnchor="middle" className="text-xs font-semibold">Selectivity</text>
-                        <text x="0" y="8" textAnchor="middle" className="text-xs">선택성</text>
+                      <g>
+                        {/* 외곽 강조 링 (활성화 시) */}
+                        {activeElementIndex === 1 && (
+                          <>
+                            <circle cx="310" cy="140" r="48" fill="none" stroke="#22c55e" strokeWidth="3" opacity="0.6">
+                              <animate attributeName="r" values="48;52;48" dur="1.5s" repeatCount="indefinite"/>
+                              <animate attributeName="opacity" values="0.6;0.3;0.6" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle cx="310" cy="140" r="45" fill="none" stroke="#22c55e" strokeWidth="2" opacity="0.4"/>
+                          </>
+                        )}
+                        {/* 기본 원 */}
+                        <circle cx="310" cy="140" r="40" fill="#dcfce7" stroke="#22c55e" strokeWidth="2"/>
+                        <text x="310" y="135" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 1 ? "bold" : "600"}>Selectivity</text>
+                        <text x="310" y="148" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 1 ? "bold" : "normal"}>선택성</text>
                       </g>
                       <line x1="245" y1="165" x2="275" y2="155" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
                       {/* 3. 균일성 (4시) */}
-                      <g transform={`translate(310, 260)`}>
-                        <circle
-                          cx="0" cy="0" r="40"
-                          fill="#e0e7ff"
-                          stroke="#6366f1"
-                          strokeWidth={activeElementIndex === 2 ? "4" : "2"}
-                          style={{
-                            transform: activeElementIndex === 2 ? 'scale(1.2)' : 'scale(1)',
-                            transformOrigin: 'center',
-                            transition: 'all 0.3s ease-in-out'
-                          }}
-                        />
-                        <text x="0" y="-5" textAnchor="middle" className="text-xs font-semibold">Uniformity</text>
-                        <text x="0" y="8" textAnchor="middle" className="text-xs">균일성</text>
+                      <g>
+                        {/* 외곽 강조 링 (활성화 시) */}
+                        {activeElementIndex === 2 && (
+                          <>
+                            <circle cx="310" cy="260" r="48" fill="none" stroke="#6366f1" strokeWidth="3" opacity="0.6">
+                              <animate attributeName="r" values="48;52;48" dur="1.5s" repeatCount="indefinite"/>
+                              <animate attributeName="opacity" values="0.6;0.3;0.6" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle cx="310" cy="260" r="45" fill="none" stroke="#6366f1" strokeWidth="2" opacity="0.4"/>
+                          </>
+                        )}
+                        {/* 기본 원 */}
+                        <circle cx="310" cy="260" r="40" fill="#e0e7ff" stroke="#6366f1" strokeWidth="2"/>
+                        <text x="310" y="255" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 2 ? "bold" : "600"}>Uniformity</text>
+                        <text x="310" y="268" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 2 ? "bold" : "normal"}>균일성</text>
                       </g>
                       <line x1="245" y1="235" x2="275" y2="245" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
                       {/* 4. 이방도 (8시) */}
-                      <g transform={`translate(90, 260)`}>
-                        <circle
-                          cx="0" cy="0" r="40"
-                          fill="#fce7f3"
-                          stroke="#ec4899"
-                          strokeWidth={activeElementIndex === 3 ? "4" : "2"}
-                          style={{
-                            transform: activeElementIndex === 3 ? 'scale(1.2)' : 'scale(1)',
-                            transformOrigin: 'center',
-                            transition: 'all 0.3s ease-in-out'
-                          }}
-                        />
-                        <text x="0" y="-5" textAnchor="middle" className="text-xs font-semibold">Anisotropy</text>
-                        <text x="0" y="8" textAnchor="middle" className="text-xs">이방도</text>
+                      <g>
+                        {/* 외곽 강조 링 (활성화 시) */}
+                        {activeElementIndex === 3 && (
+                          <>
+                            <circle cx="90" cy="260" r="48" fill="none" stroke="#ec4899" strokeWidth="3" opacity="0.6">
+                              <animate attributeName="r" values="48;52;48" dur="1.5s" repeatCount="indefinite"/>
+                              <animate attributeName="opacity" values="0.6;0.3;0.6" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle cx="90" cy="260" r="45" fill="none" stroke="#ec4899" strokeWidth="2" opacity="0.4"/>
+                          </>
+                        )}
+                        {/* 기본 원 */}
+                        <circle cx="90" cy="260" r="40" fill="#fce7f3" stroke="#ec4899" strokeWidth="2"/>
+                        <text x="90" y="255" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 3 ? "bold" : "600"}>Anisotropy</text>
+                        <text x="90" y="268" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 3 ? "bold" : "normal"}>이방도</text>
                       </g>
                       <line x1="155" y1="235" x2="125" y2="245" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
                       {/* 5. Loading Effect (10시) */}
-                      <g transform={`translate(90, 140)`}>
-                        <circle
-                          cx="0" cy="0" r="40"
-                          fill="#f3e8ff"
-                          stroke="#a855f7"
-                          strokeWidth={activeElementIndex === 4 ? "4" : "2"}
-                          style={{
-                            transform: activeElementIndex === 4 ? 'scale(1.2)' : 'scale(1)',
-                            transformOrigin: 'center',
-                            transition: 'all 0.3s ease-in-out'
-                          }}
-                        />
-                        <text x="0" y="-5" textAnchor="middle" className="text-xs font-semibold">Loading</text>
-                        <text x="0" y="8" textAnchor="middle" className="text-xs">로딩효과</text>
+                      <g>
+                        {/* 외곽 강조 링 (활성화 시) */}
+                        {activeElementIndex === 4 && (
+                          <>
+                            <circle cx="90" cy="140" r="48" fill="none" stroke="#a855f7" strokeWidth="3" opacity="0.6">
+                              <animate attributeName="r" values="48;52;48" dur="1.5s" repeatCount="indefinite"/>
+                              <animate attributeName="opacity" values="0.6;0.3;0.6" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle cx="90" cy="140" r="45" fill="none" stroke="#a855f7" strokeWidth="2" opacity="0.4"/>
+                          </>
+                        )}
+                        {/* 기본 원 */}
+                        <circle cx="90" cy="140" r="40" fill="#f3e8ff" stroke="#a855f7" strokeWidth="2"/>
+                        <text x="90" y="135" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 4 ? "bold" : "600"}>Loading</text>
+                        <text x="90" y="148" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 4 ? "bold" : "normal"}>로딩효과</text>
                       </g>
                       <line x1="155" y1="165" x2="125" y2="155" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
                     </g>
