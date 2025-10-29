@@ -614,6 +614,44 @@ const EtchSimulator = () => {
                 </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">식각률 개념도</h5>
+                  <div className="flex justify-center mb-4">
+                    <svg width="300" height="200" viewBox="0 0 300 200">
+                      {/* 기판 (맨 아래 패턴) */}
+                      <defs>
+                        <pattern id="substrate_etch_rate" patternUnits="userSpaceOnUse" width="8" height="8">
+                          <rect width="8" height="8" fill="white"/>
+                          <path d="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" stroke="#000" strokeWidth="0.5"/>
+                        </pattern>
+                      </defs>
+                      <rect x="0" y="160" width="300" height="40" fill="url(#substrate_etch_rate)"/>
+
+                      {/* 식각 대상물질 (초록색) - 전체 */}
+                      <rect x="0" y="80" width="300" height="80" fill="#4CAF50"/>
+
+                      {/* 마스크 (보라색) */}
+                      <rect x="0" y="60" width="80" height="20" fill="#8E44AD"/>
+                      <rect x="220" y="60" width="80" height="20" fill="#8E44AD"/>
+
+                      {/* 식각된 영역 (하얀색) */}
+                      <rect x="80" y="60" width="140" height="60" fill="white"/>
+
+                      {/* 세로 양방향 화살표와 x 표시 */}
+                      <g>
+                        <line x1="250" y1="85" x2="250" y2="115" stroke="black" strokeWidth="1.5"/>
+                        <polygon points="250,85 247,90 253,90" fill="black"/>
+                        <polygon points="250,115 247,110 253,110" fill="black"/>
+                        <text x="255" y="105" fontSize="16" fill="black" fontWeight="bold">x</text>
+                      </g>
+
+                      {/* Etch Time = t 라벨 */}
+                      <text x="150" y="30" fontSize="14" textAnchor="middle" fontWeight="bold" fill="#000">Etch Time = t</text>
+                    </svg>
+                  </div>
+                  <p className="text-sm text-gray-600 text-center">식각 시간 t 동안 깊이 x만큼 식각됨 → E/R = x/t</p>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
                   <h5 className="font-semibold text-gray-800 mb-3">물질별 일반적인 식각률 (ICP 기준)</h5>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center text-sm">
                     <div className="bg-white p-3 rounded shadow-sm">
@@ -720,6 +758,86 @@ const EtchSimulator = () => {
                     </table>
                   </div>
                 </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">선택성 개념도</h5>
+                  <div className="flex items-center justify-center gap-4 mb-4">
+                    {/* Before etching */}
+                    <svg width="180" height="200" viewBox="0 0 180 200">
+                      <defs>
+                        <pattern id="substrate_selectivity" patternUnits="userSpaceOnUse" width="8" height="8">
+                          <rect width="8" height="8" fill="white"/>
+                          <path d="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" stroke="#000" strokeWidth="0.5"/>
+                        </pattern>
+                      </defs>
+                      <rect x="0" y="150" width="180" height="50" fill="url(#substrate_selectivity)"/>
+                      <rect x="0" y="90" width="180" height="60" fill="#4CAF50"/>
+                      <rect x="0" y="50" width="60" height="40" fill="#8E44AD"/>
+                      <rect x="120" y="50" width="60" height="40" fill="#8E44AD"/>
+                      <rect x="60" y="70" width="60" height="80" fill="white"/>
+
+                      {/* Labels */}
+                      <text x="30" y="70" fontSize="14" textAnchor="middle" fontWeight="bold" fill="white">A</text>
+                      <text x="90" y="130" fontSize="14" textAnchor="middle" fontWeight="bold" fill="#333">B</text>
+
+                      {/* Title */}
+                      <text x="90" y="25" fontSize="16" textAnchor="middle" fontWeight="bold" fill="#000">Etching 전</text>
+                    </svg>
+
+                    {/* Arrow */}
+                    <div className="flex flex-col items-center">
+                      <svg width="60" height="40" viewBox="0 0 60 40">
+                        <line x1="5" y1="20" x2="50" y2="20" stroke="#333" strokeWidth="3"/>
+                        <polygon points="50,20 43,15 43,25" fill="#333"/>
+                      </svg>
+                      <span className="text-xs font-semibold text-gray-600">식각 진행</span>
+                    </div>
+
+                    {/* After etching */}
+                    <svg width="180" height="200" viewBox="0 0 180 200">
+                      <defs>
+                        <pattern id="substrate_selectivity2" patternUnits="userSpaceOnUse" width="8" height="8">
+                          <rect width="8" height="8" fill="white"/>
+                          <path d="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" stroke="#000" strokeWidth="0.5"/>
+                        </pattern>
+                      </defs>
+                      <rect x="0" y="150" width="180" height="50" fill="url(#substrate_selectivity2)"/>
+                      <rect x="0" y="90" width="180" height="60" fill="#4CAF50"/>
+                      <rect x="0" y="60" width="60" height="30" fill="#8E44AD"/>
+                      <rect x="120" y="60" width="60" height="30" fill="#8E44AD"/>
+                      <rect x="60" y="70" width="60" height="80" fill="white"/>
+
+                      {/* Labels with measurements */}
+                      <text x="30" y="75" fontSize="14" textAnchor="middle" fontWeight="bold" fill="white">A'</text>
+                      <text x="90" y="130" fontSize="14" textAnchor="middle" fontWeight="bold" fill="#333">B'</text>
+
+                      {/* Dimension arrows */}
+                      <g>
+                        <line x1="10" y1="60" x2="10" y2="90" stroke="#E91E63" strokeWidth="2"/>
+                        <polygon points="10,60 8,65 12,65" fill="#E91E63"/>
+                        <polygon points="10,90 8,85 12,85" fill="#E91E63"/>
+                        <text x="15" y="78" fontSize="12" fill="#E91E63" fontWeight="bold">ΔA</text>
+                      </g>
+
+                      <g>
+                        <line x1="170" y1="90" x2="170" y2="150" stroke="#2196F3" strokeWidth="2"/>
+                        <polygon points="170,90 168,95 172,95" fill="#2196F3"/>
+                        <polygon points="170,150 168,145 172,145" fill="#2196F3"/>
+                        <text x="155" y="123" fontSize="12" fill="#2196F3" fontWeight="bold">ΔB</text>
+                      </g>
+
+                      {/* Title */}
+                      <text x="90" y="25" fontSize="16" textAnchor="middle" fontWeight="bold" fill="#000">Etching 후</text>
+                    </svg>
+                  </div>
+                  <div className="text-sm text-gray-700 space-y-2">
+                    <p className="text-center font-semibold">선택비 = ΔB / ΔA</p>
+                    <p className="text-center text-xs text-gray-600">
+                      A: 마스크(Mask) 물질, B: 타겟 물질<br/>
+                      높은 선택비 → 마스크 손실 ↓, 공정 마진 ↑
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -789,6 +907,72 @@ const EtchSimulator = () => {
                     대신 식각 속도가 감소하고 등방성 식각이 증가하여 프로파일이 나빠질 수 있습니다.
                     따라서 공정 목표에 따라 최적점을 찾아야 합니다.
                   </p>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">균일성 평가 개념도</h5>
+                  <div className="flex justify-center mb-4">
+                    <svg width="400" height="400" viewBox="0 0 400 400">
+                      <defs>
+                        <radialGradient id="wafer_gradient" cx="50%" cy="50%" r="50%">
+                          <stop offset="0%" style={{stopColor: '#4CAF50', stopOpacity: 0.3}} />
+                          <stop offset="50%" style={{stopColor: '#4CAF50', stopOpacity: 0.6}} />
+                          <stop offset="100%" style={{stopColor: '#4CAF50', stopOpacity: 0.9}} />
+                        </radialGradient>
+                      </defs>
+
+                      {/* Wafer circle */}
+                      <circle cx="200" cy="200" r="150" fill="url(#wafer_gradient)" stroke="#2E7D32" strokeWidth="3"/>
+
+                      {/* Measurement points - Center */}
+                      <circle cx="200" cy="200" r="4" fill="#D32F2F"/>
+                      <text x="200" y="190" textAnchor="middle" fontSize="12" fontWeight="bold" fill="#D32F2F">Center</text>
+                      <text x="200" y="225" textAnchor="middle" fontSize="11" fill="#000">100 nm</text>
+
+                      {/* Measurement points - Mid radius (4 points) */}
+                      <circle cx="275" cy="200" r="4" fill="#1976D2"/>
+                      <text x="285" y="205" fontSize="11" fill="#1976D2">98 nm</text>
+
+                      <circle cx="125" cy="200" r="4" fill="#1976D2"/>
+                      <text x="90" y="205" fontSize="11" fill="#1976D2">102 nm</text>
+
+                      <circle cx="200" cy="125" r="4" fill="#1976D2"/>
+                      <text x="200" y="115" textAnchor="middle" fontSize="11" fill="#1976D2">99 nm</text>
+
+                      <circle cx="200" cy="275" r="4" fill="#1976D2"/>
+                      <text x="200" y="295" textAnchor="middle" fontSize="11" fill="#1976D2">101 nm</text>
+
+                      {/* Measurement points - Edge (4 points) */}
+                      <circle cx="306" cy="106" r="4" fill="#F57C00"/>
+                      <text x="315" y="103" fontSize="11" fill="#F57C00">95 nm</text>
+
+                      <circle cx="306" cy="294" r="4" fill="#F57C00"/>
+                      <text x="315" y="297" fontSize="11" fill="#F57C00">97 nm</text>
+
+                      <circle cx="94" cy="106" r="4" fill="#F57C00"/>
+                      <text x="55" y="103" fontSize="11" fill="#F57C00">96 nm</text>
+
+                      <circle cx="94" cy="294" r="4" fill="#F57C00"/>
+                      <text x="55" y="297" fontSize="11" fill="#F57C00">94 nm</text>
+
+                      {/* Center mark */}
+                      <line x1="200" y1="0" x2="200" y2="400" stroke="#999" strokeWidth="0.5" strokeDasharray="5,5"/>
+                      <line x1="0" y1="200" x2="400" y2="200" stroke="#999" strokeWidth="0.5" strokeDasharray="5,5"/>
+
+                      {/* Labels */}
+                      <text x="200" y="380" textAnchor="middle" fontSize="14" fontWeight="bold" fill="#000">Wafer Uniformity Map</text>
+                    </svg>
+                  </div>
+                  <div className="text-sm text-gray-700 space-y-2">
+                    <p className="text-center font-semibold">균일성 계산 예시</p>
+                    <div className="bg-white p-3 rounded">
+                      <p className="text-xs text-gray-600 text-center">
+                        Max = 102 nm, Min = 94 nm, Average = 98.4 nm<br/>
+                        Uniformity = ± [(102 - 94) / (2 × 98.4)] × 100 = <span className="font-bold text-blue-600">±4.07%</span><br/>
+                        <span className="text-red-600">→ 목표(±3%) 초과: 공정 개선 필요</span>
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -888,6 +1072,118 @@ const EtchSimulator = () => {
                       <p className="text-gray-600">등방성</p>
                       <p className="text-xs text-red-600 mt-1">A ~ 0</p>
                     </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">이방도별 식각 프로파일</h5>
+                  <div className="flex justify-center items-end gap-6 mb-4">
+                    {/* Isotropic Profile */}
+                    <div className="text-center">
+                      <svg width="120" height="180" viewBox="0 0 120 180">
+                        <defs>
+                          <pattern id="substrate_iso" patternUnits="userSpaceOnUse" width="6" height="6">
+                            <rect width="6" height="6" fill="white"/>
+                            <path d="M0,6 L6,0 M-1,1 L1,-1 M5,7 L7,5" stroke="#000" strokeWidth="0.3"/>
+                          </pattern>
+                        </defs>
+                        {/* Substrate */}
+                        <rect x="0" y="120" width="120" height="60" fill="url(#substrate_iso)"/>
+                        {/* Target material */}
+                        <rect x="0" y="60" width="120" height="60" fill="#4CAF50"/>
+                        {/* Mask */}
+                        <rect x="0" y="40" width="30" height="20" fill="#8E44AD"/>
+                        <rect x="90" y="40" width="30" height="20" fill="#8E44AD"/>
+                        {/* Etched area - circular profile */}
+                        <ellipse cx="60" cy="60" rx="40" ry="60" fill="white"/>
+
+                        <text x="60" y="25" fontSize="12" textAnchor="middle" fontWeight="bold" fill="#E91E63">Isotropic</text>
+                        <text x="60" y="165" fontSize="10" textAnchor="middle" fill="#666">A = 0</text>
+                      </svg>
+                      <p className="text-xs text-gray-600 mt-2">등방성 식각</p>
+                    </div>
+
+                    {/* Directional Profile (Tapered) */}
+                    <div className="text-center">
+                      <svg width="120" height="180" viewBox="0 0 120 180">
+                        <defs>
+                          <pattern id="substrate_dir" patternUnits="userSpaceOnUse" width="6" height="6">
+                            <rect width="6" height="6" fill="white"/>
+                            <path d="M0,6 L6,0 M-1,1 L1,-1 M5,7 L7,5" stroke="#000" strokeWidth="0.3"/>
+                          </pattern>
+                        </defs>
+                        {/* Substrate */}
+                        <rect x="0" y="120" width="120" height="60" fill="url(#substrate_dir)"/>
+                        {/* Target material */}
+                        <rect x="0" y="60" width="120" height="60" fill="#4CAF50"/>
+                        {/* Mask */}
+                        <rect x="0" y="40" width="30" height="20" fill="#8E44AD"/>
+                        <rect x="90" y="40" width="30" height="20" fill="#8E44AD"/>
+                        {/* Etched area - tapered profile */}
+                        <polygon points="30,60 40,120 80,120 90,60" fill="white"/>
+
+                        <text x="60" y="25" fontSize="12" textAnchor="middle" fontWeight="bold" fill="#FF9800">Directional</text>
+                        <text x="60" y="165" fontSize="10" textAnchor="middle" fill="#666">A = 0.7</text>
+                      </svg>
+                      <p className="text-xs text-gray-600 mt-2">방향성 식각</p>
+                    </div>
+
+                    {/* Anisotropic Profile (Vertical) */}
+                    <div className="text-center">
+                      <svg width="120" height="180" viewBox="0 0 120 180">
+                        <defs>
+                          <pattern id="substrate_aniso" patternUnits="userSpaceOnUse" width="6" height="6">
+                            <rect width="6" height="6" fill="white"/>
+                            <path d="M0,6 L6,0 M-1,1 L1,-1 M5,7 L7,5" stroke="#000" strokeWidth="0.3"/>
+                          </pattern>
+                        </defs>
+                        {/* Substrate */}
+                        <rect x="0" y="120" width="120" height="60" fill="url(#substrate_aniso)"/>
+                        {/* Target material */}
+                        <rect x="0" y="60" width="120" height="60" fill="#4CAF50"/>
+                        {/* Mask */}
+                        <rect x="0" y="40" width="30" height="20" fill="#8E44AD"/>
+                        <rect x="90" y="40" width="30" height="20" fill="#8E44AD"/>
+                        {/* Etched area - vertical profile */}
+                        <rect x="30" y="60" width="60" height="60" fill="white"/>
+
+                        <text x="60" y="25" fontSize="12" textAnchor="middle" fontWeight="bold" fill="#2196F3">Anisotropic</text>
+                        <text x="60" y="165" fontSize="10" textAnchor="middle" fill="#666">A = 1.0</text>
+                      </svg>
+                      <p className="text-xs text-gray-600 mt-2">이방성 식각</p>
+                    </div>
+
+                    {/* Undercut Profile */}
+                    <div className="text-center">
+                      <svg width="120" height="180" viewBox="0 0 120 180">
+                        <defs>
+                          <pattern id="substrate_under" patternUnits="userSpaceOnUse" width="6" height="6">
+                            <rect width="6" height="6" fill="white"/>
+                            <path d="M0,6 L6,0 M-1,1 L1,-1 M5,7 L7,5" stroke="#000" strokeWidth="0.3"/>
+                          </pattern>
+                        </defs>
+                        {/* Substrate */}
+                        <rect x="0" y="120" width="120" height="60" fill="url(#substrate_under)"/>
+                        {/* Target material */}
+                        <rect x="0" y="60" width="120" height="60" fill="#4CAF50"/>
+                        {/* Mask */}
+                        <rect x="0" y="40" width="30" height="20" fill="#8E44AD"/>
+                        <rect x="90" y="40" width="30" height="20" fill="#8E44AD"/>
+                        {/* Etched area - undercut profile */}
+                        <path d="M 20,60 L 30,120 L 90,120 L 100,60 Z" fill="white"/>
+
+                        <text x="60" y="25" fontSize="12" textAnchor="middle" fontWeight="bold" fill="#9C27B0">Undercut</text>
+                        <text x="60" y="165" fontSize="10" textAnchor="middle" fill="#666">A = 0.4</text>
+                      </svg>
+                      <p className="text-xs text-gray-600 mt-2">언더컷 발생</p>
+                    </div>
+                  </div>
+                  <div className="text-sm text-gray-700 text-center">
+                    <p className="font-semibold mb-2">프로파일 제어 인자</p>
+                    <p className="text-xs text-gray-600">
+                      압력 ↓, 바이어스 ↑, 이온 에너지 ↑ → 이방성 증가<br/>
+                      압력 ↑, 화학 반응 ↑ → 등방성 증가
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1000,6 +1296,127 @@ const EtchSimulator = () => {
                     예를 들어, DRAM의 Cell Array(고밀도)와 Periphery(저밀도) 사이에 20-30%의 식각률 차이가 발생할 수 있어,
                     Dummy Pattern을 삽입하거나 다단계 식각 공정을 사용하여 보상해야 합니다.
                   </p>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">Loading Effect 개념도</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                    {/* Micro Loading */}
+                    <div>
+                      <p className="text-center font-semibold text-purple-700 mb-3">Micro Loading Effect</p>
+                      <svg width="280" height="220" viewBox="0 0 280 220">
+                        <defs>
+                          <pattern id="substrate_micro" patternUnits="userSpaceOnUse" width="6" height="6">
+                            <rect width="6" height="6" fill="white"/>
+                            <path d="M0,6 L6,0 M-1,1 L1,-1 M5,7 L7,5" stroke="#000" strokeWidth="0.3"/>
+                          </pattern>
+                        </defs>
+
+                        {/* Left: High Density Area */}
+                        <g>
+                          <text x="60" y="15" fontSize="12" textAnchor="middle" fontWeight="bold" fill="#E91E63">High Density</text>
+                          <rect x="0" y="160" width="120" height="60" fill="url(#substrate_micro)"/>
+                          <rect x="0" y="100" width="120" height="60" fill="#4CAF50"/>
+
+                          {/* Multiple narrow trenches */}
+                          <rect x="0" y="80" width="15" height="20" fill="#8E44AD"/>
+                          <rect x="15" y="100" width="10" height="60" fill="white"/>
+                          <rect x="25" y="80" width="15" height="20" fill="#8E44AD"/>
+                          <rect x="40" y="100" width="10" height="60" fill="white"/>
+                          <rect x="50" y="80" width="15" height="20" fill="#8E44AD"/>
+                          <rect x="65" y="100" width="10" height="60" fill="white"/>
+                          <rect x="75" y="80" width="15" height="20" fill="#8E44AD"/>
+                          <rect x="90" y="100" width="10" height="60" fill="white"/>
+                          <rect x="100" y="80" width="20" height="20" fill="#8E44AD"/>
+
+                          {/* Depth measurement */}
+                          <line x1="5" y1="160" x2="5" y2="100" stroke="#FF5722" strokeWidth="2"/>
+                          <polygon points="5,100 3,105 7,105" fill="#FF5722"/>
+                          <text x="10" y="135" fontSize="11" fill="#FF5722" fontWeight="bold">40nm</text>
+
+                          <text x="60" y="200" fontSize="10" textAnchor="middle" fill="#666">E/R = 0.8x</text>
+                        </g>
+
+                        {/* Right: Low Density Area */}
+                        <g transform="translate(160, 0)">
+                          <text x="60" y="15" fontSize="12" textAnchor="middle" fontWeight="bold" fill="#2196F3">Low Density</text>
+                          <rect x="0" y="160" width="120" height="60" fill="url(#substrate_micro)"/>
+                          <rect x="0" y="100" width="120" height="60" fill="#4CAF50"/>
+
+                          {/* Wide isolated trenches */}
+                          <rect x="0" y="80" width="30" height="20" fill="#8E44AD"/>
+                          <rect x="30" y="90" width="30" height="70" fill="white"/>
+                          <rect x="60" y="80" width="30" height="20" fill="#8E44AD"/>
+                          <rect x="90" y="80" width="30" height="20" fill="#8E44AD"/>
+
+                          {/* Depth measurement */}
+                          <line x1="115" y1="160" x2="115" y2="90" stroke="#FF5722" strokeWidth="2"/>
+                          <polygon points="115,90 113,95 117,95" fill="#FF5722"/>
+                          <text x="105" y="128" fontSize="11" fill="#FF5722" fontWeight="bold">55nm</text>
+
+                          <text x="60" y="200" fontSize="10" textAnchor="middle" fill="#666">E/R = 1.1x</text>
+                        </g>
+                      </svg>
+                      <p className="text-xs text-center text-gray-600 mt-2">
+                        패턴 밀도가 높은 영역은 가스 소모가 빨라 식각률 감소
+                      </p>
+                    </div>
+
+                    {/* Macro Loading */}
+                    <div>
+                      <p className="text-center font-semibold text-purple-700 mb-3">Macro Loading Effect</p>
+                      <svg width="280" height="220" viewBox="0 0 280 220">
+                        <defs>
+                          <pattern id="substrate_macro" patternUnits="userSpaceOnUse" width="6" height="6">
+                            <rect width="6" height="6" fill="white"/>
+                            <path d="M0,6 L6,0 M-1,1 L1,-1 M5,7 L7,5" stroke="#000" strokeWidth="0.3"/>
+                          </pattern>
+                        </defs>
+
+                        {/* Wafer outline */}
+                        <circle cx="140" cy="110" r="100" fill="none" stroke="#333" strokeWidth="2"/>
+
+                        {/* Center region - High density */}
+                        <circle cx="140" cy="110" r="50" fill="#FFB74D" opacity="0.5"/>
+                        <text x="140" y="105" fontSize="12" textAnchor="middle" fontWeight="bold" fill="#E65100">Array</text>
+                        <text x="140" y="120" fontSize="11" textAnchor="middle" fill="#E65100">80% Density</text>
+                        <text x="140" y="135" fontSize="10" textAnchor="middle" fill="#D84315">E/R: 0.75x</text>
+
+                        {/* Outer region - Low density */}
+                        <text x="80" y="60" fontSize="11" textAnchor="middle" fontWeight="bold" fill="#1565C0">Periphery</text>
+                        <text x="80" y="75" fontSize="10" textAnchor="middle" fill="#1565C0">30% Density</text>
+                        <text x="80" y="87" fontSize="9" textAnchor="middle" fill="#0D47A1">E/R: 1.0x</text>
+
+                        <text x="200" y="60" fontSize="11" textAnchor="middle" fontWeight="bold" fill="#1565C0">Periphery</text>
+                        <text x="200" y="75" fontSize="10" textAnchor="middle" fill="#1565C0">30% Density</text>
+                        <text x="200" y="87" fontSize="9" textAnchor="middle" fill="#0D47A1">E/R: 1.0x</text>
+
+                        {/* Arrows showing gas flow */}
+                        <g>
+                          <path d="M 140,20 L 140,50" stroke="#4CAF50" strokeWidth="2" markerEnd="url(#arrowgreen)"/>
+                          <path d="M 80,30 L 100,60" stroke="#4CAF50" strokeWidth="2" markerEnd="url(#arrowgreen)"/>
+                          <path d="M 200,30 L 180,60" stroke="#4CAF50" strokeWidth="2" markerEnd="url(#arrowgreen)"/>
+                          <defs>
+                            <marker id="arrowgreen" markerWidth="10" markerHeight="10" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+                              <path d="M0,0 L0,6 L9,3 z" fill="#4CAF50"/>
+                            </marker>
+                          </defs>
+                          <text x="140" y="15" fontSize="10" textAnchor="middle" fill="#4CAF50" fontWeight="bold">Gas Flow ↓</text>
+                        </g>
+                      </svg>
+                      <p className="text-xs text-center text-gray-600 mt-2">
+                        웨이퍼 내 대면적 영역 간 식각률 차이 (Cell vs Periphery)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-3 rounded text-center">
+                    <p className="text-sm font-semibold text-gray-800 mb-1">해결 방안</p>
+                    <p className="text-xs text-gray-600">
+                      Micro: 가스 유량 증가, 압력 최적화 |
+                      Macro: Dummy pattern 추가, 다단계 식각
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
