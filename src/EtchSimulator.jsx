@@ -2442,23 +2442,26 @@ const EtchSimulator = () => {
               <div className="space-y-6">
                 <div className="bg-red-50 p-5 rounded-lg border-l-4 border-red-400">
                   <h5 className="text-lg font-semibold text-red-800 mb-3">기술적 도전과제</h5>
+                  <p className="text-sm text-gray-700 mb-4">
+                    반도체 공정이 3nm 이하로 극미세화되면서 식각 기술도 더욱 정밀하고 까다로워지고 있습니다.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">극미세화 (3nm 이하)</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>Critical Dimension (CD) &lt; 10nm</li>
-                        <li>Aspect Ratio &gt; 50:1</li>
-                        <li>Line Edge Roughness (LER) &lt; 1nm</li>
-                        <li>Plasma Damage 최소화</li>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>Critical Dimension (CD) &lt; 10nm:</strong> 회로 선폭이 10nm보다 작아져 원자 수십 개 수준의 정밀도로 식각해야 함</li>
+                        <li>• <strong>Aspect Ratio &gt; 50:1:</strong> 깊이가 폭의 50배 이상인 구조. 깊은 구멍 속까지 균일하게 식각하기 매우 어려움</li>
+                        <li>• <strong>Line Edge Roughness (LER) &lt; 1nm:</strong> 회로 가장자리가 1nm 이상 울퉁불퉁하면 성능 저하. 매우 매끄러운 식각 필요</li>
+                        <li>• <strong>Plasma Damage 최소화:</strong> 플라즈마의 고에너지 이온이 회로를 손상시킬 수 있어 손상 없는 식각 기술 개발 필요</li>
                       </ul>
                     </div>
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">새로운 재료 도입</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>EUV Resist (CAR → Metal Resist)</li>
-                        <li>High-k/Metal Gate Stack</li>
-                        <li>2D Materials (MoS₂, Graphene)</li>
-                        <li>Atomic Layer Etching (ALE) 필요</li>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>EUV Resist (CAR → Metal Resist):</strong> 극자외선 리소그래피용 감광제가 기존 화학증폭형에서 금속 함유 타입으로 변화. 식각 조건도 새롭게 최적화 필요</li>
+                        <li>• <strong>High-k/Metal Gate Stack:</strong> 고유전율 절연막과 금속 게이트 다층 구조. 각 층마다 다른 식각 조건 필요</li>
+                        <li>• <strong>2D Materials (MoS₂, Graphene):</strong> 차세대 반도체 소재인 2차원 물질. 두께가 원자 1-2층 수준이라 손상 없이 패터닝하기 극도로 어려움</li>
+                        <li>• <strong>Atomic Layer Etching (ALE) 필요:</strong> 원자층 단위로 한 층씩 식각하는 기술. 위 새로운 재료들을 정밀하게 가공하기 위해 필수</li>
                       </ul>
                     </div>
                   </div>
@@ -2466,32 +2469,38 @@ const EtchSimulator = () => {
 
                 <div className="bg-green-50 p-5 rounded-lg border-l-4 border-green-400">
                   <h5 className="text-lg font-semibold text-green-800 mb-3">글로벌 시장 현황</h5>
+                  <p className="text-sm text-gray-700 mb-4">
+                    Dry Etch 장비 시장은 소수의 글로벌 기업들이 주도하고 있으며, 반도체 미세화로 인해 지속적으로 성장하고 있습니다.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div className="bg-white p-4 rounded shadow">
                       <h6 className="font-semibold text-blue-700 mb-2">시장 점유율 (2024)</h6>
+                      <p className="text-xs text-gray-600 mb-2">식각 장비 시장은 3개 회사가 90% 이상 점유</p>
                       <ul className="space-y-1 text-gray-700">
-                        <li>Lam Research: ~45%</li>
-                        <li>Applied Materials: ~25%</li>
-                        <li>Tokyo Electron: ~20%</li>
-                        <li>Others: ~10%</li>
+                        <li>• <strong>Lam Research:</strong> 약 45% - 선도 기업, 최신 기술 보유</li>
+                        <li>• <strong>Applied Materials:</strong> 약 25% - 종합 반도체 장비 기업</li>
+                        <li>• <strong>Tokyo Electron:</strong> 약 20% - 일본 대표 장비사</li>
+                        <li>• <strong>Others:</strong> 약 10% - 중소 전문 업체들</li>
                       </ul>
                     </div>
                     <div className="bg-white p-4 rounded shadow">
                       <h6 className="font-semibold text-purple-700 mb-2">주요 고객사</h6>
+                      <p className="text-xs text-gray-600 mb-2">세계 최대 반도체 생산 기업들</p>
                       <ul className="space-y-1 text-gray-700">
-                        <li>TSMC (Taiwan)</li>
-                        <li>Samsung (Korea)</li>
-                        <li>Intel (USA)</li>
-                        <li>SK Hynix (Korea)</li>
+                        <li>• <strong>TSMC (대만):</strong> 세계 최대 파운드리, 최대 고객</li>
+                        <li>• <strong>Samsung (한국):</strong> 메모리 1위, 파운드리 2위</li>
+                        <li>• <strong>Intel (미국):</strong> CPU 제조사, 자체 팹 운영</li>
+                        <li>• <strong>SK Hynix (한국):</strong> DRAM/NAND 주요 업체</li>
                       </ul>
                     </div>
                     <div className="bg-white p-4 rounded shadow">
                       <h6 className="font-semibold text-orange-700 mb-2">시장 규모</h6>
+                      <p className="text-xs text-gray-600 mb-2">반도체 미세화로 지속 성장 중</p>
                       <ul className="space-y-1 text-gray-700">
-                        <li>2024: $15B+</li>
-                        <li>연평균 성장률: 8-10%</li>
-                        <li>Logic &gt; Memory &gt; Others</li>
-                        <li>아시아 시장 주도</li>
+                        <li>• <strong>2024년:</strong> 약 150억 달러 (약 20조원) 이상</li>
+                        <li>• <strong>성장률:</strong> 연평균 8-10% - 안정적 성장</li>
+                        <li>• <strong>용도별:</strong> Logic(로직) &gt; Memory(메모리) &gt; 기타 순</li>
+                        <li>• <strong>지역별:</strong> 아시아(한국/대만/중국) 시장이 주도</li>
                       </ul>
                     </div>
                   </div>
@@ -2499,23 +2508,28 @@ const EtchSimulator = () => {
 
                 <div className="bg-yellow-50 p-5 rounded-lg border-l-4 border-yellow-400">
                   <h5 className="text-lg font-semibold text-yellow-800 mb-3">환경 및 규제 이슈</h5>
+                  <p className="text-sm text-gray-700 mb-4">
+                    식각 공정에서 사용되는 불화합물 가스들은 강력한 온실가스로 환경 규제가 강화되고 있습니다.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">PFC 가스 규제</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>GWP (Global Warming Potential) 높음</li>
-                        <li>CF₄: 7,390배, SF₆: 22,800배</li>
-                        <li>EU REACH, 미국 EPA 규제 강화</li>
-                        <li>대체 가스 개발 필요</li>
+                      <p className="text-xs text-gray-600 mb-2">불소화합물 가스의 온실가스 문제</p>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>GWP (지구온난화지수) 매우 높음:</strong> 이산화탄소 대비 온실효과가 수천~수만 배</li>
+                        <li>• <strong>CF₄: 7,390배, SF₆: 22,800배:</strong> CF₄는 CO₂보다 7천배, SF₆는 2만배 이상 온실효과 유발</li>
+                        <li>• <strong>EU REACH, 미국 EPA 규제 강화:</strong> 유럽과 미국에서 사용량 제한과 배출 규제 강화 중</li>
+                        <li>• <strong>대체 가스 개발 필요:</strong> 환경 영향이 적은 새로운 식각 가스 개발이 시급한 과제</li>
                       </ul>
                     </div>
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">Abatement 기술</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>Thermal/Plasma Abatement</li>
-                        <li>90%+ 제거 효율 요구</li>
-                        <li>운영비 증가 요인</li>
-                        <li>In-situ Cleaning 기술 개발</li>
+                      <p className="text-xs text-gray-600 mb-2">배출 가스 처리 시스템</p>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>Thermal/Plasma Abatement:</strong> 고온 연소나 플라즈마로 유해 가스를 분해하는 장치. 모든 식각 장비에 필수 설치</li>
+                        <li>• <strong>90%+ 제거 효율 요구:</strong> 배출되는 PFC 가스의 90% 이상을 제거해야 규제 기준 충족</li>
+                        <li>• <strong>운영비 증가 요인:</strong> 처리 장비 설치 및 운영에 많은 비용 소요. 반도체 제조 원가 상승 원인</li>
+                        <li>• <strong>In-situ Cleaning 기술 개발:</strong> 챔버 내부를 현장에서 세정해 가스 사용량을 줄이는 기술 개발 중</li>
                       </ul>
                     </div>
                   </div>
@@ -2523,23 +2537,28 @@ const EtchSimulator = () => {
 
                 <div className="bg-blue-50 p-5 rounded-lg border-l-4 border-blue-400">
                   <h5 className="text-lg font-semibold text-blue-800 mb-3">미래 기술 동향</h5>
+                  <p className="text-sm text-gray-700 mb-4">
+                    반도체 미세화가 한계에 도달하면서 원자 단위 정밀도와 AI 기술 적용이 핵심 트렌드입니다.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">Atomic Layer Processing</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>ALE (Atomic Layer Etching)</li>
-                        <li>Self-limiting 반응</li>
-                        <li>단원자층 정밀도 제어</li>
-                        <li>Damage-free Processing</li>
+                      <p className="text-xs text-gray-600 mb-2">원자층 단위 초정밀 식각 기술</p>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>ALE (Atomic Layer Etching):</strong> 원자층 한 층씩만 제거하는 초정밀 식각 기술. 3nm 이하 공정의 필수 기술</li>
+                        <li>• <strong>Self-limiting 반응:</strong> 화학 반응이 자동으로 한 층에서 멈추는 특성. 정확히 원하는 만큼만 식각 가능</li>
+                        <li>• <strong>단원자층 정밀도 제어:</strong> 0.3nm (원자 1개 두께) 수준의 정밀도로 두께 제어 가능</li>
+                        <li>• <strong>Damage-free Processing:</strong> 물리적 충격 없이 화학 반응만으로 식각해 소자 손상 제로 목표</li>
                       </ul>
                     </div>
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">AI/ML 적용</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>Real-time Process Control</li>
-                        <li>Predictive Maintenance</li>
-                        <li>Recipe Optimization</li>
-                        <li>Virtual Metrology</li>
+                      <p className="text-xs text-gray-600 mb-2">인공지능 기반 공정 관리</p>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>Real-time Process Control:</strong> AI가 센서 데이터를 실시간 분석해 공정 조건을 자동 최적화. 수율과 품질 향상</li>
+                        <li>• <strong>Predictive Maintenance:</strong> 장비 상태를 AI가 예측해 고장 전 미리 정비. 가동률 향상과 비용 절감</li>
+                        <li>• <strong>Recipe Optimization:</strong> 머신러닝으로 최적의 식각 조건(레시피)을 자동으로 찾아줌. 개발 시간 단축</li>
+                        <li>• <strong>Virtual Metrology:</strong> 실제 측정 없이 AI로 결과를 예측. 측정 시간과 비용 대폭 절감</li>
                       </ul>
                     </div>
                   </div>
