@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts';
+import SiliconEtchingSimulator from './SiliconEtchingSimulator';
 
 const EtchSimulator = () => {
   // 탭 상태 관리
@@ -54,17 +55,47 @@ const EtchSimulator = () => {
   const [analysisGasRatio, setAnalysisGasRatio] = useState(50);
   const [showAnalysisResult, setShowAnalysisResult] = useState(false);
 
+  // Overview 탭 애니메이션 상태들
+  const [isAnimationPlaying, setIsAnimationPlaying] = useState(false);
+  const [activeElementIndex, setActiveElementIndex] = useState(-1);
+  const [typingText, setTypingText] = useState('');
+  const [fullText, setFullText] = useState('');
+
+  // 5대 요소 설명 데이터
+  const elementsData = [
+    {
+      name: '식각률 (Etch Rate)',
+      description: '단위 시간당 식각되는 물질의 두께를 나타내는 핵심 지표입니다. 식각률은 E/R = 식각 깊이(Å) / 식각 시간(min) 공식으로 계산되며, 일반적으로 Å/min 또는 nm/min 단위를 사용합니다. 높은 식각률은 공정 시간을 단축시켜 생산성을 향상시키지만, 너무 빠른 식각은 정밀한 제어가 어렵고 플라즈마 데미지를 유발할 수 있습니다. RF 파워, 압력, 가스 유량, 온도 등이 주요 영향 인자이며, 물질마다 최적의 식각률이 다릅니다. 예를 들어, ICP 장비로 Si를 식각할 경우 100-300 nm/min, SiO₂는 50-150 nm/min 정도의 식각률을 나타냅니다.',
+      position: { cx: 200, cy: 80 }
+    },
+    {
+      name: '선택성 (Selectivity)',
+      description: '타겟 물질과 다른 물질(마스크, 하부층) 사이의 식각률 비율을 나타냅니다. Selectivity = 타겟 물질 식각률 / 기준 물질 식각률로 계산되며, 높은 선택비는 마스크나 하부층을 보호하면서 타겟만 선택적으로 식각할 수 있게 합니다. 예를 들어 Si:SiO₂ = 20:1의 선택비는 Si가 SiO₂보다 20배 빠르게 식각됨을 의미합니다. 선택비는 공정 마진을 증가시키고 End-point 검출에 여유를 주며, 측벽 손상을 최소화합니다. HBr 첨가(Si 식각 시), 폴리머 형성, 저온 공정 등으로 선택비를 향상시킬 수 있으며, 실제 공정에서는 10:1 이상의 선택비를 목표로 합니다.',
+      position: { cx: 310, cy: 140 }
+    },
+    {
+      name: '균일성 (Uniformity)',
+      description: '웨이퍼 전체 영역에서 식각 깊이와 프로파일이 얼마나 일관적인지를 나타내는 지표입니다. Uniformity(%) = ±[(Max-Min)/(2×Average)]×100 공식으로 계산하며, ±3% 이내를 목표로 합니다(선단 공정에서는 ±2% 이내). 불균일성은 플라즈마 밀도 분포, 가스 흐름, 웨이퍼 온도 분포, RF 전력 분포 등이 원인이 됩니다. 균일성이 좋지 않으면 웨이퍼의 어떤 부분은 과도하게 식각되고(over-etch) 다른 부분은 부족하게 식각되어(under-etch) 수율이 크게 감소합니다. 압력 최적화, 다중 가스 주입구, ESC 온도 제어, 웨이퍼 회전 등으로 균일성을 개선할 수 있습니다.',
+      position: { cx: 310, cy: 260 }
+    },
+    {
+      name: '이방도 (Anisotropy)',
+      description: '식각이 수직 방향으로 진행되는 정도를 나타내며, 마스크 패턴을 얼마나 충실하게 전사하는지의 지표입니다. Anisotropy = 1 - (수평 식각률/수직 식각률)로 계산되며, A=1은 완전 이방성(수직 식각), A=0은 완전 등방성(모든 방향 균일)을 의미합니다. 미세 패턴 형성을 위해서는 높은 이방성이 필수적이며, 특히 Gate, Contact/Via, MEMS, TSV 등에서 중요합니다. 저압력(10-50 mTorr), 고 바이어스 전압, 방향성 이온 충격을 통해 이방성을 높일 수 있습니다. 반대로 고압력, 저 바이어스에서는 화학적 반응이 우세하여 등방성 식각이 일어나며, Spacer 형성이나 Recess 식각에 활용됩니다.',
+      position: { cx: 90, cy: 260 }
+    },
+    {
+      name: 'Loading Effect (로딩 효과)',
+      description: '패턴 밀도(open area ratio)에 따라 식각 속도가 달라지는 현상으로, 대면적 소자에서 심각한 문제가 됩니다. 식각되는 면적이 클수록 반응 가스가 빠르게 소모되고 부산물이 축적되어 식각률이 감소합니다. Macro Loading(웨이퍼 간/내 대면적 차이), Micro Loading(미세 패턴 간 밀도 차이), ARDE(Aspect Ratio Dependent Etch) 효과로 구분됩니다. 예를 들어 DRAM의 Cell Array(고밀도)와 Periphery(저밀도) 사이에 20-30%의 식각률 차이가 발생할 수 있습니다. 가스 유량 증가, Dummy Pattern 삽입, 다단계 식각(main+soft), OPC 적용 등으로 보상할 수 있으며, 설계 단계부터 패턴 밀도를 균일화하는 것이 중요합니다.',
+      position: { cx: 90, cy: 140 }
+    }
+  ];
+
   // 탭 정의
   const tabs = [
     { id: 'overview', name: '식각 공정 개요', icon: '📋' },
-    { id: 'etch-rate', name: '식각률', icon: '⚡' },
-    { id: 'selectivity', name: '선택성', icon: '🎯' },
-    { id: 'uniformity', name: '균일성', icon: '⚖️' },
-    { id: 'anisotropy', name: '이방도', icon: '📐' },
-    { id: 'loading-effect', name: 'Loading Effect', icon: '🔄' },
-    { id: 'etch-principle', name: '식각원리', icon: '🔬' },
-    { id: 'process', name: '식각 실험', icon: '🧪' },
-    { id: 'analysis', name: '영향 인자 분석', icon: '📊' },
+    { id: 'etch-elements', name: '식각 요소', icon: '🔬' },
+    { id: 'process', name: '식각 원리', icon: '🧪' },
+    { id: 'analysis', name: 'Si식각메커니즘', icon: '📊' },
     { id: 'quiz', name: '식각 평가', icon: '📝' }
   ];
 
@@ -249,6 +280,55 @@ const EtchSimulator = () => {
     setShowResults(false);
   };
 
+  // Overview 애니메이션 제어 - 다음 요소로 진행
+  const proceedToNextElement = () => {
+    if (activeElementIndex === -1) {
+      // 첫 시작
+      setIsAnimationPlaying(true);
+      setActiveElementIndex(0);
+      setFullText(elementsData[0].description);
+      setTypingText('');
+    } else if (activeElementIndex < elementsData.length - 1) {
+      // 다음 요소로
+      const nextIndex = activeElementIndex + 1;
+      setActiveElementIndex(nextIndex);
+      setFullText(elementsData[nextIndex].description);
+      setTypingText('');
+    } else {
+      // 마지막 요소 완료 - 처음으로
+      setActiveElementIndex(0);
+      setFullText(elementsData[0].description);
+      setTypingText('');
+    }
+  };
+
+  // 애니메이션 정지
+  const stopAnimation = () => {
+    setIsAnimationPlaying(false);
+    setActiveElementIndex(-1);
+    setTypingText('');
+  };
+
+  // 타이핑 효과
+  useEffect(() => {
+    if (!isAnimationPlaying || activeElementIndex === -1) return;
+
+    let currentIndex = 0;
+    const text = fullText;
+    setTypingText('');
+
+    const typingInterval = setInterval(() => {
+      if (currentIndex < text.length) {
+        setTypingText(text.substring(0, currentIndex + 1));
+        currentIndex++;
+      } else {
+        clearInterval(typingInterval);
+      }
+    }, 30); // 30ms마다 한 글자씩
+
+    return () => clearInterval(typingInterval);
+  }, [fullText, isAnimationPlaying, activeElementIndex]);
+
   // 가스 조합 프리셋
   const gasPresets = {
     'Si': { Cl2: 30, HBr: 15, CF4: 0, CHF3: 0, O2: 0, Ar: 90 },
@@ -272,56 +352,166 @@ const EtchSimulator = () => {
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h4 className="text-lg font-semibold mb-4 text-center">식각 공정 관리 5대 핵심 요소</h4>
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-lg font-semibold">식각 공정 관리 5대 핵심 요소</h4>
+                <div className="flex gap-2">
+                  {isAnimationPlaying && (
+                    <button
+                      onClick={stopAnimation}
+                      className="px-6 py-2 rounded-lg font-semibold transition-all bg-red-500 hover:bg-red-600 text-white"
+                    >
+                      ⏸ 정지
+                    </button>
+                  )}
+                  <button
+                    onClick={proceedToNextElement}
+                    className="px-6 py-2 rounded-lg font-semibold transition-all bg-blue-500 hover:bg-blue-600 text-white"
+                  >
+                    {activeElementIndex === -1 ? '▶ 재생' :
+                     activeElementIndex === elementsData.length - 1 ? '🔄 처음부터' : '▶ 계속 재생'}
+                  </button>
+                </div>
+              </div>
 
-              {/* 중앙의 순환 다이어그램 */}
-              <div className="flex justify-center mb-6">
-                <svg width="400" height="400" viewBox="0 0 400 400">
-                  {/* 중앙 원 */}
-                  <circle cx="200" cy="200" r="50" fill="#e0f2fe" stroke="#0284c7" strokeWidth="3"/>
-                  <text x="200" y="195" textAnchor="middle" className="text-sm font-bold" fill="#0284c7">식각</text>
-                  <text x="200" y="210" textAnchor="middle" className="text-sm font-bold" fill="#0284c7">공정</text>
+              {/* 다이어그램과 설명 영역 */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 중앙의 순환 다이어그램 */}
+                <div className="flex justify-center items-center">
+                  <svg width="400" height="400" viewBox="0 0 400 400">
+                    {/* 중앙 원 */}
+                    <circle cx="200" cy="200" r="50" fill="#e0f2fe" stroke="#0284c7" strokeWidth="3"/>
+                    <text x="200" y="195" textAnchor="middle" className="text-sm font-bold" fill="#0284c7">식각</text>
+                    <text x="200" y="210" textAnchor="middle" className="text-sm font-bold" fill="#0284c7">공정</text>
 
-                  {/* 5개 요소 원들 */}
-                  <g>
-                    {/* 1. 식각률 (12시) */}
-                    <circle cx="200" cy="80" r="40" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2"/>
-                    <text x="200" y="75" textAnchor="middle" className="text-xs font-semibold">Etch Rate</text>
-                    <text x="200" y="88" textAnchor="middle" className="text-xs">식각률</text>
-                    <line x1="200" y1="150" x2="200" y2="120" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                    {/* 5개 요소 원들 - 애니메이션 적용 */}
+                    <g>
+                      {/* 1. 식각률 (12시) */}
+                      <g>
+                        {/* 외곽 강조 링 (활성화 시) */}
+                        {activeElementIndex === 0 && (
+                          <>
+                            <circle cx="200" cy="80" r="48" fill="none" stroke="#f59e0b" strokeWidth="3" opacity="0.6">
+                              <animate attributeName="r" values="48;52;48" dur="1.5s" repeatCount="indefinite"/>
+                              <animate attributeName="opacity" values="0.6;0.3;0.6" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle cx="200" cy="80" r="45" fill="none" stroke="#f59e0b" strokeWidth="2" opacity="0.4"/>
+                          </>
+                        )}
+                        {/* 기본 원 */}
+                        <circle cx="200" cy="80" r="40" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2"/>
+                        <text x="200" y="75" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 0 ? "bold" : "600"}>Etch Rate</text>
+                        <text x="200" y="88" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 0 ? "bold" : "normal"}>식각률</text>
+                      </g>
+                      <line x1="200" y1="150" x2="200" y2="120" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
-                    {/* 2. 선택성 (2시) */}
-                    <circle cx="310" cy="140" r="40" fill="#dcfce7" stroke="#22c55e" strokeWidth="2"/>
-                    <text x="310" y="135" textAnchor="middle" className="text-xs font-semibold">Selectivity</text>
-                    <text x="310" y="148" textAnchor="middle" className="text-xs">선택성</text>
-                    <line x1="245" y1="165" x2="275" y2="155" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                      {/* 2. 선택성 (2시) */}
+                      <g>
+                        {/* 외곽 강조 링 (활성화 시) */}
+                        {activeElementIndex === 1 && (
+                          <>
+                            <circle cx="310" cy="140" r="48" fill="none" stroke="#22c55e" strokeWidth="3" opacity="0.6">
+                              <animate attributeName="r" values="48;52;48" dur="1.5s" repeatCount="indefinite"/>
+                              <animate attributeName="opacity" values="0.6;0.3;0.6" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle cx="310" cy="140" r="45" fill="none" stroke="#22c55e" strokeWidth="2" opacity="0.4"/>
+                          </>
+                        )}
+                        {/* 기본 원 */}
+                        <circle cx="310" cy="140" r="40" fill="#dcfce7" stroke="#22c55e" strokeWidth="2"/>
+                        <text x="310" y="135" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 1 ? "bold" : "600"}>Selectivity</text>
+                        <text x="310" y="148" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 1 ? "bold" : "normal"}>선택성</text>
+                      </g>
+                      <line x1="245" y1="165" x2="275" y2="155" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
-                    {/* 3. 균일성 (4시) */}
-                    <circle cx="310" cy="260" r="40" fill="#e0e7ff" stroke="#6366f1" strokeWidth="2"/>
-                    <text x="310" y="255" textAnchor="middle" className="text-xs font-semibold">Uniformity</text>
-                    <text x="310" y="268" textAnchor="middle" className="text-xs">균일성</text>
-                    <line x1="245" y1="235" x2="275" y2="245" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                      {/* 3. 균일성 (4시) */}
+                      <g>
+                        {/* 외곽 강조 링 (활성화 시) */}
+                        {activeElementIndex === 2 && (
+                          <>
+                            <circle cx="310" cy="260" r="48" fill="none" stroke="#6366f1" strokeWidth="3" opacity="0.6">
+                              <animate attributeName="r" values="48;52;48" dur="1.5s" repeatCount="indefinite"/>
+                              <animate attributeName="opacity" values="0.6;0.3;0.6" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle cx="310" cy="260" r="45" fill="none" stroke="#6366f1" strokeWidth="2" opacity="0.4"/>
+                          </>
+                        )}
+                        {/* 기본 원 */}
+                        <circle cx="310" cy="260" r="40" fill="#e0e7ff" stroke="#6366f1" strokeWidth="2"/>
+                        <text x="310" y="255" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 2 ? "bold" : "600"}>Uniformity</text>
+                        <text x="310" y="268" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 2 ? "bold" : "normal"}>균일성</text>
+                      </g>
+                      <line x1="245" y1="235" x2="275" y2="245" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
-                    {/* 4. 이방도 (8시) */}
-                    <circle cx="90" cy="260" r="40" fill="#fce7f3" stroke="#ec4899" strokeWidth="2"/>
-                    <text x="90" y="255" textAnchor="middle" className="text-xs font-semibold">Anisotropy</text>
-                    <text x="90" y="268" textAnchor="middle" className="text-xs">이방도</text>
-                    <line x1="155" y1="235" x2="125" y2="245" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                      {/* 4. 이방도 (8시) */}
+                      <g>
+                        {/* 외곽 강조 링 (활성화 시) */}
+                        {activeElementIndex === 3 && (
+                          <>
+                            <circle cx="90" cy="260" r="48" fill="none" stroke="#ec4899" strokeWidth="3" opacity="0.6">
+                              <animate attributeName="r" values="48;52;48" dur="1.5s" repeatCount="indefinite"/>
+                              <animate attributeName="opacity" values="0.6;0.3;0.6" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle cx="90" cy="260" r="45" fill="none" stroke="#ec4899" strokeWidth="2" opacity="0.4"/>
+                          </>
+                        )}
+                        {/* 기본 원 */}
+                        <circle cx="90" cy="260" r="40" fill="#fce7f3" stroke="#ec4899" strokeWidth="2"/>
+                        <text x="90" y="255" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 3 ? "bold" : "600"}>Anisotropy</text>
+                        <text x="90" y="268" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 3 ? "bold" : "normal"}>이방도</text>
+                      </g>
+                      <line x1="155" y1="235" x2="125" y2="245" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
 
-                    {/* 5. Loading Effect (10시) */}
-                    <circle cx="90" cy="140" r="40" fill="#f3e8ff" stroke="#a855f7" strokeWidth="2"/>
-                    <text x="90" y="135" textAnchor="middle" className="text-xs font-semibold">Loading</text>
-                    <text x="90" y="148" textAnchor="middle" className="text-xs">로딩효과</text>
-                    <line x1="155" y1="165" x2="125" y2="155" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
-                  </g>
+                      {/* 5. Loading Effect (10시) */}
+                      <g>
+                        {/* 외곽 강조 링 (활성화 시) */}
+                        {activeElementIndex === 4 && (
+                          <>
+                            <circle cx="90" cy="140" r="48" fill="none" stroke="#a855f7" strokeWidth="3" opacity="0.6">
+                              <animate attributeName="r" values="48;52;48" dur="1.5s" repeatCount="indefinite"/>
+                              <animate attributeName="opacity" values="0.6;0.3;0.6" dur="1.5s" repeatCount="indefinite"/>
+                            </circle>
+                            <circle cx="90" cy="140" r="45" fill="none" stroke="#a855f7" strokeWidth="2" opacity="0.4"/>
+                          </>
+                        )}
+                        {/* 기본 원 */}
+                        <circle cx="90" cy="140" r="40" fill="#f3e8ff" stroke="#a855f7" strokeWidth="2"/>
+                        <text x="90" y="135" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 4 ? "bold" : "600"}>Loading</text>
+                        <text x="90" y="148" textAnchor="middle" className="text-xs" fontWeight={activeElementIndex === 4 ? "bold" : "normal"}>로딩효과</text>
+                      </g>
+                      <line x1="155" y1="165" x2="125" y2="155" stroke="#64748b" strokeWidth="2" markerEnd="url(#arrowhead)"/>
+                    </g>
 
-                  {/* 화살표 마커 정의 */}
-                  <defs>
-                    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
-                    </marker>
-                  </defs>
-                </svg>
+                    {/* 화살표 마커 정의 */}
+                    <defs>
+                      <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                        <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+                      </marker>
+                    </defs>
+                  </svg>
+                </div>
+
+                {/* 설명 영역 */}
+                <div className="flex items-center">
+                  {activeElementIndex >= 0 ? (
+                    <div className="bg-gradient-to-br from-indigo-50 to-purple-50 p-6 rounded-lg border-2 border-indigo-200 shadow-lg min-h-[300px]">
+                      <h5 className="text-xl font-bold text-indigo-900 mb-4">
+                        {elementsData[activeElementIndex].name}
+                      </h5>
+                      <p className="text-gray-700 leading-relaxed text-lg">
+                        {typingText}
+                        <span className="inline-block w-0.5 h-5 bg-indigo-600 ml-1 animate-pulse"></span>
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 p-6 rounded-lg border-2 border-gray-200 min-h-[300px] flex items-center justify-center">
+                      <p className="text-gray-500 text-center">
+                        ▶ 재생 버튼을 눌러<br />
+                        5대 핵심 요소를<br />
+                        자세히 알아보세요
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -366,11 +556,1080 @@ const EtchSimulator = () => {
             <div className="bg-yellow-50 p-6 rounded-lg border-l-4 border-yellow-400">
               <h4 className="text-lg font-semibold text-yellow-800 mb-4">💡 학습 가이드</h4>
               <div className="space-y-2 text-gray-700">
-                <p>• 각 탭을 클릭하여 식각의 핵심 요소들을 자세히 학습하세요</p>
-                <p>• 실험 탭에서 실제 공정 조건을 조절해보며 결과를 관찰하세요</p>
-                <p>• 분석 탭에서 파라미터 변화가 식각 결과에 미치는 영향을 확인하세요</p>
-                <p>• 평가 탭에서 학습한 내용을 점검해보세요</p>
+                <p>• <strong>식각 요소</strong> 탭에서 5가지 핵심 요소(식각률, 선택성, 균일성, 이방도, 로딩효과)를 자세히 학습하세요</p>
+                <p>• <strong>식각 원리</strong> 탭에서 실제 공정 조건을 조절하며 화학 반응과 물리적 메커니즘을 체험하세요</p>
+                <p>• <strong>영향 인자 분석</strong> 탭에서 파라미터 변화가 식각 결과에 미치는 영향을 확인하세요</p>
+                <p>• <strong>식각 평가</strong> 탭에서 학습한 내용을 퀴즈로 점검해보세요</p>
               </div>
+            </div>
+          </div>
+        );
+
+      case 'etch-elements':
+        return (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-6 rounded-lg">
+              <h3 className="text-xl font-bold text-indigo-800 mb-4">🔬 식각 공정 5대 핵심 요소</h3>
+              <p className="text-gray-700 leading-relaxed">
+                반도체 식각 공정을 정확하게 제어하고 평가하기 위해서는 5가지 핵심 요소를 이해하고 관리해야 합니다.
+                각 요소는 서로 밀접하게 연관되어 있으며, 최적의 식각 결과를 얻기 위해서는 이들 간의 균형을 맞추는 것이 중요합니다.
+              </p>
+            </div>
+
+            {/* 1. 식각률 (Etch Rate) */}
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-yellow-400">
+              <h4 className="text-2xl font-bold text-yellow-800 mb-4">⚡ 1. 식각률 (Etch Rate)</h4>
+
+              <div className="space-y-4">
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-yellow-900 mb-2">정의</h5>
+                  <p className="text-gray-700">단위 시간당 식각되는 물질의 두께 또는 깊이를 나타내는 지표</p>
+                  <div className="mt-3 p-3 bg-white rounded border-2 border-yellow-300">
+                    <p className="font-mono text-center text-lg">E/R = 식각 깊이(Å) / 식각 시간(min)</p>
+                    <p className="text-sm text-gray-600 text-center mt-2">단위: Å/min 또는 nm/min</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-blue-800 mb-3">영향 인자</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>RF 파워:</strong> 파워 ↑ → 식각률 ↑</li>
+                      <li>• <strong>압력:</strong> 최적 압력 존재 (물질마다 다름)</li>
+                      <li>• <strong>가스 유량:</strong> 반응 가스 ↑ → 식각률 ↑</li>
+                      <li>• <strong>온도:</strong> 온도 ↑ → 화학 반응 ↑</li>
+                      <li>• <strong>바이어스:</strong> 이온 에너지 ↑ → 식각률 ↑</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-red-800 mb-3">공정 고려사항</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• 생산성: 높은 식각률 → 짧은 공정 시간</li>
+                      <li>• 제어성: 너무 빠르면 정밀 제어 어려움</li>
+                      <li>• 손상: 과도한 식각률 → 플라즈마 데미지</li>
+                      <li>• 균일성: 식각률과 균일성은 trade-off</li>
+                      <li>• 선택비: 식각률 증가 시 선택비 감소 가능</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">식각률 개념도</h5>
+                  <div className="flex justify-center mb-4">
+                    <svg width="300" height="200" viewBox="0 0 300 200">
+                      {/* 기판 (맨 아래 패턴) */}
+                      <defs>
+                        <pattern id="substrate_etch_rate" patternUnits="userSpaceOnUse" width="8" height="8">
+                          <rect width="8" height="8" fill="white"/>
+                          <path d="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" stroke="#000" strokeWidth="0.5"/>
+                        </pattern>
+                      </defs>
+                      <rect x="0" y="160" width="300" height="40" fill="url(#substrate_etch_rate)"/>
+
+                      {/* 식각 대상물질 (초록색) - 전체 */}
+                      <rect x="0" y="80" width="300" height="80" fill="#4CAF50"/>
+
+                      {/* 마스크 (보라색) */}
+                      <rect x="0" y="60" width="80" height="20" fill="#8E44AD"/>
+                      <rect x="220" y="60" width="80" height="20" fill="#8E44AD"/>
+
+                      {/* 식각된 영역 (하얀색) */}
+                      <rect x="80" y="60" width="140" height="60" fill="white"/>
+
+                      {/* 세로 양방향 화살표와 x 표시 */}
+                      <g>
+                        <line x1="250" y1="85" x2="250" y2="115" stroke="black" strokeWidth="1.5"/>
+                        <polygon points="250,85 247,90 253,90" fill="black"/>
+                        <polygon points="250,115 247,110 253,110" fill="black"/>
+                        <text x="255" y="105" fontSize="16" fill="black" fontWeight="bold">x</text>
+                      </g>
+
+                      {/* Etch Time = t 라벨 */}
+                      <text x="150" y="30" fontSize="14" textAnchor="middle" fontWeight="bold" fill="#000">Etch Time = t</text>
+                    </svg>
+                  </div>
+                  <p className="text-sm text-gray-600 text-center">식각 시간 t 동안 깊이 x만큼 식각됨 → E/R = x/t</p>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">물질별 일반적인 식각률 (ICP 기준)</h5>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center text-sm">
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <p className="font-semibold text-blue-700">Si</p>
+                      <p className="text-2xl font-bold text-blue-900">100-300</p>
+                      <p className="text-gray-600">nm/min</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <p className="font-semibold text-green-700">SiO₂</p>
+                      <p className="text-2xl font-bold text-green-900">50-150</p>
+                      <p className="text-gray-600">nm/min</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <p className="font-semibold text-purple-700">Si₃N₄</p>
+                      <p className="text-2xl font-bold text-purple-900">40-120</p>
+                      <p className="text-gray-600">nm/min</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <p className="font-semibold text-orange-700">PR</p>
+                      <p className="text-2xl font-bold text-orange-900">200-500</p>
+                      <p className="text-gray-600">nm/min</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. 선택성 (Selectivity) */}
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-green-400">
+              <h4 className="text-2xl font-bold text-green-800 mb-4">🎯 2. 선택성 (Selectivity)</h4>
+
+              <div className="space-y-4">
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-green-900 mb-2">정의</h5>
+                  <p className="text-gray-700">타겟 물질과 다른 물질(마스크, 하부층) 사이의 식각률 비율</p>
+                  <div className="mt-3 p-3 bg-white rounded border-2 border-green-300">
+                    <p className="font-mono text-center text-lg">Selectivity = 타겟 물질 식각률 / 기준 물질 식각률</p>
+                    <p className="text-sm text-gray-600 text-center mt-2">예: Si:SiO₂ = 20:1 (Si가 SiO₂보다 20배 빠르게 식각)</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-blue-800 mb-3">선택비가 중요한 이유</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>마스크 보호:</strong> 높은 선택비로 PR 손실 최소화</li>
+                      <li>• <strong>하부층 보호:</strong> 언더층 손상 방지</li>
+                      <li>• <strong>공정 마진:</strong> End-point 여유 확보</li>
+                      <li>• <strong>프로파일 제어:</strong> 측벽 손상 최소화</li>
+                      <li>• <strong>수율 향상:</strong> 공정 안정성 증가</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-purple-800 mb-3">선택비 향상 방법</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>가스 조성 최적화:</strong> HBr 첨가 (Si 식각)</li>
+                      <li>• <strong>폴리머 형성:</strong> 측벽 보호막 생성</li>
+                      <li>• <strong>온도 제어:</strong> 저온에서 선택비 향상</li>
+                      <li>• <strong>압력 조절:</strong> 화학적 반응 우세 조건</li>
+                      <li>• <strong>바이어스 최적화:</strong> 이온 에너지 제어</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">일반적인 선택비 예시</h5>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-200">
+                        <tr>
+                          <th className="p-2 text-left">식각 조합</th>
+                          <th className="p-2 text-center">선택비</th>
+                          <th className="p-2 text-left">주요 가스</th>
+                          <th className="p-2 text-left">응용</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        <tr className="bg-white">
+                          <td className="p-2">Si : SiO₂</td>
+                          <td className="p-2 text-center font-bold text-blue-700">10-20 : 1</td>
+                          <td className="p-2">Cl₂ + HBr</td>
+                          <td className="p-2">Gate 식각</td>
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <td className="p-2">SiO₂ : Si</td>
+                          <td className="p-2 text-center font-bold text-green-700">15-30 : 1</td>
+                          <td className="p-2">CF₄ + CHF₃</td>
+                          <td className="p-2">STI, Contact</td>
+                        </tr>
+                        <tr className="bg-white">
+                          <td className="p-2">Si₃N₄ : SiO₂</td>
+                          <td className="p-2 text-center font-bold text-purple-700">8-15 : 1</td>
+                          <td className="p-2">CHF₃ + O₂</td>
+                          <td className="p-2">Spacer</td>
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <td className="p-2">PR : Si</td>
+                          <td className="p-2 text-center font-bold text-orange-700">∞ : 1</td>
+                          <td className="p-2">O₂</td>
+                          <td className="p-2">Ashing</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">선택성 개념도</h5>
+
+                  <div className="mb-4">
+                    <p className="text-sm leading-relaxed mb-2">
+                      식각의 선택성이란 서로 다른 종류의 박막을 동일한 식각조건하에서 식각할때 각각의 박막에 대한 식각률의 상대적인 비율을 말함.
+                    </p>
+                    <div className="text-center my-3">
+                      <div className="text-xl font-bold">
+                        S<sub>A/B</sub> = <span className="text-lg">E<sub>A</sub></span>/<span className="text-lg">E<sub>B</sub></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center items-center space-x-4">
+                    {/* 왼쪽 그림 - 보라색 두께 두배, 녹색 살짝 채워짐 */}
+                    <svg width="280" height="200" viewBox="0 0 300 200">
+                      {/* 기판 (맨 아래 패턴) */}
+                      <defs>
+                        <pattern id="substrate_left" patternUnits="userSpaceOnUse" width="8" height="8">
+                          <rect width="8" height="8" fill="white"/>
+                          <path d="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" stroke="#000" strokeWidth="0.5"/>
+                        </pattern>
+                      </defs>
+                      <rect x="0" y="160" width="300" height="40" fill="url(#substrate_left)"/>
+
+                      {/* 식각 대상물질 (초록색) - 전체 */}
+                      <rect x="0" y="80" width="300" height="80" fill="#4CAF50"/>
+
+                      {/* 마스크 (보라색) - 두께 두배 */}
+                      <rect x="0" y="40" width="80" height="40" fill="#8E44AD"/>
+                      <rect x="220" y="40" width="80" height="40" fill="#8E44AD"/>
+
+                      {/* 식각된 영역 (하얀색) - 녹색 살짝 채워짐 */}
+                      <rect x="80" y="40" width="140" height="80" fill="white"/>
+
+                      {/* 세로 양방향 화살표와 x 표시 */}
+                      <g>
+                        {/* 세로 선 */}
+                        <line x1="250" y1="85" x2="250" y2="115" stroke="black" strokeWidth="1.5"/>
+
+                        {/* 위쪽 화살표 */}
+                        <polygon points="250,85 247,90 253,90" fill="black"/>
+
+                        {/* 아래쪽 화살표 */}
+                        <polygon points="250,115 247,110 253,110" fill="black"/>
+
+                        {/* x 표시 */}
+                        <text x="255" y="105" fontSize="16" fill="black" fontWeight="bold">x</text>
+                      </g>
+                    </svg>
+
+                    {/* 화살표 (왼쪽에서 오른쪽) */}
+                    <div className="flex items-center">
+                      <svg width="60" height="40" viewBox="0 0 60 40">
+                        <defs>
+                          <marker id="processArrow" markerWidth="10" markerHeight="7"
+                                  refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#000" />
+                          </marker>
+                        </defs>
+                        <line x1="5" y1="20" x2="50" y2="20" stroke="#000" strokeWidth="2"
+                              markerEnd="url(#processArrow)"/>
+                      </svg>
+                    </div>
+
+                    {/* 오른쪽 그림 - 식각 깊이 증가 */}
+                    <svg width="280" height="200" viewBox="0 0 300 200">
+                      {/* 기판 (맨 아래 패턴) */}
+                      <defs>
+                        <pattern id="substrate_right" patternUnits="userSpaceOnUse" width="8" height="8">
+                          <rect width="8" height="8" fill="white"/>
+                          <path d="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" stroke="#000" strokeWidth="0.5"/>
+                        </pattern>
+                      </defs>
+                      <rect x="0" y="160" width="300" height="40" fill="url(#substrate_right)"/>
+
+                      {/* 식각 대상물질 (초록색) - 전체 */}
+                      <rect x="0" y="80" width="300" height="80" fill="#4CAF50"/>
+
+                      {/* 마스크 (보라색) */}
+                      <rect x="0" y="60" width="80" height="20" fill="#8E44AD"/>
+                      <rect x="220" y="60" width="80" height="20" fill="#8E44AD"/>
+
+                      {/* 식각된 영역 (하얀색) - 더 깊게 식각 */}
+                      <rect x="80" y="60" width="140" height="80" fill="white"/>
+
+                      {/* A 표시 - 녹색 식각 깊이 */}
+                      <g>
+                        {/* 세로 선 */}
+                        <line x1="250" y1="85" x2="250" y2="135" stroke="black" strokeWidth="1.5"/>
+
+                        {/* 위쪽 화살표 */}
+                        <polygon points="250,85 247,90 253,90" fill="black"/>
+
+                        {/* 아래쪽 화살표 */}
+                        <polygon points="250,135 247,130 253,130" fill="black"/>
+
+                        {/* A 표시 */}
+                        <text x="255" y="115" fontSize="16" fill="black" fontWeight="bold">A</text>
+                      </g>
+
+                      {/* B 표시 - 깎인 보라색 부분 */}
+                      <g>
+                        {/* 세로 선 - 첫번째 보라색 높이에서 두번째 보라색 높이까지 */}
+                        <line x1="40" y1="40" x2="40" y2="60" stroke="black" strokeWidth="1.5"/>
+
+                        {/* 위쪽 화살표 */}
+                        <polygon points="40,40 37,45 43,45" fill="black"/>
+
+                        {/* 아래쪽 화살표 */}
+                        <polygon points="40,60 37,55 43,55" fill="black"/>
+
+                        {/* B 표시 */}
+                        <text x="45" y="55" fontSize="16" fill="black" fontWeight="bold">B</text>
+                      </g>
+                    </svg>
+                  </div>
+
+                  <div className="mt-4 text-sm text-gray-700">
+                    <p className="text-center mb-2">
+                      예) A라는 박막에 대한 <span className="text-red-500 underline">식각속도는 Ea</span>, B라는 박막에서는 동일한 <span className="text-red-500 underline">식각조건에서 Eb</span>라고 할때
+                    </p>
+                    <p className="text-center text-xs text-gray-600">
+                      선택비 = A / B | 건식식각시 습식에 비하여 선택성이 좋지 못하기에 over etch를 하더라도 식각 대상물질이 아닌 막의 손상을 최소화하는 연구 진행
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. 균일성 (Uniformity) */}
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-blue-400">
+              <h4 className="text-2xl font-bold text-blue-800 mb-4">⚖️ 3. 균일성 (Uniformity)</h4>
+
+              <div className="space-y-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-blue-900 mb-2">정의</h5>
+                  <p className="text-gray-700">웨이퍼 전체 영역에서 식각 특성(깊이, 프로파일)이 얼마나 일관적인지 나타내는 지표</p>
+                  <div className="mt-3 p-3 bg-white rounded border-2 border-blue-300">
+                    <p className="font-mono text-center text-lg">Uniformity (%) = ± [(Max - Min) / (2 × Average)] × 100</p>
+                    <p className="text-sm text-gray-600 text-center mt-2">목표: ±3% 이내 (선단 공정)</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-red-800 mb-3">불균일성의 원인</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>플라즈마 분포:</strong> 중심/가장자리 밀도 차이</li>
+                      <li>• <strong>가스 흐름:</strong> 불균일한 가스 공급</li>
+                      <li>• <strong>온도 분포:</strong> 웨이퍼 온도 불균일</li>
+                      <li>• <strong>전기장:</strong> RF 전력 분포 불균일</li>
+                      <li>• <strong>챔버 형상:</strong> 기하학적 비대칭</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-green-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-green-800 mb-3">균일성 개선 방법</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>압력 최적화:</strong> 충분히 높은 압력</li>
+                      <li>• <strong>가스 주입 설계:</strong> 다중 주입구</li>
+                      <li>• <strong>온도 제어:</strong> ESC 정밀 제어</li>
+                      <li>• <strong>전극 설계:</strong> 대칭적 전극 구조</li>
+                      <li>• <strong>회전:</strong> 웨이퍼 회전으로 평균화</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">균일성 측정 및 평가</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-white p-4 rounded shadow-sm text-center">
+                      <div className="text-3xl mb-2">📊</div>
+                      <p className="font-semibold text-gray-800">측정 방법</p>
+                      <p className="text-sm text-gray-600 mt-2">웨이퍼 49점/121점 측정</p>
+                    </div>
+                    <div className="bg-white p-4 rounded shadow-sm text-center">
+                      <div className="text-3xl mb-2">🎯</div>
+                      <p className="font-semibold text-gray-800">목표 균일성</p>
+                      <p className="text-sm text-gray-600 mt-2">Logic: ±2%, Memory: ±3%</p>
+                    </div>
+                    <div className="bg-white p-4 rounded shadow-sm text-center">
+                      <div className="text-3xl mb-2">⚡</div>
+                      <p className="font-semibold text-gray-800">Trade-off</p>
+                      <p className="text-sm text-gray-600 mt-2">속도 vs 균일성</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400">
+                  <h5 className="font-semibold text-yellow-800 mb-2">💡 실무 Tip</h5>
+                  <p className="text-sm text-gray-700">
+                    압력을 높이면 평균 자유 행정이 짧아져 이온-분자 충돌이 증가하므로 균일성이 개선되지만,
+                    대신 식각 속도가 감소하고 등방성 식각이 증가하여 프로파일이 나빠질 수 있습니다.
+                    따라서 공정 목표에 따라 최적점을 찾아야 합니다.
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">균일성 평가 개념도</h5>
+
+                  <div className="mb-4 text-center">
+                    <div className="text-lg mb-2">
+                      Uniformity(%) = <span className="text-sm">
+                        (max. etch rate - min. etch rate) / (max. etch rate + min. etch rate)
+                      </span> × 100% &nbsp;&nbsp;or
+                    </div>
+                    <div className="text-lg">
+                      = <span className="text-sm">
+                        (max. etch rate - min. etch rate) / (2 × average etch rate)
+                      </span> × 100%
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center">
+                    <svg width="350" height="350" viewBox="0 0 280 280">
+                      {/* 웨이퍼 원형 베이스 */}
+                      <circle cx="140" cy="140" r="130" fill="#f0f0f0" stroke="#000" strokeWidth="2"/>
+
+                      {/* 컬러 그라디언트 패턴들 */}
+                      <defs>
+                        <radialGradient id="etchGradient" cx="50%" cy="50%" r="50%">
+                          <stop offset="0%" style={{stopColor: '#4a0080'}} />
+                          <stop offset="15%" style={{stopColor: '#0000ff'}} />
+                          <stop offset="30%" style={{stopColor: '#00ffff'}} />
+                          <stop offset="45%" style={{stopColor: '#00ff00'}} />
+                          <stop offset="60%" style={{stopColor: '#ffff00'}} />
+                          <stop offset="75%" style={{stopColor: '#ff8000'}} />
+                          <stop offset="90%" style={{stopColor: '#ff0000'}} />
+                          <stop offset="100%" style={{stopColor: '#800000'}} />
+                        </radialGradient>
+                      </defs>
+
+                      <circle cx="140" cy="140" r="125" fill="url(#etchGradient)"/>
+
+                      {/* 격자 라인들 */}
+                      {[...Array(8)].map((_, i) => {
+                        const angle = (i * 45) * Math.PI / 180;
+                        const x1 = 140 + 20 * Math.cos(angle);
+                        const y1 = 140 + 20 * Math.sin(angle);
+                        const x2 = 140 + 120 * Math.cos(angle);
+                        const y2 = 140 + 120 * Math.sin(angle);
+                        return (
+                          <line key={`line-${i}`} x1={x1} y1={y1} x2={x2} y2={y2}
+                                stroke="#000" strokeWidth="0.5" opacity="0.3"/>
+                        );
+                      })}
+
+                      {[...Array(4)].map((_, i) => (
+                        <circle key={`circle-${i}`} cx="140" cy="140" r={30 + i * 25}
+                                fill="none" stroke="#000" strokeWidth="0.5" opacity="0.3"/>
+                      ))}
+
+                      {/* 측정 포인트들 */}
+                      {[
+                        {x: 140, y: 140, label: "35.4"},
+                        {x: 80, y: 80, label: "32.1"},
+                        {x: 200, y: 80, label: "28.9"},
+                        {x: 200, y: 200, label: "31.2"},
+                        {x: 80, y: 200, label: "33.8"},
+                      ].map((point, i) => (
+                        <g key={`point-${i}`}>
+                          <circle cx={point.x} cy={point.y} r="3" fill="#000"/>
+                          <text x={point.x} y={point.y - 8} fontSize="10" textAnchor="middle" fill="#000">
+                            {point.label}
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+
+                  {/* 범례 */}
+                  <div className="mt-4 text-center">
+                    <div className="inline-flex items-center space-x-2 text-xs">
+                      <span>Etch Rate:</span>
+                      <div className="w-4 h-3" style={{backgroundColor: '#4a0080'}}></div>
+                      <span>25</span>
+                      <div className="w-4 h-3" style={{backgroundColor: '#0000ff'}}></div>
+                      <span>27</span>
+                      <div className="w-4 h-3" style={{backgroundColor: '#00ffff'}}></div>
+                      <span>29</span>
+                      <div className="w-4 h-3" style={{backgroundColor: '#00ff00'}}></div>
+                      <span>31</span>
+                      <div className="w-4 h-3" style={{backgroundColor: '#ffff00'}}></div>
+                      <span>33</span>
+                      <div className="w-4 h-3" style={{backgroundColor: '#ff8000'}}></div>
+                      <span>35</span>
+                      <div className="w-4 h-3" style={{backgroundColor: '#ff0000'}}></div>
+                      <span>37 nm/min</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. 이방도 (Anisotropy) */}
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-pink-400">
+              <h4 className="text-2xl font-bold text-pink-800 mb-4">📐 4. 이방도 (Anisotropy)</h4>
+
+              <div className="space-y-4">
+                <div className="bg-pink-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-pink-900 mb-2">정의</h5>
+                  <p className="text-gray-700">마스크 패턴의 충실도를 나타내는 지표. 수직 방향과 수평 방향의 식각 속도 차이</p>
+                  <div className="mt-3 p-3 bg-white rounded border-2 border-pink-300">
+                    <p className="font-mono text-center text-lg">Anisotropy = 1 - (수평 식각률 / 수직 식각률)</p>
+                    <p className="text-sm text-gray-600 text-center mt-2">A = 1 (완전 이방성), A = 0 (완전 등방성)</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-blue-800 mb-3">이방성 식각 (Anisotropic)</h5>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <p className="font-semibold text-blue-900">특징:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• 수직 방향으로만 식각</li>
+                        <li>• 마스크 패턴 그대로 전사</li>
+                        <li>• 수직 프로파일 (90°)</li>
+                        <li>• 물리적 스퍼터링 우세</li>
+                      </ul>
+                      <p className="font-semibold text-blue-900 mt-3">조건:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• 저압력 (10-50 mTorr)</li>
+                        <li>• 고 바이어스 전압</li>
+                        <li>• 방향성 이온 충격</li>
+                        <li>• ICP 장비 사용</li>
+                      </ul>
+                      <p className="font-semibold text-blue-900 mt-3">응용:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• Gate 식각</li>
+                        <li>• Contact/Via 형성</li>
+                        <li>• MEMS, TSV</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="bg-orange-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-orange-800 mb-3">등방성 식각 (Isotropic)</h5>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <p className="font-semibold text-orange-900">특징:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• 모든 방향으로 균일하게 식각</li>
+                        <li>• 언더컷(undercut) 발생</li>
+                        <li>• 둥근 프로파일</li>
+                        <li>• 화학적 반응 우세</li>
+                      </ul>
+                      <p className="font-semibold text-orange-900 mt-3">조건:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• 고압력 (>100 mTorr)</li>
+                        <li>• 저 바이어스 전압</li>
+                        <li>• 라디칼 반응 우세</li>
+                        <li>• 습식 식각</li>
+                      </ul>
+                      <p className="font-semibold text-orange-900 mt-3">응용:</p>
+                      <ul className="space-y-1 ml-4">
+                        <li>• Spacer 형성</li>
+                        <li>• Recess 식각</li>
+                        <li>• 클리닝</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">프로파일 제어</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-center text-sm">
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-3xl mb-2">📏</div>
+                      <p className="font-semibold">Vertical</p>
+                      <p className="text-gray-600">90° 프로파일</p>
+                      <p className="text-xs text-blue-600 mt-1">A ~ 1.0</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-3xl mb-2">📐</div>
+                      <p className="font-semibold">Tapered</p>
+                      <p className="text-gray-600">경사 프로파일</p>
+                      <p className="text-xs text-green-600 mt-1">0.7 &lt; A &lt; 0.9</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-3xl mb-2">🌙</div>
+                      <p className="font-semibold">Undercut</p>
+                      <p className="text-gray-600">언더컷</p>
+                      <p className="text-xs text-orange-600 mt-1">0.3 &lt; A &lt; 0.7</p>
+                    </div>
+                    <div className="bg-white p-3 rounded shadow-sm">
+                      <div className="text-3xl mb-2">⭕</div>
+                      <p className="font-semibold">Isotropic</p>
+                      <p className="text-gray-600">등방성</p>
+                      <p className="text-xs text-red-600 mt-1">A ~ 0</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">이방도별 식각 프로파일</h5>
+
+                  <div className="mb-6">
+                    <svg width="100%" height="400" viewBox="0 0 800 400">
+                      {/* 상단 마스크와 언더컷 다이어그램 */}
+                      <g>
+                        <text x="90" y="20" fontSize="12" textAnchor="middle" fontWeight="bold">mask</text>
+
+                        {/* 언더컷 형상 - 마스크 중앙에서 아래로 향하는 엷은 회색 삼각형 */}
+                        <polygon points="90,35 50,75 130,75" fill="#d3d3d3"/>
+
+                        {/* 마스크 (회색 사각형) - 삼각형 위에 다시 그려서 중첩 부분 덮기 */}
+                        <rect x="50" y="30" width="80" height="25" fill="#999"/>
+
+                        {/* 언더컷 라벨 - 그림 오른쪽에 배치 */}
+                        <path d="M 115 60 L 140 58" stroke="#000" strokeWidth="1" fill="none"/>
+                        <text x="145" y="62" fontSize="10">undercut</text>
+                      </g>
+
+                      {/* 이방성 공식 */}
+                      <g transform="translate(50, 120)">
+                        <text x="0" y="0" fontSize="16" fontWeight="bold">A = 1 - R<tspan baselineShift="sub">l</tspan>/R<tspan baselineShift="sub">v</tspan></text>
+                        <text x="200" y="0" fontSize="14">A=0, isotropic etching</text>
+                        <text x="200" y="20" fontSize="14">A=1, anisotropic etching</text>
+                        <text x="0" y="40" fontSize="12" fill="red">R<tspan baselineShift="sub">L</tspan>: lateral etch rate</text>
+                        <text x="0" y="55" fontSize="12" fill="red">R<tspan baselineShift="sub">v</tspan>: vertical etch rate</text>
+                      </g>
+
+                      {/* 식각률 다이어그램 (우측 상단) */}
+                      <g transform="translate(450, 50)">
+                        <svg width="200" height="130" viewBox="0 0 300 200">
+                          {/* 기판 (맨 아래 패턴) */}
+                          <defs>
+                            <pattern id="substrate_aniso" patternUnits="userSpaceOnUse" width="8" height="8">
+                              <rect width="8" height="8" fill="white"/>
+                              <path d="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" stroke="#000" strokeWidth="0.5"/>
+                            </pattern>
+                          </defs>
+                          <rect x="0" y="160" width="300" height="40" fill="url(#substrate_aniso)"/>
+
+                          {/* 식각 대상물질 (회색) - 전체 */}
+                          <rect x="0" y="80" width="300" height="80" fill="#808080"/>
+
+                          {/* 마스크 (보라색) */}
+                          <rect x="0" y="60" width="80" height="20" fill="#8E44AD"/>
+                          <rect x="220" y="60" width="80" height="20" fill="#8E44AD"/>
+
+                          {/* 파인 부분도 모두 회색으로 채움 - x 표시 없음 */}
+                          <rect x="80" y="80" width="140" height="80" fill="#808080"/>
+                        </svg>
+                      </g>
+
+                      {/* 하단 3개 구조들 - 우측 상단 스타일로 통일 */}
+                      <g transform="translate(50, 200)">
+                        {/* Isotropic Etch - 반원형 형태로 파임 */}
+                        <g>
+                          <svg width="160" height="130" viewBox="0 0 300 200">
+                            {/* 기판 패턴 */}
+                            <defs>
+                              <pattern id="substrate_iso" patternUnits="userSpaceOnUse" width="8" height="8">
+                                <rect width="8" height="8" fill="white"/>
+                                <path d="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" stroke="#000" strokeWidth="0.5"/>
+                              </pattern>
+                            </defs>
+                            <rect x="0" y="160" width="300" height="40" fill="url(#substrate_iso)"/>
+
+                            {/* 식각 대상물질 (회색) */}
+                            <rect x="0" y="80" width="300" height="80" fill="#808080"/>
+
+                            {/* 마스크 (보라색) */}
+                            <rect x="0" y="60" width="80" height="20" fill="#8E44AD"/>
+                            <rect x="220" y="60" width="80" height="20" fill="#8E44AD"/>
+
+                            {/* 등방성 식각 - 타원 중심을 위로 올려서 아래 회색 부분이 보이도록 */}
+                            <ellipse cx="150" cy="90" rx="80" ry="60" fill="white"/>
+
+                            {/* 마스크 재적용 - 식각되지 않는 보라색 마스크 */}
+                            <rect x="0" y="60" width="80" height="20" fill="#8E44AD"/>
+                            <rect x="220" y="60" width="80" height="20" fill="#8E44AD"/>
+                          </svg>
+                          <text x="80" y="150" fontSize="12" textAnchor="middle" fontWeight="bold" fill="green">Isotropic Etch</text>
+                        </g>
+
+                        {/* Directional Etch - 경사진 형태 */}
+                        <g transform="translate(200, 0)">
+                          <svg width="160" height="130" viewBox="0 0 300 200">
+                            {/* 기판 패턴 */}
+                            <defs>
+                              <pattern id="substrate_dir" patternUnits="userSpaceOnUse" width="8" height="8">
+                                <rect width="8" height="8" fill="white"/>
+                                <path d="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" stroke="#000" strokeWidth="0.5"/>
+                              </pattern>
+                            </defs>
+                            <rect x="0" y="160" width="300" height="40" fill="url(#substrate_dir)"/>
+
+                            {/* 식각 대상물질 (회색) */}
+                            <rect x="0" y="80" width="300" height="80" fill="#808080"/>
+
+                            {/* 마스크 (보라색) */}
+                            <rect x="0" y="60" width="80" height="20" fill="#8E44AD"/>
+                            <rect x="220" y="60" width="80" height="20" fill="#8E44AD"/>
+
+                            {/* 방향성 식각 - 경사진 형태 */}
+                            <polygon points="80,80 100,160 200,160 220,80" fill="white"/>
+                          </svg>
+                          <text x="80" y="150" fontSize="12" textAnchor="middle" fontWeight="bold" fill="green">Directional Etch</text>
+                        </g>
+
+                        {/* Vertical Etch - 수직 형태 */}
+                        <g transform="translate(400, 0)">
+                          <svg width="160" height="130" viewBox="0 0 300 200">
+                            {/* 기판 패턴 */}
+                            <defs>
+                              <pattern id="substrate_ver" patternUnits="userSpaceOnUse" width="8" height="8">
+                                <rect width="8" height="8" fill="white"/>
+                                <path d="M0,8 L8,0 M-2,2 L2,-2 M6,10 L10,6" stroke="#000" strokeWidth="0.5"/>
+                              </pattern>
+                            </defs>
+                            <rect x="0" y="160" width="300" height="40" fill="url(#substrate_ver)"/>
+
+                            {/* 식각 대상물질 (회색) */}
+                            <rect x="0" y="80" width="300" height="80" fill="#808080"/>
+
+                            {/* 마스크 (보라색) */}
+                            <rect x="0" y="60" width="80" height="20" fill="#8E44AD"/>
+                            <rect x="220" y="60" width="80" height="20" fill="#8E44AD"/>
+
+                            {/* 수직 식각 - 바닥에 회색 남김 */}
+                            <rect x="80" y="80" width="140" height="40" fill="white"/>
+
+                            {/* 바닥에 남은 회색 물질 - 마스크 두께의 두배 */}
+                            <rect x="80" y="120" width="140" height="40" fill="#808080"/>
+                          </svg>
+                          <text x="80" y="150" fontSize="12" textAnchor="middle" fontWeight="bold" fill="green">Vertical Etch</text>
+                        </g>
+                      </g>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Loading Effect */}
+            <div className="bg-white p-6 rounded-lg shadow-md border-l-4 border-purple-400">
+              <h4 className="text-2xl font-bold text-purple-800 mb-4">🔄 5. Loading Effect (로딩 효과)</h4>
+
+              <div className="space-y-4">
+                <div className="bg-purple-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-purple-900 mb-2">정의</h5>
+                  <p className="text-gray-700">
+                    패턴 밀도(open area ratio)에 따라 식각 속도가 달라지는 현상.
+                    식각되는 면적이 클수록 반응 가스가 빠르게 소모되어 식각 속도가 감소합니다.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-red-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-red-800 mb-3">발생 원인</h5>
+                    <ul className="space-y-2 text-sm text-gray-700">
+                      <li>• <strong>Reactant Depletion:</strong> 반응 가스의 국부적 소모</li>
+                      <li>• <strong>Product Accumulation:</strong> 반응 부산물의 축적</li>
+                      <li>• <strong>Ion Shadowing:</strong> 이온 플럭스 불균일</li>
+                      <li>• <strong>Radical Loss:</strong> 라디칼 재결합/확산</li>
+                      <li>• <strong>Temperature Rise:</strong> 고밀도 영역 온도 상승</li>
+                    </ul>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h5 className="font-semibold text-blue-800 mb-3">Loading Effect 종류</h5>
+                    <div className="space-y-3 text-sm">
+                      <div className="bg-white p-2 rounded">
+                        <p className="font-semibold text-blue-900">Macro Loading</p>
+                        <p className="text-gray-700">웨이퍼 간 또는 웨이퍼 내 대면적 차이</p>
+                      </div>
+                      <div className="bg-white p-2 rounded">
+                        <p className="font-semibold text-blue-900">Micro Loading</p>
+                        <p className="text-gray-700">미세 패턴 간 밀도 차이 (수십 μm)</p>
+                      </div>
+                      <div className="bg-white p-2 rounded">
+                        <p className="font-semibold text-blue-900">ARDE Effect</p>
+                        <p className="text-gray-700">Aspect Ratio에 따른 식각률 변화</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-green-800 mb-3">개선 방법</h5>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="font-semibold text-green-900 mb-2">공정 조건 최적화:</p>
+                      <ul className="space-y-1 text-gray-700 ml-4">
+                        <li>• 가스 유량 증가 (충분한 공급)</li>
+                        <li>• 압력 최적화</li>
+                        <li>• Over-etch 시간 조절</li>
+                        <li>• 다단계 식각 (main + soft)</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-green-900 mb-2">설계 최적화:</p>
+                      <ul className="space-y-1 text-gray-700 ml-4">
+                        <li>• Dummy pattern 추가</li>
+                        <li>• 패턴 밀도 균일화</li>
+                        <li>• OPC (Optical Proximity Correction)</li>
+                        <li>• 레이아웃 최적화</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h5 className="font-semibold text-gray-800 mb-3">실제 영향 예시</h5>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-200">
+                        <tr>
+                          <th className="p-2 text-left">패턴 밀도</th>
+                          <th className="p-2 text-center">상대 식각률</th>
+                          <th className="p-2 text-left">문제점</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        <tr className="bg-white">
+                          <td className="p-2">High Density (80%)</td>
+                          <td className="p-2 text-center font-bold text-red-700">0.7-0.8×</td>
+                          <td className="p-2">Under-etch, Residue</td>
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <td className="p-2">Medium Density (50%)</td>
+                          <td className="p-2 text-center font-bold text-green-700">1.0×</td>
+                          <td className="p-2">기준 (정상)</td>
+                        </tr>
+                        <tr className="bg-white">
+                          <td className="p-2">Low Density (20%)</td>
+                          <td className="p-2 text-center font-bold text-blue-700">1.1-1.3×</td>
+                          <td className="p-2">Over-etch, 손상</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-400">
+                  <h5 className="font-semibold text-yellow-800 mb-2">💡 실무에서</h5>
+                  <p className="text-sm text-gray-700">
+                    Loading Effect는 특히 대면적 DRAM이나 고밀도 Logic 소자에서 심각한 문제가 됩니다.
+                    예를 들어, DRAM의 Cell Array(고밀도)와 Periphery(저밀도) 사이에 20-30%의 식각률 차이가 발생할 수 있어,
+                    Dummy Pattern을 삽입하거나 다단계 식각 공정을 사용하여 보상해야 합니다.
+                  </p>
+                </div>
+
+                {/* 마이크로 로딩 효과 */}
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                  <h3 className="text-xl font-bold mb-3 text-blue-800">마이크로 로딩 효과 (Micro Loading Effect)</h3>
+
+                  <div className="mb-4 space-y-2 text-sm">
+                    <div>
+                      <span className="font-semibold text-blue-700">정의:</span> 패턴이 좁고 깊어지면서 발생하는 현상. 좁은 패턴 내부로 반응물은 들어가지만, 부산물이 제대로 배출되지 않아 식각 속도가 느려짐.
+                    </div>
+                    <div>
+                      <span className="font-semibold text-blue-700">원인:</span> 좁고 깊은 패턴 내에서 부산물(Byproduct)의 배출(Pump Out) 속도 차이 때문에 발생.
+                    </div>
+                    <div>
+                      <span className="font-semibold text-blue-700">해결 방법:</span>
+                      <ul className="list-disc list-inside ml-4 mt-1">
+                        <li>공정 압력 조절: 압력을 낮춰 반응물 및 부산물의 잔류 시간 감소</li>
+                        <li>펄싱 식각 기법: 플라즈마를 켜고 끄는 펄싱 기법으로 Off 상태에서 부산물 배출 시간 확보</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center mb-4">
+                    <svg width="100%" height="200" viewBox="0 0 300 200">
+                      {/* 기판 (맨 아래 패턴) */}
+                      <defs>
+                        <pattern id="substrate_micro" patternUnits="userSpaceOnUse" width="2" height="2">
+                          <rect width="2" height="2" fill="white"/>
+                          <path d="M0,2 L2,0 M-0.5,0.5 L0.5,-0.5 M1.5,2.5 L2.5,1.5" stroke="#000" strokeWidth="0.2"/>
+                        </pattern>
+                      </defs>
+                      <rect x="0" y="160" width="300" height="40" fill="url(#substrate_micro)"/>
+
+                      {/* 식각 대상물질 (초록색) */}
+                      <rect x="0" y="80" width="300" height="80" fill="#4CAF50"/>
+
+                      {/* 마스크 (보라색) */}
+                      <rect x="0" y="60" width="80" height="20" fill="#8E44AD"/>
+                      <rect x="220" y="60" width="80" height="20" fill="#8E44AD"/>
+
+                      {/* 식각된 영역들 - 4개의 좁은 패턴 + 1개의 넓은 패턴 (파란 배경색) */}
+                      <rect x="20" y="60" width="20" height="80" fill="#EFF6FF"/>
+                      <rect x="60" y="60" width="20" height="80" fill="#EFF6FF"/>
+                      <rect x="100" y="60" width="20" height="80" fill="#EFF6FF"/>
+                      <rect x="140" y="60" width="20" height="80" fill="#EFF6FF"/>
+                      <rect x="200" y="60" width="60" height="90" fill="#EFF6FF"/>
+
+                      {/* 보라색 마스크 재적용 */}
+                      <rect x="0" y="60" width="20" height="20" fill="#8E44AD"/>
+                      <rect x="40" y="60" width="20" height="20" fill="#8E44AD"/>
+                      <rect x="80" y="60" width="20" height="20" fill="#8E44AD"/>
+                      <rect x="120" y="60" width="20" height="20" fill="#8E44AD"/>
+                      <rect x="160" y="60" width="40" height="20" fill="#8E44AD"/>
+                      <rect x="260" y="60" width="40" height="20" fill="#8E44AD"/>
+
+                      {/* 작은 패턴들 안의 위쪽 화살표 - 첫 번째 패턴 */}
+                      <g>
+                        <line x1="30" y1="125" x2="30" y2="70" stroke="black" strokeWidth="1.2"/>
+                        <polygon points="30,70 27,75 33,75" fill="black"/>
+                      </g>
+
+                      {/* 두 번째 패턴 */}
+                      <g>
+                        <line x1="70" y1="125" x2="70" y2="70" stroke="black" strokeWidth="1.2"/>
+                        <polygon points="70,70 67,75 73,75" fill="black"/>
+                      </g>
+
+                      {/* 세 번째 패턴 */}
+                      <g>
+                        <line x1="110" y1="125" x2="110" y2="70" stroke="black" strokeWidth="1.2"/>
+                        <polygon points="110,70 107,75 113,75" fill="black"/>
+                      </g>
+
+                      {/* 네 번째 패턴 */}
+                      <g>
+                        <line x1="150" y1="125" x2="150" y2="70" stroke="black" strokeWidth="1.2"/>
+                        <polygon points="150,70 147,75 153,75" fill="black"/>
+                      </g>
+
+                      {/* B 표시 - 넓은 패턴 깊이 (더 깊음) - 위쪽 화살표만 */}
+                      <g>
+                        <line x1="230" y1="135" x2="230" y2="70" stroke="black" strokeWidth="1.5"/>
+                        <polygon points="230,70 227,75 233,75" fill="black"/>
+                      </g>
+
+                      {/* The Difference of Pump out rate 텍스트 */}
+                      <text x="150" y="50" fontSize="11" textAnchor="middle" fill="black" fontWeight="bold">The Difference of Pump out rate</text>
+                    </svg>
+                  </div>
+                  <p className="text-xs text-center text-gray-600">좁은 패턴(A)은 부산물 배출이 어려워 식각이 느리고, 넓은 패턴(B)은 배출이 원활하여 더 깊게 식각됨</p>
+                </div>
+
+                {/* 매크로 로딩 효과 */}
+                <div className="mb-6 p-4 bg-green-50 rounded-lg">
+                  <h3 className="text-xl font-bold mb-3 text-green-800">매크로 로딩 효과 (Macro Loading Effect)</h3>
+
+                  <div className="mb-4 space-y-2 text-sm">
+                    <div>
+                      <span className="font-semibold text-green-700">정의:</span> 식각 면적의 패턴 밀도가 전체적으로 달라질 때 발생. 단위 면적당 반응물이 부족해져, 넓은 영역의 식각 속도가 느려지고 좁은 패턴의 식각 속도는 빨라지는 현상.
+                    </div>
+                    <div>
+                      <span className="font-semibold text-green-700">원인:</span> 일정하게 공급되는 반응 가스가 면적 전체에 고르게 공급되지 못해 발생.
+                    </div>
+                    <div>
+                      <span className="font-semibold text-green-700">해결 방법:</span>
+                      <ul className="list-disc list-inside ml-4 mt-1">
+                        <li>공정 조건 조절: 압력을 높여 반응 가스 공급을 원활하게 하거나, Bias Power를 감소시켜 고에너지 이온 영향 감소</li>
+                        <li>더미 패턴 삽입: 넓은 영역에 더미(dummy) 패턴을 삽입하여 패턴 밀도를 균일하게 조정</li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center mb-4">
+                    <svg width="100%" height="240" viewBox="0 0 400 240">
+                      {/* 기판 (맨 아래 패턴) */}
+                      <defs>
+                        <pattern id="substrate_macro_new" patternUnits="userSpaceOnUse" width="2" height="2">
+                          <rect width="2" height="2" fill="white"/>
+                          <path d="M0,2 L2,0 M-0.5,0.5 L0.5,-0.5 M1.5,2.5 L2.5,1.5" stroke="#000" strokeWidth="0.2"/>
+                        </pattern>
+                      </defs>
+                      <rect x="0" y="200" width="400" height="40" fill="url(#substrate_macro_new)"/>
+
+                      {/* 식각 대상물질 (초록색) */}
+                      <rect x="0" y="100" width="400" height="100" fill="#4CAF50"/>
+
+                      {/* 왼쪽: 좁은 홀들 (패턴 밀도 높음) - 위에서 아래까지 완전히 뚫림 - 초록색 배경 */}
+                      <rect x="20" y="0" width="18" height="170" fill="#f0fdf4"/>
+                      <rect x="50" y="0" width="18" height="170" fill="#f0fdf4"/>
+                      <rect x="80" y="0" width="18" height="170" fill="#f0fdf4"/>
+                      <rect x="110" y="0" width="18" height="170" fill="#f0fdf4"/>
+
+                      {/* 오른쪽: 넓은 홀 (패턴 밀도 낮음) - 더 얕게 식각됨 - 초록색 배경 */}
+                      <rect x="220" y="0" width="100" height="140" fill="#f0fdf4"/>
+
+                      {/* 보라색 마스크들 - 뚫리지 않은 부분에만 배치 */}
+                      {/* 맨 왼쪽 */}
+                      <rect x="0" y="100" width="20" height="15" fill="#8E44AD"/>
+                      {/* 첫번째와 두번째 홀 사이 */}
+                      <rect x="38" y="100" width="12" height="15" fill="#8E44AD"/>
+                      {/* 두번째와 세번째 홀 사이 */}
+                      <rect x="68" y="100" width="12" height="15" fill="#8E44AD"/>
+                      {/* 세번째와 네번째 홀 사이 */}
+                      <rect x="98" y="100" width="12" height="15" fill="#8E44AD"/>
+                      {/* 네번째 홀 후부터 오른쪽 큰 홀 전까지 */}
+                      <rect x="128" y="100" width="92" height="15" fill="#8E44AD"/>
+                      {/* 오른쪽 영역 - 큰 홀 오른쪽 */}
+                      <rect x="320" y="100" width="80" height="15" fill="#8E44AD"/>
+
+                      {/* The difference of Etchant Concentration per Unit Area 텍스트 */}
+                      <text x="200" y="90" fontSize="11" textAnchor="middle" fill="black" fontWeight="bold">The difference of Etchant Concentration per Unit Area</text>
+                    </svg>
+                  </div>
+                  <p className="text-xs text-center text-gray-600">
+                    왼쪽: 패턴 밀도가 높아 반응물이 분산되어 얕게 식각됨 | 오른쪽: 패턴 밀도가 낮아 반응물이 집중되어 깊게 식각됨
+                  </p>
+                </div>
+
+                {/* 비교 표 */}
+                <div className="mt-6">
+                  <h3 className="text-lg font-bold mb-3 text-center">마이크로 vs 매크로 로딩 효과 비교</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse border border-gray-300 text-sm">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="border border-gray-300 px-4 py-2">구분</th>
+                          <th className="border border-gray-300 px-4 py-2 bg-blue-50">마이크로 로딩</th>
+                          <th className="border border-gray-300 px-4 py-2 bg-green-50">매크로 로딩</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="border border-gray-300 px-4 py-2 font-semibold">발생 원인</td>
+                          <td className="border border-gray-300 px-4 py-2">좁고 깊은 패턴 내 부산물 배출 지연</td>
+                          <td className="border border-gray-300 px-4 py-2">패턴 밀도 차이로 인한 반응물 공급 부족</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-300 px-4 py-2 font-semibold">영향</td>
+                          <td className="border border-gray-300 px-4 py-2">좁은 패턴 내부의 식각 속도 저하</td>
+                          <td className="border border-gray-300 px-4 py-2">넓은 영역과 좁은 패턴의 식각 속도 차이</td>
+                        </tr>
+                        <tr>
+                          <td className="border border-gray-300 px-4 py-2 font-semibold">주요 해결책</td>
+                          <td className="border border-gray-300 px-4 py-2">압력 감소, 펄싱 식각 기법</td>
+                          <td className="border border-gray-300 px-4 py-2">압력 증가, Bias Power 감소, 더미 패턴 삽입</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 요약 */}
+            <div className="bg-gradient-to-r from-blue-50 via-purple-50 to-pink-50 p-6 rounded-lg border-2 border-indigo-200">
+              <h4 className="text-xl font-bold text-indigo-900 mb-4">🎯 5대 요소 종합 정리</h4>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-3 text-sm text-center">
+                <div className="bg-white p-3 rounded-lg shadow">
+                  <div className="text-2xl mb-2">⚡</div>
+                  <p className="font-semibold text-yellow-800">식각률</p>
+                  <p className="text-xs text-gray-600 mt-1">생산성</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg shadow">
+                  <div className="text-2xl mb-2">🎯</div>
+                  <p className="font-semibold text-green-800">선택성</p>
+                  <p className="text-xs text-gray-600 mt-1">공정 마진</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg shadow">
+                  <div className="text-2xl mb-2">⚖️</div>
+                  <p className="font-semibold text-blue-800">균일성</p>
+                  <p className="text-xs text-gray-600 mt-1">수율</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg shadow">
+                  <div className="text-2xl mb-2">📐</div>
+                  <p className="font-semibold text-pink-800">이방도</p>
+                  <p className="text-xs text-gray-600 mt-1">패턴 충실도</p>
+                </div>
+                <div className="bg-white p-3 rounded-lg shadow">
+                  <div className="text-2xl mb-2">🔄</div>
+                  <p className="font-semibold text-purple-800">로딩효과</p>
+                  <p className="text-xs text-gray-600 mt-1">밀도 보상</p>
+                </div>
+              </div>
+              <p className="text-center text-gray-700 mt-4">
+                이 5가지 요소는 서로 연관되어 있으며, 최적의 공정을 위해서는 trade-off를 고려한 균형 잡힌 설정이 필요합니다.
+              </p>
             </div>
           </div>
         );
@@ -379,10 +1638,10 @@ const EtchSimulator = () => {
         return (
           <div className="space-y-6">
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-6 rounded-lg">
-              <h3 className="text-xl font-bold text-green-800 mb-4">🔬 식각 실험 시뮬레이션</h3>
+              <h3 className="text-xl font-bold text-green-800 mb-4">🧪 식각 원리 시뮬레이션</h3>
               <p className="text-gray-700">
-                실제 식각 장비를 조작하여 다양한 물질의 식각 공정을 체험해보세요.
-                가스 조성, 압력, 파워 등을 조절하여 최적의 식각 조건을 찾아보세요.
+                실제 식각 장비를 조작하여 다양한 물질의 식각 원리를 체험해보세요.
+                가스 조성, 압력, 파워 등을 조절하며 화학 반응과 물리적 메커니즘을 이해해보세요.
               </p>
             </div>
 
@@ -754,365 +2013,6 @@ const EtchSimulator = () => {
             </div>
 
             <div className="bg-white p-6 rounded-lg shadow-md">
-              <h4 className="text-lg font-semibold mb-4">실시간 식각 과정 시뮬레이션</h4>
-
-              <div className="flex justify-center">
-                <svg width="500" height="350" viewBox="0 0 500 350">
-                  {/* 챔버 외곽 */}
-                  <rect x="50" y="50" width="400" height="250" fill="none" stroke="#374151" strokeWidth="2" rx="5"/>
-                  <text x="250" y="40" textAnchor="middle" className="text-sm font-bold">Etch Chamber</text>
-
-                  {/* 기판 */}
-                  <rect x="100" y="250" width="300" height="30" fill="#4a5568" />
-                  <text x="250" y="270" textAnchor="middle" fill="white" className="text-xs font-semibold">
-                    {etchTarget === 'PR' ? 'Si Substrate (with PR)' : 'Si Substrate'}
-                  </text>
-
-                  {/* 1. 전체 타겟층 - 마스크로 보호된 부분만, 타겟에 따라 색상 변경 */}
-                  <rect x="100" y="220" width="80" height="30" fill={
-                    etchTarget === 'Si' ? "#60a5fa" :
-                    etchTarget === 'SiO2' ? "#94a3b8" :
-                    etchTarget === 'Si3N4' ? "#a855f7" :
-                    "#fbbf24"
-                  } />
-                  <rect x="220" y="220" width="60" height="30" fill={
-                    etchTarget === 'Si' ? "#60a5fa" :
-                    etchTarget === 'SiO2' ? "#94a3b8" :
-                    etchTarget === 'Si3N4' ? "#a855f7" :
-                    "#fbbf24"
-                  } />
-                  <rect x="320" y="220" width="80" height="30" fill={
-                    etchTarget === 'Si' ? "#60a5fa" :
-                    etchTarget === 'SiO2' ? "#94a3b8" :
-                    etchTarget === 'Si3N4' ? "#a855f7" :
-                    "#fbbf24"
-                  } />
-
-                  {/* 노출된 타겟 영역 - 식각에 따라 크기 변화, 타겟에 따라 색상 변경 */}
-                  {isSimulating && (() => {
-                    const targetEtchProgress = Math.min(etchDepth / 80, 1);
-                    const remainingHeight = Math.max(0, 30 - (targetEtchProgress * 35)); // 최대 35px까지 식각
-                    const etchedFromTop = Math.min(targetEtchProgress * 35, 35);
-                    const targetColor =
-                      etchTarget === 'Si' ? "#60a5fa" :
-                      etchTarget === 'SiO2' ? "#94a3b8" :
-                      etchTarget === 'Si3N4' ? "#a855f7" :
-                      "#fbbf24";
-
-                    return (
-                      <>
-                        {remainingHeight > 0 && (
-                          <>
-                            <rect
-                              x="180"
-                              y={220 + etchedFromTop}
-                              width="40"
-                              height={remainingHeight}
-                              fill={targetColor}
-                            />
-                            <rect
-                              x="280"
-                              y={220 + etchedFromTop}
-                              width="40"
-                              height={remainingHeight}
-                              fill={targetColor}
-                            />
-                          </>
-                        )}
-                      </>
-                    );
-                  })()}
-
-                  {/* 2. 마스크 (황색) - 식각에 따라 크기 변화 */}
-                  {isSimulating && (() => {
-                    const maskEtchProgress = Math.min(etchDepth / 200, 0.8);
-                    const maskRemainingHeight = Math.max(0, 10 - (maskEtchProgress * 10));
-                    const maskEtchedFromTop = Math.min(maskEtchProgress * 10, 10);
-
-                    return maskRemainingHeight > 0 ? (
-                      <>
-                        <rect
-                          x="100"
-                          y={210 + maskEtchedFromTop}
-                          width="80"
-                          height={maskRemainingHeight}
-                          fill="#fbbf24"
-                        />
-                        <rect
-                          x="220"
-                          y={210 + maskEtchedFromTop}
-                          width="60"
-                          height={maskRemainingHeight}
-                          fill="#fbbf24"
-                        />
-                        <rect
-                          x="320"
-                          y={210 + maskEtchedFromTop}
-                          width="80"
-                          height={maskRemainingHeight}
-                          fill="#fbbf24"
-                        />
-                      </>
-                    ) : null;
-                  })()}
-
-                  {/* 3. 플라즈마 및 이온들 - 타겟에 따라 다른 이온 타입 */}
-                  {Array.from({length: 20}, (_, i) => {
-                    const seed = i * 23 + 37;
-                    const x = 60 + (seed % 380);
-                    const cyclePeriod = 100;
-                    const ionCycle = (animatedValue * 3 + i * 15) % cyclePeriod;
-                    const isActive = ionCycle < 70;
-                    const ionY = 60 + ionCycle * 2.5;
-
-                    // 타겟에 따라 다른 이온 타입 정의
-                    const getIonsByTarget = (target) => {
-                      switch(target) {
-                        case 'Si':
-                          return [
-                            { color: "#dc2626", name: "Cl+", size: 2 },
-                            { color: "#7c3aed", name: "Ar+", size: 2.5 },
-                            { color: "#ea580c", name: "HBr+", size: 1.8 }
-                          ];
-                        case 'SiO2':
-                          return [
-                            { color: "#059669", name: "F+", size: 1.5 },
-                            { color: "#0891b2", name: "CF3+", size: 2 },
-                            { color: "#7c3aed", name: "Ar+", size: 2.5 }
-                          ];
-                        case 'Si3N4':
-                          return [
-                            { color: "#059669", name: "F+", size: 1.5 },
-                            { color: "#0891b2", name: "CHF2+", size: 1.8 },
-                            { color: "#dc2626", name: "O+", size: 1.3 }
-                          ];
-                        case 'PR':
-                          return [
-                            { color: "#dc2626", name: "O+", size: 1.5 },
-                            { color: "#ea580c", name: "O2+", size: 1.8 },
-                            { color: "#7c3aed", name: "Ar+", size: 2 }
-                          ];
-                        default:
-                          return [
-                            { color: "#7c3aed", name: "Ion+", size: 2 }
-                          ];
-                      }
-                    };
-
-                    const ionTypes = getIonsByTarget(etchTarget);
-                    const ionType = ionTypes[seed % ionTypes.length];
-
-                    // 표면 충돌 확인
-                    const maskSurface = 210 + (etchDepth > 200 ? 10 : (etchDepth / 200) * 10);
-                    const targetSurface = 220 + Math.min(etchDepth / 80, 1) * 35;
-
-                    const hitsMask = ((x >= 100 && x <= 180) || (x >= 220 && x <= 280) || (x >= 320 && x <= 400));
-                    const hitsTarget = ((x >= 180 && x <= 220) || (x >= 280 && x <= 320));
-
-                    const hasCollision = (hitsMask && ionY >= maskSurface) || (hitsTarget && ionY >= targetSurface);
-
-                    return isActive && !hasCollision ? (
-                      <g key={i}>
-                        <circle
-                          cx={x}
-                          cy={ionY}
-                          r={ionType.size}
-                          fill={ionType.color}
-                          opacity="0.8"
-                          style={{
-                            animation: 'flash 0.5s ease-in-out infinite'
-                          }}
-                        />
-                        {/* 이온 궤적 */}
-                        <line
-                          x1={x}
-                          y1={ionY - 10}
-                          x2={x}
-                          y2={ionY}
-                          stroke={ionType.color}
-                          strokeWidth="1"
-                          opacity="0.4"
-                        />
-                      </g>
-                    ) : null;
-                  })}
-
-                  {/* 4. 반응 생성물 상승 - 타겟에 따라 다른 생성물 */}
-                  {Array.from({length: 12}, (_, i) => {
-                    const seed = i * 29 + 53;
-                    const riseX = 70 + (seed % 360);
-                    const riseCycle = (animatedValue * 2 + i * 25) % 200;
-                    const isRising = riseCycle < 140;
-                    const riseDistance = riseCycle * 1.8;
-                    const productY = 260 - riseDistance;
-
-                    // 타겟에 따라 다른 생성물 정의
-                    const getProductsByTarget = (target) => {
-                      switch(target) {
-                        case 'Si':
-                          return [
-                            { color: "#f97316", name: "SiCl4", size: 1.8 },
-                            { color: "#7c3aed", name: "Ar", size: 1.2 },
-                            { color: "#dc2626", name: "Cl2", size: 1.5 }
-                          ];
-                        case 'SiO2':
-                          return [
-                            { color: "#38bdf8", name: "SiF4", size: 1.5 },
-                            { color: "#84cc16", name: "CO2", size: 1.2 },
-                            { color: "#06b6d4", name: "CF2", size: 1.3 }
-                          ];
-                        case 'Si3N4':
-                          return [
-                            { color: "#38bdf8", name: "SiF4", size: 1.5 },
-                            { color: "#3b82f6", name: "N2", size: 1.4 },
-                            { color: "#a855f7", name: "CO", size: 1.2 }
-                          ];
-                        case 'PR':
-                          return [
-                            { color: "#84cc16", name: "CO2", size: 1.5 },
-                            { color: "#06b6d4", name: "H2O", size: 1.3 },
-                            { color: "#f59e0b", name: "O2", size: 1.1 }
-                          ];
-                        default:
-                          return [
-                            { color: "#84cc16", name: "Product", size: 1.5 }
-                          ];
-                      }
-                    };
-
-                    const products = getProductsByTarget(etchTarget);
-                    const product = products[seed % products.length];
-
-                    return isRising && productY > 60 ? (
-                      <g key={`rise-${i}`}>
-                        <circle
-                          cx={riseX}
-                          cy={productY}
-                          r={product.size}
-                          fill={product.color}
-                          opacity={0.7 - (riseDistance / 200)}
-                        />
-                        {/* 상승 궤적 */}
-                        <line
-                          x1={riseX}
-                          y1={productY}
-                          x2={riseX}
-                          y2={productY + 8}
-                          stroke={product.color}
-                          strokeWidth="0.5"
-                          opacity="0.3"
-                        />
-                        {/* 생성물 라벨 */}
-                        {riseDistance < 20 && (
-                          <text
-                            x={riseX + 8}
-                            y={productY + 2}
-                            className="text-xs"
-                            fill={product.color}
-                            opacity="0.7"
-                          >
-                            {product.name}
-                          </text>
-                        )}
-                      </g>
-                    ) : null;
-                  })}
-
-                  {/* 가스 입구 */}
-                  <circle cx="100" cy="70" r="5" fill="#6b7280" />
-                  <circle cx="250" cy="65" r="5" fill="#6b7280" />
-                  <circle cx="400" cy="70" r="5" fill="#6b7280" />
-                  <text x="250" y="55" textAnchor="middle" className="text-xs">Gas Inlet</text>
-
-                  {/* 진공 배출 */}
-                  <rect x="420" y="290" width="15" height="8" fill="#374151" />
-                  <text x="427" y="310" textAnchor="middle" className="text-xs">Pump</text>
-
-                  {/* 정보 표시 */}
-                  <g transform="translate(60, 210)">
-                    <rect x="0" y="0" width="110" height="60" fill="white" fillOpacity="0.95" stroke="#e5e7eb" strokeWidth="1" rx="3"/>
-
-                    {isSimulating ? (
-                      <>
-                        <text x="5" y="12" className="text-xs font-semibold">실시간 상태</text>
-                        <text x="5" y="25" className="text-xs">진행: {simulationProgress.toFixed(0)}%</text>
-                        <text x="5" y="37" className="text-xs">깊이: {(etchDepth * 2).toFixed(0)}nm</text>
-                        <text x="5" y="49" className="text-xs">{pressure}mT, {power}W</text>
-                      </>
-                    ) : (
-                      <>
-                        <text x="5" y="15" className="text-xs font-semibold">준비 상태</text>
-                        <text x="5" y="28" className="text-xs">타겟: {etchTarget}</text>
-                        <text x="5" y="41" className="text-xs">시작 대기중</text>
-                      </>
-                    )}
-                  </g>
-
-                  {/* 결과 표시 */}
-                  {endpointDetected && (
-                    <g transform="translate(350, 210)">
-                      <rect x="0" y="0" width="80" height="60" fill="green" fillOpacity="0.1" stroke="#10b981" strokeWidth="2" rx="3"/>
-                      <text x="5" y="12" className="text-xs font-semibold text-green-700">완료!</text>
-                      <text x="5" y="25" className="text-xs text-green-700">속도: {etchRate.toFixed(0)}</text>
-                      <text x="5" y="37" className="text-xs text-green-700">선택비: {selectivity.toFixed(1)}</text>
-                      <text x="5" y="49" className="text-xs text-green-700">End Point</text>
-                    </g>
-                  )}
-
-                  {/* CSS 애니메이션 */}
-                  <defs>
-                    <style>{`
-                      @keyframes flash {
-                        0% { r: 1; opacity: 1; }
-                        50% { r: 3; opacity: 0.8; }
-                        100% { r: 5; opacity: 0; }
-                      }
-                    `}</style>
-                  </defs>
-                </svg>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-sm bg-gray-50 p-4 rounded-lg">
-                <div className="text-center">
-                  <div className="font-semibold text-purple-700 mb-1">1. 플라즈마 분해</div>
-                  <p className="text-gray-600">
-                    {etchTarget === 'Si' && 'Cl2, HBr, Ar 가스가 플라즈마로 분해됨'}
-                    {etchTarget === 'SiO2' && 'CF4, CHF3 가스가 F 라디칼 생성'}
-                    {etchTarget === 'Si3N4' && 'CHF3, O2 가스가 F 라디칼과 O 라디칼 생성'}
-                    {etchTarget === 'PR' && 'O2 가스가 O 라디칼로 분해됨'}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="font-semibold text-red-700 mb-1">2. 표면 반응</div>
-                  <p className="text-gray-600">
-                    {etchTarget === 'Si' && 'Cl 라디칼이 Si와 반응하여 SiCl4 형성'}
-                    {etchTarget === 'SiO2' && 'F 라디칼이 Si-O 결합을 끊어 SiF4 형성'}
-                    {etchTarget === 'Si3N4' && 'F 라디칼이 Si-N 결합 공격, O2로 탄소 제거'}
-                    {etchTarget === 'PR' && 'O 라디칼이 C-C, C-H 결합을 절단'}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="font-semibold text-blue-700 mb-1">3. 생성물 배출</div>
-                  <p className="text-gray-600">
-                    {etchTarget === 'Si' && 'SiCl4가 기체상으로 상승하여 배출'}
-                    {etchTarget === 'SiO2' && 'SiF4, CO2가 휘발성 기체로 배출'}
-                    {etchTarget === 'Si3N4' && 'SiF4, N2가 안정한 기체로 배출'}
-                    {etchTarget === 'PR' && 'CO2, H2O가 완전 연소 생성물로 배출'}
-                  </p>
-                </div>
-                <div className="text-center">
-                  <div className="font-semibold text-orange-700 mb-1">4. 선택비 제어</div>
-                  <p className="text-gray-600">
-                    {etchTarget === 'Si' && 'HBr 첨가로 옥사이드 선택비 향상'}
-                    {etchTarget === 'SiO2' && '폴리머 형성으로 Si 보호, 선택적 식각'}
-                    {etchTarget === 'Si3N4' && '적절한 F/C 비율로 선택비 조절'}
-                    {etchTarget === 'PR' && '무기물은 O2에 반응하지 않아 완전 선택적'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
               <h4 className="text-lg font-semibold mb-4">식각 장비별 특성 및 응용</h4>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -1184,23 +2084,26 @@ const EtchSimulator = () => {
               <div className="space-y-6">
                 <div className="bg-red-50 p-5 rounded-lg border-l-4 border-red-400">
                   <h5 className="text-lg font-semibold text-red-800 mb-3">기술적 도전과제</h5>
+                  <p className="text-sm text-gray-700 mb-4">
+                    반도체 공정이 3nm 이하로 극미세화되면서 식각 기술도 더욱 정밀하고 까다로워지고 있습니다.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">극미세화 (3nm 이하)</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>Critical Dimension (CD) &lt; 10nm</li>
-                        <li>Aspect Ratio &gt; 50:1</li>
-                        <li>Line Edge Roughness (LER) &lt; 1nm</li>
-                        <li>Plasma Damage 최소화</li>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>Critical Dimension (CD) &lt; 10nm:</strong> 회로 선폭이 10nm보다 작아져 원자 수십 개 수준의 정밀도로 식각해야 함</li>
+                        <li>• <strong>Aspect Ratio &gt; 50:1:</strong> 깊이가 폭의 50배 이상인 구조. 깊은 구멍 속까지 균일하게 식각하기 매우 어려움</li>
+                        <li>• <strong>Line Edge Roughness (LER) &lt; 1nm:</strong> 회로 가장자리가 1nm 이상 울퉁불퉁하면 성능 저하. 매우 매끄러운 식각 필요</li>
+                        <li>• <strong>Plasma Damage 최소화:</strong> 플라즈마의 고에너지 이온이 회로를 손상시킬 수 있어 손상 없는 식각 기술 개발 필요</li>
                       </ul>
                     </div>
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">새로운 재료 도입</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>EUV Resist (CAR → Metal Resist)</li>
-                        <li>High-k/Metal Gate Stack</li>
-                        <li>2D Materials (MoS₂, Graphene)</li>
-                        <li>Atomic Layer Etching (ALE) 필요</li>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>EUV Resist (CAR → Metal Resist):</strong> 극자외선 리소그래피용 감광제가 기존 화학증폭형에서 금속 함유 타입으로 변화. 식각 조건도 새롭게 최적화 필요</li>
+                        <li>• <strong>High-k/Metal Gate Stack:</strong> 고유전율 절연막과 금속 게이트 다층 구조. 각 층마다 다른 식각 조건 필요</li>
+                        <li>• <strong>2D Materials (MoS₂, Graphene):</strong> 차세대 반도체 소재인 2차원 물질. 두께가 원자 1-2층 수준이라 손상 없이 패터닝하기 극도로 어려움</li>
+                        <li>• <strong>Atomic Layer Etching (ALE) 필요:</strong> 원자층 단위로 한 층씩 식각하는 기술. 위 새로운 재료들을 정밀하게 가공하기 위해 필수</li>
                       </ul>
                     </div>
                   </div>
@@ -1208,32 +2111,38 @@ const EtchSimulator = () => {
 
                 <div className="bg-green-50 p-5 rounded-lg border-l-4 border-green-400">
                   <h5 className="text-lg font-semibold text-green-800 mb-3">글로벌 시장 현황</h5>
+                  <p className="text-sm text-gray-700 mb-4">
+                    Dry Etch 장비 시장은 소수의 글로벌 기업들이 주도하고 있으며, 반도체 미세화로 인해 지속적으로 성장하고 있습니다.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div className="bg-white p-4 rounded shadow">
                       <h6 className="font-semibold text-blue-700 mb-2">시장 점유율 (2024)</h6>
+                      <p className="text-xs text-gray-600 mb-2">식각 장비 시장은 3개 회사가 90% 이상 점유</p>
                       <ul className="space-y-1 text-gray-700">
-                        <li>Lam Research: ~45%</li>
-                        <li>Applied Materials: ~25%</li>
-                        <li>Tokyo Electron: ~20%</li>
-                        <li>Others: ~10%</li>
+                        <li>• <strong>Lam Research:</strong> 약 45% - 선도 기업, 최신 기술 보유</li>
+                        <li>• <strong>Applied Materials:</strong> 약 25% - 종합 반도체 장비 기업</li>
+                        <li>• <strong>Tokyo Electron:</strong> 약 20% - 일본 대표 장비사</li>
+                        <li>• <strong>Others:</strong> 약 10% - 중소 전문 업체들</li>
                       </ul>
                     </div>
                     <div className="bg-white p-4 rounded shadow">
                       <h6 className="font-semibold text-purple-700 mb-2">주요 고객사</h6>
+                      <p className="text-xs text-gray-600 mb-2">세계 최대 반도체 생산 기업들</p>
                       <ul className="space-y-1 text-gray-700">
-                        <li>TSMC (Taiwan)</li>
-                        <li>Samsung (Korea)</li>
-                        <li>Intel (USA)</li>
-                        <li>SK Hynix (Korea)</li>
+                        <li>• <strong>TSMC (대만):</strong> 세계 최대 파운드리, 최대 고객</li>
+                        <li>• <strong>Samsung (한국):</strong> 메모리 1위, 파운드리 2위</li>
+                        <li>• <strong>Intel (미국):</strong> CPU 제조사, 자체 팹 운영</li>
+                        <li>• <strong>SK Hynix (한국):</strong> DRAM/NAND 주요 업체</li>
                       </ul>
                     </div>
                     <div className="bg-white p-4 rounded shadow">
                       <h6 className="font-semibold text-orange-700 mb-2">시장 규모</h6>
+                      <p className="text-xs text-gray-600 mb-2">반도체 미세화로 지속 성장 중</p>
                       <ul className="space-y-1 text-gray-700">
-                        <li>2024: $15B+</li>
-                        <li>연평균 성장률: 8-10%</li>
-                        <li>Logic &gt; Memory &gt; Others</li>
-                        <li>아시아 시장 주도</li>
+                        <li>• <strong>2024년:</strong> 약 150억 달러 (약 20조원) 이상</li>
+                        <li>• <strong>성장률:</strong> 연평균 8-10% - 안정적 성장</li>
+                        <li>• <strong>용도별:</strong> Logic(로직) &gt; Memory(메모리) &gt; 기타 순</li>
+                        <li>• <strong>지역별:</strong> 아시아(한국/대만/중국) 시장이 주도</li>
                       </ul>
                     </div>
                   </div>
@@ -1241,23 +2150,28 @@ const EtchSimulator = () => {
 
                 <div className="bg-yellow-50 p-5 rounded-lg border-l-4 border-yellow-400">
                   <h5 className="text-lg font-semibold text-yellow-800 mb-3">환경 및 규제 이슈</h5>
+                  <p className="text-sm text-gray-700 mb-4">
+                    식각 공정에서 사용되는 불화합물 가스들은 강력한 온실가스로 환경 규제가 강화되고 있습니다.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">PFC 가스 규제</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>GWP (Global Warming Potential) 높음</li>
-                        <li>CF₄: 7,390배, SF₆: 22,800배</li>
-                        <li>EU REACH, 미국 EPA 규제 강화</li>
-                        <li>대체 가스 개발 필요</li>
+                      <p className="text-xs text-gray-600 mb-2">불소화합물 가스의 온실가스 문제</p>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>GWP (지구온난화지수) 매우 높음:</strong> 이산화탄소 대비 온실효과가 수천~수만 배</li>
+                        <li>• <strong>CF₄: 7,390배, SF₆: 22,800배:</strong> CF₄는 CO₂보다 7천배, SF₆는 2만배 이상 온실효과 유발</li>
+                        <li>• <strong>EU REACH, 미국 EPA 규제 강화:</strong> 유럽과 미국에서 사용량 제한과 배출 규제 강화 중</li>
+                        <li>• <strong>대체 가스 개발 필요:</strong> 환경 영향이 적은 새로운 식각 가스 개발이 시급한 과제</li>
                       </ul>
                     </div>
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">Abatement 기술</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>Thermal/Plasma Abatement</li>
-                        <li>90%+ 제거 효율 요구</li>
-                        <li>운영비 증가 요인</li>
-                        <li>In-situ Cleaning 기술 개발</li>
+                      <p className="text-xs text-gray-600 mb-2">배출 가스 처리 시스템</p>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>Thermal/Plasma Abatement:</strong> 고온 연소나 플라즈마로 유해 가스를 분해하는 장치. 모든 식각 장비에 필수 설치</li>
+                        <li>• <strong>90%+ 제거 효율 요구:</strong> 배출되는 PFC 가스의 90% 이상을 제거해야 규제 기준 충족</li>
+                        <li>• <strong>운영비 증가 요인:</strong> 처리 장비 설치 및 운영에 많은 비용 소요. 반도체 제조 원가 상승 원인</li>
+                        <li>• <strong>In-situ Cleaning 기술 개발:</strong> 챔버 내부를 현장에서 세정해 가스 사용량을 줄이는 기술 개발 중</li>
                       </ul>
                     </div>
                   </div>
@@ -1265,23 +2179,28 @@ const EtchSimulator = () => {
 
                 <div className="bg-blue-50 p-5 rounded-lg border-l-4 border-blue-400">
                   <h5 className="text-lg font-semibold text-blue-800 mb-3">미래 기술 동향</h5>
+                  <p className="text-sm text-gray-700 mb-4">
+                    반도체 미세화가 한계에 도달하면서 원자 단위 정밀도와 AI 기술 적용이 핵심 트렌드입니다.
+                  </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">Atomic Layer Processing</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>ALE (Atomic Layer Etching)</li>
-                        <li>Self-limiting 반응</li>
-                        <li>단원자층 정밀도 제어</li>
-                        <li>Damage-free Processing</li>
+                      <p className="text-xs text-gray-600 mb-2">원자층 단위 초정밀 식각 기술</p>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>ALE (Atomic Layer Etching):</strong> 원자층 한 층씩만 제거하는 초정밀 식각 기술. 3nm 이하 공정의 필수 기술</li>
+                        <li>• <strong>Self-limiting 반응:</strong> 화학 반응이 자동으로 한 층에서 멈추는 특성. 정확히 원하는 만큼만 식각 가능</li>
+                        <li>• <strong>단원자층 정밀도 제어:</strong> 0.3nm (원자 1개 두께) 수준의 정밀도로 두께 제어 가능</li>
+                        <li>• <strong>Damage-free Processing:</strong> 물리적 충격 없이 화학 반응만으로 식각해 소자 손상 제로 목표</li>
                       </ul>
                     </div>
                     <div>
                       <h6 className="font-semibold text-gray-800 mb-2">AI/ML 적용</h6>
-                      <ul className="list-disc list-inside space-y-1 text-gray-700">
-                        <li>Real-time Process Control</li>
-                        <li>Predictive Maintenance</li>
-                        <li>Recipe Optimization</li>
-                        <li>Virtual Metrology</li>
+                      <p className="text-xs text-gray-600 mb-2">인공지능 기반 공정 관리</p>
+                      <ul className="space-y-2 text-gray-700">
+                        <li>• <strong>Real-time Process Control:</strong> AI가 센서 데이터를 실시간 분석해 공정 조건을 자동 최적화. 수율과 품질 향상</li>
+                        <li>• <strong>Predictive Maintenance:</strong> 장비 상태를 AI가 예측해 고장 전 미리 정비. 가동률 향상과 비용 절감</li>
+                        <li>• <strong>Recipe Optimization:</strong> 머신러닝으로 최적의 식각 조건(레시피)을 자동으로 찾아줌. 개발 시간 단축</li>
+                        <li>• <strong>Virtual Metrology:</strong> 실제 측정 없이 AI로 결과를 예측. 측정 시간과 비용 대폭 절감</li>
                       </ul>
                     </div>
                   </div>
@@ -1315,228 +2234,7 @@ const EtchSimulator = () => {
         );
 
       case 'analysis':
-        return (
-          <div className="space-y-6">
-            <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-lg">
-              <h3 className="text-xl font-bold text-purple-800 mb-4">📊 식각 영향 인자 분석</h3>
-              <p className="text-gray-700 leading-relaxed">
-                식각 공정에 영향을 미치는 핵심 인자들을 개별적으로 조절하여
-                각각이 식각 결과에 미치는 영향을 분석해보세요.
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h4 className="text-lg font-semibold text-gray-800 mb-4">1. 압력(Pressure) 영향 분석</h4>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700">
-                      압력 설정: {analysisPressure} mTorr
-                    </label>
-                    <input
-                      type="range"
-                      min="30"
-                      max="200"
-                      step="10"
-                      value={analysisPressure}
-                      onChange={(e) => setAnalysisPressure(Number(e.target.value))}
-                      className="w-full"
-                    />
-                    <div className="text-center">
-                      <button
-                        onClick={() => setShowAnalysisResult(true)}
-                        className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
-                      >
-                        분석 실행
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-2 text-sm bg-gray-50 p-4 rounded">
-                    <h6 className="font-semibold">압력 효과 예측:</h6>
-                    <p><strong>등방성 지수:</strong> {calculatePressureEffect(analysisPressure).toFixed(2)}</p>
-                    <p><strong>프로파일:</strong> {analysisPressure > 100 ? '등방성 증가' : '이방성 유리'}</p>
-                    <p><strong>평균 자유행정:</strong> {(10/analysisPressure).toFixed(3)} cm</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="bg-red-50 p-4 rounded border-l-4 border-red-400">
-                    <h6 className="font-semibold text-red-800">고압력 조건 (&gt;100 mTorr)</h6>
-                    <ul className="text-sm text-gray-700 mt-2 space-y-1">
-                      <li>• 짧은 평균 자유행정 → 이온-분자 충돌 증가</li>
-                      <li>• 등방성 식각 경향 → 언더컷 발생</li>
-                      <li>• 낮은 이온 에너지 → 물리적 식각 감소</li>
-                      <li>• 라디칼 농도 증가 → 화학적 식각 활성화</li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-blue-50 p-4 rounded border-l-4 border-blue-400">
-                    <h6 className="font-semibold text-blue-800">저압력 조건 (&lt;100 mTorr)</h6>
-                    <ul className="text-sm text-gray-700 mt-2 space-y-1">
-                      <li>• 긴 평균 자유행정 → 직진성 향상</li>
-                      <li>• 이방성 식각 → 수직 프로파일</li>
-                      <li>• 높은 이온 에너지 → 물리적 식각 우세</li>
-                      <li>• 라디칼 밀도 감소 → 선택비 저하 가능</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h4 className="text-lg font-semibold text-gray-800 mb-4">2. RF 파워 영향 분석</h4>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700">
-                      RF 파워: {analysisPower} W
-                    </label>
-                    <input
-                      type="range"
-                      min="200"
-                      max="800"
-                      step="50"
-                      value={analysisPower}
-                      onChange={(e) => setAnalysisPower(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="mt-4 space-y-2 text-sm bg-gray-50 p-4 rounded">
-                    <h6 className="font-semibold">파워 효과 예측:</h6>
-                    <p><strong>식각속도 지수:</strong> {calculatePowerEffect(analysisPower).toFixed(2)}</p>
-                    <p><strong>플라즈마 밀도:</strong> {((analysisPower/300) * 5e11).toExponential(1)} cm⁻³</p>
-                    <p><strong>바이어스 전압:</strong> ~{(analysisPower * 0.3).toFixed(0)} V</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="bg-orange-50 p-4 rounded border-l-4 border-orange-400">
-                    <h6 className="font-semibold text-orange-800">고출력 조건 (&gt;500W)</h6>
-                    <ul className="text-sm text-gray-700 mt-2 space-y-1">
-                      <li>• 높은 플라즈마 밀도 → 빠른 식각속도</li>
-                      <li>• 강한 이온 충격 → 플라즈마 데미지 위험</li>
-                      <li>• 높은 바이어스 전압 → 이방성 증가</li>
-                      <li>• 발열 증가 → 온도 제어 필요</li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-green-50 p-4 rounded border-l-4 border-green-400">
-                    <h6 className="font-semibold text-green-800">저출력 조건 (&lt;300W)</h6>
-                    <ul className="text-sm text-gray-700 mt-2 space-y-1">
-                      <li>• 낮은 플라즈마 밀도 → 느린 식각속도</li>
-                      <li>• 약한 이온 충격 → 데미지 최소화</li>
-                      <li>• 낮은 바이어스 → 화학적 식각 우세</li>
-                      <li>• 온도 안정성 → 정밀 제어 가능</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h4 className="text-lg font-semibold text-gray-800 mb-4">3. 가스 비율 최적화</h4>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                  <div className="space-y-3">
-                    <label className="block text-sm font-medium text-gray-700">
-                      주 가스 비율: {analysisGasRatio}%
-                    </label>
-                    <input
-                      type="range"
-                      min="10"
-                      max="90"
-                      step="5"
-                      value={analysisGasRatio}
-                      onChange={(e) => setAnalysisGasRatio(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-
-                  <div className="mt-4 space-y-2 text-sm bg-gray-50 p-4 rounded">
-                    <h6 className="font-semibold">가스비 효과 예측:</h6>
-                    <p><strong>선택비 지수:</strong> {calculateGasRatioEffect(analysisGasRatio).toFixed(2)}</p>
-                    <p><strong>Cl₂/HBr 비율:</strong> {analysisGasRatio}:{100-analysisGasRatio}</p>
-                    <p><strong>예상 선택비:</strong> {(10 * calculateGasRatioEffect(analysisGasRatio)).toFixed(1)}:1</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="bg-cyan-50 p-4 rounded border-l-4 border-cyan-400">
-                    <h6 className="font-semibold text-cyan-800">Cl₂ 우세 (&gt;70%)</h6>
-                    <ul className="text-sm text-gray-700 mt-2 space-y-1">
-                      <li>• 높은 식각속도 → 생산성 향상</li>
-                      <li>• 낮은 선택비 → 마스크 손상 위험</li>
-                      <li>• 이방성 프로파일 → 수직 식각</li>
-                      <li>• 폴리머 형성 부족 → 측벽 거칠음</li>
-                    </ul>
-                  </div>
-
-                  <div className="bg-pink-50 p-4 rounded border-l-4 border-pink-400">
-                    <h6 className="font-semibold text-pink-800">HBr 첨가 증가 (&gt;30%)</h6>
-                    <ul className="text-sm text-gray-700 mt-2 space-y-1">
-                      <li>• 높은 선택비 → 마스크 보호</li>
-                      <li>• 낮은 식각속도 → 공정시간 증가</li>
-                      <li>• 측벽 보호 → 부드러운 프로파일</li>
-                      <li>• 온도 의존성 → 정밀 제어 필요</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-lg shadow-md">
-              <h4 className="text-lg font-semibold text-gray-800 mb-4">종합 분석 결과</h4>
-
-              {showAnalysisResult && (
-                <div className="space-y-6">
-                  <ResponsiveContainer width="100%" height={400}>
-                    <LineChart data={generateAnalysisData()}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="pressure" label={{ value: '압력 (mTorr)', position: 'insideBottom', offset: -10 }} />
-                      <YAxis label={{ value: '값', angle: -90, position: 'insideLeft' }} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="etchRate" stroke="#8884d8" strokeWidth={2} name="식각속도" />
-                      <Line type="monotone" dataKey="uniformity" stroke="#82ca9d" strokeWidth={2} name="균일성" />
-                    </LineChart>
-                  </ResponsiveContainer>
-
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="bg-white p-4 rounded-lg text-center">
-                      <div className="text-sm text-gray-600 mb-2">최적 압력</div>
-                      <div className="text-2xl font-bold text-blue-700">100 mTorr</div>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-lg text-center">
-                      <div className="text-sm text-gray-600 mb-2">최적 파워</div>
-                      <div className="text-2xl font-bold text-green-700">300 W</div>
-                    </div>
-
-                    <div className="bg-white p-4 rounded-lg text-center">
-                      <div className="text-sm text-gray-600 mb-2">예상 식각속도</div>
-                      <div className="text-2xl font-bold text-purple-700">
-                        {(calculatePressureEffect(analysisPressure) * calculatePowerEffect(analysisPower) * 50).toFixed(0)} nm/min
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-yellow-50 p-6 rounded-lg border-l-4 border-yellow-400">
-              <h4 className="text-lg font-semibold text-yellow-800 mb-4">🤔 생각해 보기</h4>
-              <div className="space-y-3 text-gray-700">
-                <p><strong>Q1:</strong> 압력을 높일 때와 낮출 때 식각 프로파일이 어떻게 달라지는지 분석해보세요.</p>
-                <p><strong>Q2:</strong> RF 파워를 과도하게 높이면 어떤 문제가 발생할 수 있을까요?</p>
-                <p><strong>Q3:</strong> 가스 비율 조절로 식각속도와 선택비 사이의 trade-off를 어떻게 최적화할 수 있을까요?</p>
-              </div>
-            </div>
-          </div>
-        );
+        return <SiliconEtchingSimulator />;
 
       case 'quiz':
         return (
