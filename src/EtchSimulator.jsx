@@ -1968,42 +1968,198 @@ const EtchSimulator = () => {
                 </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h5 className="font-semibold mb-3">실험 결과</h5>
-                  {etchRate > 0 && (
-                    <div className="space-y-3">
-                      <div className="bg-white p-3 rounded border">
-                        <div className="flex justify-between text-sm">
-                          <span>식각속도:</span>
-                          <span className="font-semibold text-blue-600">
-                            {etchRate.toFixed(1)} nm/min
-                          </span>
+                  <h5 className="font-semibold mb-3">📊 실험 결과</h5>
+                  {etchRate > 0 ? (
+                    <div className="space-y-4">
+                      {/* 실험 결과 */}
+                      <div className="space-y-3">
+                        <div className="bg-white p-3 rounded border">
+                          <div className="flex justify-between text-sm">
+                            <span>✓ 식각속도:</span>
+                            <span className="font-semibold text-blue-600">
+                              {etchRate.toFixed(1)} nm/min
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded border">
+                          <div className="flex justify-between text-sm">
+                            <span>✓ 선택비:</span>
+                            <span className="font-semibold text-green-600">
+                              {selectivity.toFixed(1)} : 1
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded border">
+                          <div className="flex justify-between text-sm">
+                            <span>✓ 균일성:</span>
+                            <span className="font-semibold text-purple-600">
+                              {uniformity.toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="bg-white p-3 rounded border">
+                          <div className="flex justify-between text-sm">
+                            <span>✓ 식각 깊이:</span>
+                            <span className="font-semibold text-red-600">
+                              {(etchDepth * 2).toFixed(0)} nm
+                            </span>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="bg-white p-3 rounded border">
-                        <div className="flex justify-between text-sm">
-                          <span>선택비:</span>
-                          <span className="font-semibold text-green-600">
-                            {selectivity.toFixed(1)} : 1
-                          </span>
+                      {/* 현재 조건 분석 */}
+                      <div className="border-t pt-3">
+                        <h6 className="font-semibold text-sm mb-2">💡 현재 조건 분석</h6>
+                        <div className="space-y-1 text-xs text-gray-700">
+                          {etchTarget === 'Si' && (
+                            <>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>Cl₂ {gasFlows.Cl2} sccm: {gasFlows.Cl2 >= 25 ? '높은 식각률 제공 ✓' : gasFlows.Cl2 >= 15 ? '적정 식각률' : '식각률 낮음 ⚠'}</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>HBr {gasFlows.HBr} sccm: {gasFlows.HBr >= 12 ? '우수한 선택비 기여 ✓' : gasFlows.HBr >= 5 ? '선택비 보통' : '선택비 낮음 ⚠'}</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>Ar {gasFlows.Ar} sccm: {gasFlows.Ar >= 70 ? '수직 프로파일 향상 ✓' : gasFlows.Ar >= 40 ? '이방성 보통' : '등방성 경향 ⚠'}</span>
+                              </div>
+                              <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                                → {gasFlows.Cl2 >= 25 && gasFlows.HBr >= 12 && gasFlows.Ar >= 70 ? '이상적인 Si 식각 조건입니다' : '일부 파라미터 조정이 필요합니다'}
+                              </div>
+                            </>
+                          )}
+                          {etchTarget === 'SiO2' && (
+                            <>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>CF₄ {gasFlows.CF4} sccm: {gasFlows.CF4 >= 20 ? 'SiO₂ 식각 활성화 ✓' : gasFlows.CF4 >= 10 ? '식각률 보통' : '식각률 부족 ⚠'}</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>CHF₃ {gasFlows.CHF3} sccm: {gasFlows.CHF3 >= 15 ? '높은 선택비 유지 ✓' : gasFlows.CHF3 >= 8 ? '선택비 보통' : '선택비 낮음 ⚠'}</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>Ar {gasFlows.Ar} sccm: {gasFlows.Ar >= 50 ? '물리적 충격 증가 ✓' : gasFlows.Ar >= 30 ? '적정 수준' : '스퍼터링 부족 ⚠'}</span>
+                              </div>
+                              <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                                → {gasFlows.CF4 >= 20 && gasFlows.CHF3 >= 15 && gasFlows.Ar >= 50 ? '이상적인 SiO₂ 식각 조건입니다' : '일부 파라미터 조정이 필요합니다'}
+                              </div>
+                            </>
+                          )}
+                          {etchTarget === 'Si3N4' && (
+                            <>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>CHF₃ {gasFlows.CHF3} sccm: {gasFlows.CHF3 >= 25 ? 'Si₃N₄ 식각 최적 ✓' : gasFlows.CHF3 >= 15 ? '식각률 보통' : '식각률 낮음 ⚠'}</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>O₂ {gasFlows.O2} sccm: {gasFlows.O2 >= 8 && gasFlows.O2 <= 15 ? '폴리머 제거 최적 ✓' : gasFlows.O2 > 15 ? '과도한 등방성 ⚠' : 'O₂ 부족 ⚠'}</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>Ar {gasFlows.Ar} sccm: {gasFlows.Ar >= 60 ? '수직성 확보 ✓' : gasFlows.Ar >= 40 ? '적정 수준' : '이방성 부족 ⚠'}</span>
+                              </div>
+                              <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                                → {gasFlows.CHF3 >= 25 && gasFlows.O2 >= 8 && gasFlows.O2 <= 15 && gasFlows.Ar >= 60 ? '이상적인 Si₃N₄ 식각 조건입니다' : '일부 파라미터 조정이 필요합니다'}
+                              </div>
+                            </>
+                          )}
+                          {etchTarget === 'PR' && (
+                            <>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>O₂ {gasFlows.O2} sccm: {gasFlows.O2 >= 80 ? 'PR 제거 최적 ✓' : gasFlows.O2 >= 50 ? '제거율 보통' : '제거율 낮음 ⚠'}</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span>•</span>
+                                <span>Ar {gasFlows.Ar} sccm: {gasFlows.Ar >= 15 && gasFlows.Ar <= 25 ? '스퍼터링 보조 ✓' : gasFlows.Ar > 25 ? 'Ar 과다 ⚠' : 'Ar 부족 ⚠'}</span>
+                              </div>
+                              <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                                → {gasFlows.O2 >= 80 && gasFlows.Ar >= 15 && gasFlows.Ar <= 25 ? '이상적인 PR 제거 조건입니다' : '일부 파라미터 조정이 필요합니다'}
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
-
-                      <div className="bg-white p-3 rounded border">
-                        <div className="flex justify-between text-sm">
-                          <span>균일성:</span>
-                          <span className="font-semibold text-purple-600">
-                            {uniformity.toFixed(1)}%
-                          </span>
-                        </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* 시뮬레이션 시작 전 가이드 */}
+                      <div className="text-center py-4 text-gray-500 text-sm border-2 border-dashed border-gray-300 rounded">
+                        시뮬레이션을 시작하세요
                       </div>
 
-                      <div className="bg-white p-3 rounded border">
-                        <div className="flex justify-between text-sm">
-                          <span>식각 깊이:</span>
-                          <span className="font-semibold text-red-600">
-                            {(etchDepth * 2).toFixed(0)} nm
-                          </span>
+                      {/* 가스별 영향 가이드 */}
+                      <div className="border-t pt-3">
+                        <h6 className="font-semibold text-sm mb-2">💡 가스별 영향 가이드</h6>
+                        <div className="space-y-1.5 text-xs text-gray-700">
+                          {etchTarget === 'Si' && (
+                            <>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>Cl₂ 증가</strong> → 식각률↑, 선택비↓, 이방성 유지</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>HBr 증가</strong> → 선택비↑, 측벽 보호↑, 이방성↑</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>Ar 증가</strong> → 물리적 스퍼터링↑, 이방성↑</span>
+                              </div>
+                            </>
+                          )}
+                          {etchTarget === 'SiO2' && (
+                            <>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>CF₄ 증가</strong> → SiO₂ 식각률↑, F 라디칼↑</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>CHF₃ 증가</strong> → 높은 선택비, 폴리머 형성↑</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>Ar 증가</strong> → 물리적 충격↑, 폴리머 제거</span>
+                              </div>
+                            </>
+                          )}
+                          {etchTarget === 'Si3N4' && (
+                            <>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>CHF₃ 증가</strong> → Si₃N₄ 식각률↑, 선택비↑</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>O₂ 증가</strong> → 폴리머 제거↑, 등방성↑</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>Ar 증가</strong> → 수직성 향상↑, 이방성↑</span>
+                              </div>
+                            </>
+                          )}
+                          {etchTarget === 'PR' && (
+                            <>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>O₂ 증가</strong> → PR 제거율↑, 완전 연소</span>
+                              </div>
+                              <div className="flex items-start gap-1">
+                                <span className="text-blue-600">🔹</span>
+                                <span><strong>Ar 증가</strong> → 스퍼터링 보조, 속도↑</span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
