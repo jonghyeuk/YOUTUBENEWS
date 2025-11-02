@@ -1,4 +1,4 @@
-import EtchSimulator from './EtchSimulator'
+import EtchSimulator from './EtchingSimulator'
 
 function App() {
   return (
