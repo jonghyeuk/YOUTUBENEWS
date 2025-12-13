@@ -359,9 +359,10 @@ with gr.Blocks(title="NewsVideoFactory", css=CUSTOM_CSS) as demo:
                     label="자막 크기",
                     choices=[
                         ("자동", "auto"),
-                        ("작게 (48px)", "small"),
-                        ("보통 (60px)", "medium"),
-                        ("크게 (72px)", "large"),
+                        ("작게 (60px)", "small"),
+                        ("보통 (80px)", "medium"),
+                        ("크게 (100px)", "large"),
+                        ("아주 크게 (120px)", "xlarge"),
                     ],
                     value="medium"
                 )
