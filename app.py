@@ -1,6 +1,7 @@
 import gradio as gr
 import os
 import json
+import time
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -24,7 +25,7 @@ CUSTOM_CSS = """
     border-radius: 8px;
     padding: 1rem;
     background-color: #f9f9f9;
-    max-height: 600px;
+    max-height: 500px;
     overflow-y: auto;
 }
 .scene-card {
@@ -39,17 +40,25 @@ CUSTOM_CSS = """
     border-radius: 8px;
     margin: 1rem 0;
 }
-.success-box {
-    background-color: #d4edda;
-    border-color: #c3e6cb;
-    color: #155724;
+.confirm-btn {
+    background-color: #28a745 !important;
+    font-size: 1.2em !important;
 }
-.error-box {
-    background-color: #f8d7da;
-    border-color: #f5c6cb;
-    color: #721c24;
+.regenerate-btn {
+    background-color: #ffc107 !important;
 }
 """
+
+
+# 전역 상태 저장 (세션별로 관리)
+session_data = {
+    "script": None,
+    "profile": None,
+    "image_paths": [],
+    "audio_files": [],
+    "thumbnail_path": None,
+    "export_dir": None,
+}
 
 
 def check_api_keys():
@@ -73,157 +82,41 @@ def check_api_keys():
     return "\n".join(status), all_required_set
 
 
-def generate_news_video(
+def step1_generate_script(
     news_mode: str,
     news_content: str,
     image_style: str,
     duration_minutes: float,
-    subtitle_mode: str,
-    subtitle_size: str,
-    parallax_enabled: bool,
     progress=gr.Progress()
 ):
-    """뉴스 영상 생성 메인 함수"""
+    """1단계: 대본 생성"""
+    global session_data
 
     if not news_content or not news_content.strip():
-        return None, None, "❌ 뉴스 내용을 입력해주세요.", None, ""
+        return "❌ 뉴스 내용을 입력해주세요.", ""
 
     _, all_keys_set = check_api_keys()
     if not all_keys_set:
-        return None, None, "❌ API 키가 설정되지 않았습니다. .env 파일을 확인해주세요.", None, ""
+        return "❌ API 키가 설정되지 않았습니다.", ""
 
     try:
-        progress(0, desc="시작 중...")
-
-        # 환경변수 설정
-        os.environ["NEWS_MODE"] = news_mode
-        os.environ["IMAGE_STYLE"] = image_style
-        os.environ["IMAGE_ENGINE"] = "gemini"  # Gemini만 사용
-        os.environ["TTS_ENGINE"] = "google"    # Google TTS만 사용
-        os.environ["SUBTITLE_MODE"] = subtitle_mode
-        os.environ["SUBTITLE_SIZE"] = subtitle_size
-        os.environ["PARALLAX_ENABLED"] = "true" if parallax_enabled else "false"
-
-        # 해상도 설정
-        if duration_minutes < 1:
-            os.environ["VIDEO_RESOLUTION"] = "1080x1920"
-            video_type = "YouTube Shorts (9:16 세로)"
-        else:
-            os.environ["VIDEO_RESOLUTION"] = "1920x1080"
-            video_type = "일반 영상 (16:9 가로)"
-
-        progress(0.1, desc="뉴스 내용 분석 중...")
-
-        # 파이프라인 실행
-        from main import run_news_pipeline
-        result = run_news_pipeline(
-            news_content=news_content.strip(),
-            news_mode=news_mode,
-            image_style=image_style,
-            duration_minutes=duration_minutes
-        )
-
-        if result is None:
-            error_msg = "❌ 영상 생성 실패\n\n**가능한 원인:**\n- API 할당량 초과\n- TTS 생성 오류\n- 네트워크 연결 문제"
-            return None, None, error_msg, None, ""
-
-        progress(1.0, desc="완료!")
-
-        video_path = result.get('video_path')
-        thumbnail_path = result.get('thumbnail_path')
-        export_dir = result.get('export_dir')
-        script = result.get('script')
-        image_paths = result.get('image_paths', [])
-
-        # 검수용 씬 정보 생성
-        scene_preview = generate_scene_preview(script.scenes if script else [], image_paths)
-
-        mode_names = {
-            "accident_news": "🚨 사건사고 뉴스",
-            "rumor_news": "💬 카더라 뉴스"
-        }
-
-        style_names = {
-            "anime": "🎨 애니 스타일",
-            "realistic": "📷 실사 스타일"
-        }
-
-        resolution = os.getenv("VIDEO_RESOLUTION", "1920x1080")
-        info_text = f"""
-## 🎉 영상 생성 완료!
-
-**📌 프로젝트 정보**:
-- 모드: {mode_names.get(news_mode, news_mode)}
-- 이미지 스타일: {style_names.get(image_style, image_style)}
-- 영상 길이: {int(duration_minutes)}분
-- Scene 수: {len(script.scenes) if script else 0}개
-
-**📺 영상 형식**: {video_type} ({resolution})
-
-**📂 출력 디렉토리**: `{export_dir}`
-"""
-
-        video_output = video_path if video_path and os.path.exists(video_path) else None
-        thumbnail_output = thumbnail_path if thumbnail_path and os.path.exists(thumbnail_path) else None
-
-        # 이미지 갤러리용 데이터
-        gallery_images = [(img, f"Scene {i+1}") for i, img in enumerate(image_paths) if os.path.exists(img)]
-
-        return video_output, thumbnail_output, info_text, gallery_images, scene_preview
-
-    except Exception as e:
-        error_msg = f"❌ 오류 발생: {str(e)}\n\n자세한 내용은 콘솔 로그를 확인해주세요."
-        print(f"[ERROR] {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None, error_msg, None, ""
-
-
-def generate_scene_preview(scenes, image_paths):
-    """씬별 대본 미리보기 생성"""
-    if not scenes:
-        return "아직 생성된 씬이 없습니다."
-
-    preview_lines = []
-    for i, scene in enumerate(scenes):
-        scene_id = getattr(scene, 'scene_id', f'scene_{i+1}')
-        narration = getattr(scene, 'narration', '')
-        duration = getattr(scene, 'duration_sec', 0)
-
-        # 나레이션 미리보기 (최대 200자)
-        narration_preview = narration[:200] + "..." if len(narration) > 200 else narration
-
-        preview_lines.append(f"""
-### 🎬 Scene {i+1} ({scene_id})
-**⏱️ 길이**: {duration}초
-
-**📝 나레이션**:
-> {narration_preview}
-
----
-""")
-
-    return "\n".join(preview_lines)
-
-
-def preview_script_only(
-    news_mode: str,
-    news_content: str,
-    image_style: str,
-    duration_minutes: float,
-    progress=gr.Progress()
-):
-    """대본만 미리 생성 (이미지/영상 생성 없이)"""
-
-    if not news_content or not news_content.strip():
-        return "❌ 뉴스 내용을 입력해주세요.", None
-
-    try:
-        progress(0, desc="대본 생성 중...")
+        progress(0.1, desc="대본 생성 중...")
 
         from engines.script_engine import ScriptEngine
         from engines.profile_engine import ContentProfileEngine
         from models.types import TitleThumbnailResult, TopicScore
+
+        # 출력 디렉토리 설정
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        project_name = f"news_{news_mode}_{timestamp}"
+        export_dir = os.path.join("export", project_name)
+        os.makedirs(export_dir, exist_ok=True)
+        os.makedirs(os.path.join(export_dir, "images"), exist_ok=True)
+        os.makedirs(os.path.join(export_dir, "audio"), exist_ok=True)
+
+        # 환경변수 설정
+        os.environ["NEWS_MODE"] = news_mode
+        os.environ["IMAGE_STYLE"] = image_style
 
         # 프로필 생성
         profile_engine = ContentProfileEngine()
@@ -253,26 +146,369 @@ def preview_script_only(
             title_block=title_block
         )
 
-        progress(1.0, desc="완료!")
+        progress(1.0, desc="대본 생성 완료!")
 
-        # 미리보기 생성
-        preview = generate_scene_preview(script.scenes, [])
+        # 세션 데이터 저장
+        session_data["script"] = script
+        session_data["profile"] = profile
+        session_data["export_dir"] = export_dir
+        session_data["image_paths"] = []
+        session_data["audio_files"] = []
 
-        # 전체 대본 텍스트
-        full_script = ""
+        # 대본 미리보기 생성
+        preview_lines = []
         for i, scene in enumerate(script.scenes):
-            full_script += f"\n\n=== Scene {i+1} ===\n"
-            full_script += f"[이미지 프롬프트]: {getattr(scene, 'image_prompt', '')}\n\n"
-            full_script += f"[나레이션]:\n{getattr(scene, 'narration', '')}\n"
+            scene_id = getattr(scene, 'scene_id', f'scene_{i+1}')
+            narration = getattr(scene, 'narration', '')
+            image_prompt = getattr(scene, 'image_prompt', '')
+            duration = getattr(scene, 'duration_sec', 0)
 
-        return preview, full_script
+            preview_lines.append(f"""
+### 🎬 Scene {i+1} ({scene_id})
+**⏱️ 길이**: {duration}초
+
+**🖼️ 이미지 프롬프트**:
+> {image_prompt[:100]}{'...' if len(image_prompt) > 100 else ''}
+
+**📝 나레이션**:
+> {narration[:200]}{'...' if len(narration) > 200 else ''}
+
+---
+""")
+
+        preview = "\n".join(preview_lines)
+
+        status_msg = f"""
+## ✅ 대본 생성 완료!
+
+- **씬 개수**: {len(script.scenes)}개
+- **예상 길이**: {int(duration_minutes)}분
+- **출력 디렉토리**: `{export_dir}`
+
+👉 **다음 단계**: "이미지 생성" 버튼을 눌러주세요.
+"""
+
+        return status_msg, preview
 
     except Exception as e:
         error_msg = f"❌ 대본 생성 오류: {str(e)}"
         print(f"[ERROR] {e}")
         import traceback
         traceback.print_exc()
+        return error_msg, ""
+
+
+def step2_generate_images(progress=gr.Progress()):
+    """2단계: 이미지 생성 (실시간 업데이트)"""
+    global session_data
+
+    if session_data["script"] is None:
+        return "❌ 먼저 대본을 생성해주세요.", []
+
+    try:
+        from engines.image_engine import ImageEngine
+
+        script = session_data["script"]
+        profile = session_data["profile"]
+        export_dir = session_data["export_dir"]
+        image_style = os.getenv("IMAGE_STYLE", "realistic")
+
+        image_engine = ImageEngine()
+        image_paths = []
+        gallery_data = []
+
+        total_scenes = len(script.scenes)
+
+        for idx, scene in enumerate(script.scenes):
+            progress((idx + 1) / total_scenes, desc=f"이미지 생성 중... ({idx+1}/{total_scenes})")
+
+            output_path = os.path.join(export_dir, "images", f"scene_{idx:03d}.png")
+
+            try:
+                image_engine._generate_image(
+                    prompt=scene.image_prompt,
+                    output_path=output_path,
+                    image_style=image_style
+                )
+                image_paths.append(output_path)
+                gallery_data.append((output_path, f"Scene {idx+1}"))
+                print(f"[ImageEngine] Scene {idx}: Generated")
+
+            except Exception as e:
+                print(f"[ImageEngine] Scene {idx} Error: {e}")
+                # 플레이스홀더 생성
+                placeholder = image_engine._create_placeholder(
+                    output_path=output_path,
+                    scene_id=scene.scene_id,
+                    text=f"Scene {idx + 1}"
+                )
+                image_paths.append(placeholder)
+                gallery_data.append((placeholder, f"Scene {idx+1} (오류)"))
+
+            # API 레이트 리밋 방지
+            time.sleep(1)
+
+        session_data["image_paths"] = image_paths
+
+        status_msg = f"""
+## ✅ 이미지 생성 완료!
+
+- **생성된 이미지**: {len(image_paths)}개
+
+👉 이미지를 검토하고, 필요하면 개별 이미지를 재생성하세요.
+👉 **다음 단계**: "TTS 생성" 버튼을 눌러주세요.
+"""
+
+        return status_msg, gallery_data
+
+    except Exception as e:
+        error_msg = f"❌ 이미지 생성 오류: {str(e)}"
+        print(f"[ERROR] {e}")
+        import traceback
+        traceback.print_exc()
+        return error_msg, []
+
+
+def regenerate_single_image(scene_index: int, custom_prompt: str = None):
+    """개별 이미지 재생성"""
+    global session_data
+
+    if session_data["script"] is None:
+        return "❌ 먼저 대본을 생성해주세요.", []
+
+    try:
+        from engines.image_engine import ImageEngine
+
+        script = session_data["script"]
+        export_dir = session_data["export_dir"]
+        image_style = os.getenv("IMAGE_STYLE", "realistic")
+
+        if scene_index < 0 or scene_index >= len(script.scenes):
+            return "❌ 잘못된 씬 번호입니다.", []
+
+        scene = script.scenes[scene_index]
+        prompt = custom_prompt if custom_prompt else scene.image_prompt
+
+        image_engine = ImageEngine()
+        output_path = os.path.join(export_dir, "images", f"scene_{scene_index:03d}.png")
+
+        image_engine._generate_image(
+            prompt=prompt,
+            output_path=output_path,
+            image_style=image_style
+        )
+
+        # 세션 데이터 업데이트
+        if scene_index < len(session_data["image_paths"]):
+            session_data["image_paths"][scene_index] = output_path
+
+        # 갤러리 데이터 재구성
+        gallery_data = [
+            (path, f"Scene {i+1}")
+            for i, path in enumerate(session_data["image_paths"])
+            if os.path.exists(path)
+        ]
+
+        return f"✅ Scene {scene_index + 1} 이미지 재생성 완료!", gallery_data
+
+    except Exception as e:
+        error_msg = f"❌ 이미지 재생성 오류: {str(e)}"
+        print(f"[ERROR] {e}")
+        return error_msg, []
+
+
+def step3_generate_audio(progress=gr.Progress()):
+    """3단계: TTS 음성 생성"""
+    global session_data
+
+    if session_data["script"] is None:
+        return "❌ 먼저 대본을 생성해주세요."
+
+    try:
+        from engines.tts_engine import TTSEngine
+
+        script = session_data["script"]
+        profile = session_data["profile"]
+        export_dir = session_data["export_dir"]
+
+        progress(0.1, desc="TTS 음성 생성 중...")
+
+        tts_engine = TTSEngine()
+        audio_files = tts_engine.generate_audio(
+            script.scenes,
+            profile,
+            os.path.join(export_dir, "audio")
+        )
+
+        session_data["audio_files"] = audio_files
+
+        progress(1.0, desc="TTS 생성 완료!")
+
+        total_duration = sum(af.get("duration", 0) for af in audio_files)
+
+        status_msg = f"""
+## ✅ TTS 음성 생성 완료!
+
+- **생성된 오디오**: {len(audio_files)}개
+- **총 길이**: {total_duration:.1f}초 ({total_duration/60:.1f}분)
+
+👉 **다음 단계**: "썸네일 생성" 버튼을 눌러주세요.
+"""
+
+        return status_msg
+
+    except Exception as e:
+        error_msg = f"❌ TTS 생성 오류: {str(e)}"
+        print(f"[ERROR] {e}")
+        import traceback
+        traceback.print_exc()
+        return error_msg
+
+
+def step4_generate_thumbnail(progress=gr.Progress()):
+    """4단계: 썸네일 생성"""
+    global session_data
+
+    if session_data["script"] is None:
+        return "❌ 먼저 대본을 생성해주세요.", None
+
+    try:
+        from engines.image_engine import ImageEngine
+
+        script = session_data["script"]
+        profile = session_data["profile"]
+        export_dir = session_data["export_dir"]
+
+        progress(0.5, desc="썸네일 생성 중...")
+
+        image_engine = ImageEngine()
+        thumbnail_path = os.path.join(export_dir, "thumbnail.png")
+
+        if script.scenes:
+            first_scene = script.scenes[0]
+            image_engine.generate_thumbnail(
+                prompt=first_scene.image_prompt,
+                text="뉴스",
+                output_path=thumbnail_path,
+                category=profile.category
+            )
+
+        session_data["thumbnail_path"] = thumbnail_path
+
+        progress(1.0, desc="썸네일 생성 완료!")
+
+        status_msg = f"""
+## ✅ 썸네일 생성 완료!
+
+👉 모든 준비가 완료되었습니다!
+👉 **최종 단계**: 모든 내용을 확인하고 "🎬 영상 생성 확정" 버튼을 눌러주세요.
+"""
+
+        return status_msg, thumbnail_path
+
+    except Exception as e:
+        error_msg = f"❌ 썸네일 생성 오류: {str(e)}"
+        print(f"[ERROR] {e}")
         return error_msg, None
+
+
+def step5_confirm_and_render(
+    subtitle_mode: str,
+    subtitle_size: str,
+    parallax_enabled: bool,
+    progress=gr.Progress()
+):
+    """5단계: 확정 후 자막 생성 및 영상 렌더링"""
+    global session_data
+
+    if session_data["script"] is None:
+        return None, "❌ 먼저 모든 단계를 완료해주세요."
+
+    if not session_data["audio_files"]:
+        return None, "❌ TTS 음성이 생성되지 않았습니다."
+
+    try:
+        from engines.stt_subtitle_engine import STTSubtitleEngine
+        from engines.video_engine import VideoRenderEngine
+
+        script = session_data["script"]
+        export_dir = session_data["export_dir"]
+        image_paths = session_data["image_paths"]
+        audio_files = session_data["audio_files"]
+
+        # 환경변수 설정
+        os.environ["SUBTITLE_MODE"] = subtitle_mode
+        os.environ["SUBTITLE_SIZE"] = subtitle_size
+        os.environ["PARALLAX_ENABLED"] = "true" if parallax_enabled else "false"
+
+        resolution = os.getenv("VIDEO_RESOLUTION", "1920x1080")
+        width, height = map(int, resolution.split("x"))
+
+        # 1) 자막 생성 (STT 기반)
+        subtitle_path = None
+        if subtitle_mode != "none":
+            progress(0.2, desc="자막 생성 중 (음성 분석)...")
+
+            stt_engine = STTSubtitleEngine(font_size_preset=subtitle_size)
+            subtitle_path = os.path.join(export_dir, "subtitles.ass")
+
+            stt_engine.generate_subtitles_from_audio(
+                audio_files=audio_files,
+                output_path=subtitle_path,
+                video_width=width,
+                video_height=height,
+                subtitle_mode=subtitle_mode
+            )
+
+        # 2) 영상 렌더링
+        progress(0.5, desc="영상 렌더링 중...")
+
+        video_engine = VideoRenderEngine()
+        video_path = video_engine.render_video(
+            image_paths,
+            audio_files,
+            script,
+            os.path.join(export_dir, "video.mp4"),
+            resolution=resolution,
+            video_paths={},
+            subtitle_path=subtitle_path,
+            subtitle_engine=None,
+            per_scene_subtitle=False,
+            subtitle_mode=subtitle_mode
+        )
+
+        progress(1.0, desc="완료!")
+
+        # 메타데이터 저장
+        meta = {
+            "news_mode": os.getenv("NEWS_MODE", "accident_news"),
+            "image_style": os.getenv("IMAGE_STYLE", "realistic"),
+            "scene_count": len(script.scenes),
+            "subtitle_mode": subtitle_mode,
+            "created_at": datetime.now().strftime("%Y%m%d_%H%M%S")
+        }
+
+        meta_path = os.path.join(export_dir, "meta.json")
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, ensure_ascii=False, indent=2)
+
+        status_msg = f"""
+## 🎉 영상 생성 완료!
+
+**📂 출력 위치**: `{export_dir}`
+**🎬 영상 파일**: `video.mp4`
+
+모든 작업이 완료되었습니다!
+"""
+
+        return video_path, status_msg
+
+    except Exception as e:
+        error_msg = f"❌ 영상 렌더링 오류: {str(e)}"
+        print(f"[ERROR] {e}")
+        import traceback
+        traceback.print_exc()
+        return None, error_msg
 
 
 # ========== Gradio UI 구성 ==========
@@ -296,16 +532,16 @@ with gr.Blocks(title="NewsVideoFactory", css=CUSTOM_CSS) as demo:
     # ========== 메인 레이아웃 (2컬럼) ==========
     with gr.Row():
 
-        # ========== 왼쪽: 입력 영역 ==========
+        # ========== 왼쪽: 입력 및 제어 ==========
         with gr.Column(scale=1):
-            gr.Markdown("## 📝 입력")
+            gr.Markdown("## 📝 입력 및 제어")
 
             # 모드 선택
             news_mode_input = gr.Radio(
                 label="🎬 콘텐츠 모드",
                 choices=[
-                    ("🚨 사건사고 뉴스 - 실제 뉴스 기반 재구성", "accident_news"),
-                    ("💬 카더라 뉴스 - 소문/풍문 기반 각색", "rumor_news"),
+                    ("🚨 사건사고 뉴스", "accident_news"),
+                    ("💬 카더라 뉴스", "rumor_news"),
                 ],
                 value="accident_news"
             )
@@ -313,46 +549,55 @@ with gr.Blocks(title="NewsVideoFactory", css=CUSTOM_CSS) as demo:
             # 뉴스 내용 입력
             news_content_input = gr.Textbox(
                 label="📰 뉴스 내용 붙여넣기",
-                placeholder="여기에 뉴스 기사 내용을 붙여넣으세요...\n\n예시:\n서울 강남구에서 발생한 교통사고로 인해...",
-                lines=12,
-                max_lines=20
+                placeholder="여기에 뉴스 기사 내용을 붙여넣으세요...",
+                lines=10,
+                max_lines=15
             )
 
             with gr.Row():
-                # 이미지 스타일
                 image_style_input = gr.Radio(
                     label="🎨 이미지 스타일",
                     choices=[
-                        ("🎨 애니 스타일", "anime"),
-                        ("📷 실사 스타일", "realistic"),
+                        ("🎨 애니", "anime"),
+                        ("📷 실사", "realistic"),
                     ],
                     value="realistic"
                 )
 
-                # 영상 길이
                 duration_input = gr.Dropdown(
                     label="⏱️ 영상 길이",
-                    choices=[
-                        ("1분", 1),
-                        ("3분", 3),
-                        ("5분", 5),
-                        ("10분", 10),
-                        ("15분", 15),
-                    ],
+                    choices=[("1분", 1), ("3분", 3), ("5분", 5), ("10분", 10), ("15분", 15)],
                     value=5
                 )
 
+            # 단계별 버튼들
+            gr.Markdown("### 📋 단계별 진행")
+
+            with gr.Row():
+                step1_btn = gr.Button("1️⃣ 대본 생성", variant="primary")
+                step2_btn = gr.Button("2️⃣ 이미지 생성", variant="secondary")
+
+            with gr.Row():
+                step3_btn = gr.Button("3️⃣ TTS 생성", variant="secondary")
+                step4_btn = gr.Button("4️⃣ 썸네일 생성", variant="secondary")
+
+            # 이미지 재생성
+            with gr.Accordion("🔄 이미지 재생성", open=False):
+                regen_scene_idx = gr.Number(label="씬 번호 (1부터 시작)", value=1, precision=0)
+                regen_prompt = gr.Textbox(label="커스텀 프롬프트 (선택)", placeholder="비워두면 원래 프롬프트 사용", lines=2)
+                regen_btn = gr.Button("🔄 해당 씬 이미지 재생성", variant="secondary")
+
             # 고급 설정
-            with gr.Accordion("⚙️ 고급 설정", open=False):
+            with gr.Accordion("⚙️ 자막 및 영상 설정", open=True):
                 subtitle_input = gr.Radio(
                     label="자막 모드",
                     choices=[
                         ("없음", "none"),
-                        ("하이라이트 자막", "highlight"),
                         ("전체 자막", "full"),
+                        ("하이라이트", "highlight"),
                         ("전체 + 하이라이트", "full_highlight"),
                     ],
-                    value="full_highlight"
+                    value="full"
                 )
 
                 subtitle_size_input = gr.Dropdown(
@@ -372,90 +617,114 @@ with gr.Blocks(title="NewsVideoFactory", css=CUSTOM_CSS) as demo:
                     value=True
                 )
 
-            # 버튼들
-            with gr.Row():
-                preview_btn = gr.Button("👁️ 대본 미리보기", variant="secondary")
-                generate_btn = gr.Button("🎬 영상 생성하기", variant="primary", size="lg")
+            # 최종 확정 버튼
+            gr.Markdown("---")
+            confirm_btn = gr.Button(
+                "🎬 영상 생성 확정",
+                variant="primary",
+                size="lg",
+                elem_classes="confirm-btn"
+            )
 
-        # ========== 오른쪽: 검수 영역 ==========
+        # ========== 오른쪽: 실시간 미리보기 ==========
         with gr.Column(scale=1):
-            gr.Markdown("## 🔍 검수 패널")
+            gr.Markdown("## 🔍 실시간 미리보기")
 
-            # 씬별 이미지 갤러리
+            # 상태 표시
+            status_output = gr.Markdown(
+                value="👈 왼쪽에서 뉴스 내용을 입력하고 '대본 생성' 버튼을 눌러주세요.",
+                elem_classes="status-box"
+            )
+
+            # 이미지 갤러리
             with gr.Accordion("🖼️ 생성된 이미지", open=True):
                 image_gallery = gr.Gallery(
-                    label="씬별 이미지",
+                    label="씬별 이미지 (클릭하여 확대)",
                     columns=3,
                     rows=2,
-                    height="300px",
+                    height="250px",
                     object_fit="contain"
                 )
 
-            # 씬별 대본 미리보기
-            with gr.Accordion("📝 씬별 대본", open=True):
-                scene_preview_output = gr.Markdown(
-                    value="영상을 생성하면 여기에 씬별 대본이 표시됩니다.",
+            # 썸네일
+            with gr.Accordion("🎨 썸네일", open=True):
+                thumbnail_output = gr.Image(
+                    label="썸네일 미리보기",
+                    type="filepath",
+                    height=200
+                )
+
+            # 대본 미리보기
+            with gr.Accordion("📝 대본 미리보기", open=True):
+                script_preview = gr.Markdown(
+                    value="대본이 생성되면 여기에 표시됩니다.",
                     elem_classes="preview-panel"
                 )
 
-            # 전체 대본 (편집 가능)
-            with gr.Accordion("📄 전체 대본 (편집용)", open=False):
-                full_script_output = gr.Textbox(
-                    label="전체 대본",
-                    lines=15,
-                    interactive=True,
-                    placeholder="대본 미리보기 버튼을 누르면 여기에 전체 대본이 표시됩니다."
-                )
-
-    # ========== 하단: 결과 및 미리보기 ==========
+    # ========== 하단: 최종 영상 ==========
     gr.Markdown("---")
-    gr.Markdown("## 📤 결과")
+    gr.Markdown("## 🎬 최종 영상")
 
-    info_output = gr.Markdown(label="상태")
+    final_status = gr.Markdown("")
 
-    with gr.Row():
-        video_output = gr.Video(
-            label="🎬 생성된 영상 (미리보기)",
-            interactive=False,
-            height=400
-        )
-        thumbnail_output = gr.Image(
-            label="🖼️ 썸네일",
-            type="filepath",
-            height=400
-        )
+    video_output = gr.Video(
+        label="생성된 영상",
+        interactive=False,
+        height=400
+    )
 
     # ========== 이벤트 핸들러 ==========
 
-    # 대본 미리보기
-    preview_btn.click(
-        fn=preview_script_only,
+    # 1단계: 대본 생성
+    step1_btn.click(
+        fn=step1_generate_script,
         inputs=[news_mode_input, news_content_input, image_style_input, duration_input],
-        outputs=[scene_preview_output, full_script_output]
+        outputs=[status_output, script_preview]
     )
 
-    # 영상 생성
-    generate_btn.click(
-        fn=generate_news_video,
-        inputs=[
-            news_mode_input, news_content_input, image_style_input, duration_input,
-            subtitle_input, subtitle_size_input, parallax_input
-        ],
-        outputs=[video_output, thumbnail_output, info_output, image_gallery, scene_preview_output]
+    # 2단계: 이미지 생성
+    step2_btn.click(
+        fn=step2_generate_images,
+        inputs=[],
+        outputs=[status_output, image_gallery]
+    )
+
+    # 이미지 재생성
+    regen_btn.click(
+        fn=lambda idx, prompt: regenerate_single_image(int(idx) - 1, prompt if prompt else None),
+        inputs=[regen_scene_idx, regen_prompt],
+        outputs=[status_output, image_gallery]
+    )
+
+    # 3단계: TTS 생성
+    step3_btn.click(
+        fn=step3_generate_audio,
+        inputs=[],
+        outputs=[status_output]
+    )
+
+    # 4단계: 썸네일 생성
+    step4_btn.click(
+        fn=step4_generate_thumbnail,
+        inputs=[],
+        outputs=[status_output, thumbnail_output]
+    )
+
+    # 5단계: 확정 및 영상 생성
+    confirm_btn.click(
+        fn=step5_confirm_and_render,
+        inputs=[subtitle_input, subtitle_size_input, parallax_input],
+        outputs=[video_output, final_status]
     )
 
     # 푸터
     gr.Markdown("""
     ---
     <div style="text-align: center; color: #666; font-size: 0.9em;">
-    NewsVideoFactory | Powered by Claude, Google Gemini, Google TTS, FFmpeg
+    NewsVideoFactory | Powered by Claude, Google Gemini, Google TTS, Google STT, FFmpeg
     </div>
     """)
 
-
-# 변수명 수정 (subtitle_input → subtitle_mode_input)
-# Gradio 블록 외부에서 참조하기 위해 이름 변경 필요
-demo.launch_kwargs = {}
 
 if __name__ == "__main__":
     print("=" * 60)
