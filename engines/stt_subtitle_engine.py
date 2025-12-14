@@ -1,24 +1,31 @@
 """
-STT 기반 자막 엔진
+Whisper 기반 자막 엔진
 
-TTS로 생성된 음성 파일에서 Speech-to-Text로 정확한 타이밍 추출
-- Google Cloud Speech-to-Text 사용
+TTS로 생성된 음성 파일에서 Whisper로 정확한 타이밍 추출
+- OpenAI Whisper (로컬 실행, 무료)
 - 단어별 정확한 타임스탬프
-- 예측이 아닌 실제 음성 기반 자막 동기화
+- 한국어 인식 정확도 높음
 """
 
 import os
-import io
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 from dataclasses import dataclass
 
-# Google Cloud Speech-to-Text
+# Whisper
 try:
-    from google.cloud import speech
-    SPEECH_AVAILABLE = True
+    import whisper
+    WHISPER_AVAILABLE = True
+    WHISPER_TYPE = "openai"
 except ImportError:
-    SPEECH_AVAILABLE = False
-    print("[STTSubtitleEngine] Warning: google-cloud-speech not installed")
+    WHISPER_AVAILABLE = False
+    WHISPER_TYPE = None
+
+# faster-whisper (더 빠른 대안)
+try:
+    from faster_whisper import WhisperModel
+    FASTER_WHISPER_AVAILABLE = True
+except ImportError:
+    FASTER_WHISPER_AVAILABLE = False
 
 
 @dataclass
@@ -39,9 +46,12 @@ class SubtitleSegment:
 
 class STTSubtitleEngine:
     """
-    STT 기반 자막 생성 엔진
+    Whisper 기반 자막 생성 엔진
 
     음성 파일에서 실제 발화 타이밍을 추출하여 정확한 자막 생성
+    - 무료 (로컬 실행)
+    - 오프라인 가능
+    - 한국어 인식 우수
     """
 
     # 자막 크기 프리셋
@@ -52,21 +62,46 @@ class STTSubtitleEngine:
         "xlarge": 120,
     }
 
-    def __init__(self, font_size_preset: str = "medium"):
+    def __init__(self, font_size_preset: str = "medium", model_size: str = "medium"):
         """
-        STT 자막 엔진 초기화
+        Whisper 자막 엔진 초기화
 
         Args:
             font_size_preset: 자막 크기 (small/medium/large/xlarge)
+            model_size: Whisper 모델 크기 (tiny/base/small/medium/large)
+                - tiny: 가장 빠름, 정확도 낮음
+                - base: 빠름
+                - small: 균형
+                - medium: 권장 (한국어 좋음)
+                - large: 가장 정확, 느림
         """
-        self.client = None
+        self.model = None
+        self.model_size = model_size
+        self.use_faster_whisper = FASTER_WHISPER_AVAILABLE
 
-        if SPEECH_AVAILABLE:
+        # Whisper 모델 로드
+        if FASTER_WHISPER_AVAILABLE:
+            print(f"[STTSubtitleEngine] Loading faster-whisper model: {model_size}")
             try:
-                self.client = speech.SpeechClient()
-                print("[STTSubtitleEngine] Google Speech-to-Text initialized")
+                # GPU 사용 가능하면 cuda, 아니면 cpu
+                self.model = WhisperModel(model_size, device="auto", compute_type="auto")
+                print("[STTSubtitleEngine] faster-whisper loaded (GPU accelerated if available)")
             except Exception as e:
-                print(f"[STTSubtitleEngine] Init error: {e}")
+                print(f"[STTSubtitleEngine] faster-whisper load error: {e}")
+                self.model = None
+
+        elif WHISPER_AVAILABLE:
+            print(f"[STTSubtitleEngine] Loading openai-whisper model: {model_size}")
+            try:
+                self.model = whisper.load_model(model_size)
+                print("[STTSubtitleEngine] openai-whisper loaded")
+            except Exception as e:
+                print(f"[STTSubtitleEngine] whisper load error: {e}")
+                self.model = None
+        else:
+            print("[STTSubtitleEngine] Warning: No whisper library installed!")
+            print("  Install with: pip install faster-whisper")
+            print("  Or: pip install openai-whisper")
 
         # 자막 설정
         preset_size = self.FONT_SIZE_PRESETS.get(font_size_preset, 80)
@@ -82,7 +117,7 @@ class STTSubtitleEngine:
 
     def transcribe_audio(self, audio_path: str) -> List[WordTiming]:
         """
-        음성 파일에서 단어별 타이밍 추출
+        음성 파일에서 단어별 타이밍 추출 (Whisper)
 
         Args:
             audio_path: 오디오 파일 경로 (MP3/WAV)
@@ -90,8 +125,8 @@ class STTSubtitleEngine:
         Returns:
             WordTiming 리스트
         """
-        if not self.client:
-            print("[STTSubtitleEngine] No Speech client available")
+        if self.model is None:
+            print("[STTSubtitleEngine] No model loaded")
             return []
 
         if not os.path.exists(audio_path):
@@ -99,82 +134,58 @@ class STTSubtitleEngine:
             return []
 
         try:
-            # 오디오 파일 읽기
-            with io.open(audio_path, "rb") as audio_file:
-                content = audio_file.read()
-
-            # 파일 확장자로 인코딩 결정
-            ext = os.path.splitext(audio_path)[1].lower()
-            if ext == ".mp3":
-                encoding = speech.RecognitionConfig.AudioEncoding.MP3
-            elif ext == ".wav":
-                encoding = speech.RecognitionConfig.AudioEncoding.LINEAR16
-            else:
-                encoding = speech.RecognitionConfig.AudioEncoding.ENCODING_UNSPECIFIED
-
-            audio = speech.RecognitionAudio(content=content)
-
-            config = speech.RecognitionConfig(
-                encoding=encoding,
-                sample_rate_hertz=24000,  # Google TTS 기본 샘플레이트
-                language_code="ko-KR",
-                enable_word_time_offsets=True,  # ★ 단어별 타임스탬프 활성화
-                enable_automatic_punctuation=True,
-            )
-
             print(f"[STTSubtitleEngine] Transcribing: {audio_path}")
-            response = self.client.recognize(config=config, audio=audio)
 
             word_timings = []
 
-            for result in response.results:
-                alternative = result.alternatives[0]
+            if self.use_faster_whisper:
+                # faster-whisper 사용
+                segments, info = self.model.transcribe(
+                    audio_path,
+                    language="ko",
+                    word_timestamps=True,
+                    vad_filter=True,  # 음성 활동 감지로 정확도 향상
+                )
 
-                for word_info in alternative.words:
-                    word = word_info.word
-                    start_time = word_info.start_time.total_seconds()
-                    end_time = word_info.end_time.total_seconds()
+                for segment in segments:
+                    if segment.words:
+                        for word in segment.words:
+                            word_timings.append(WordTiming(
+                                word=word.word.strip(),
+                                start_time=word.start,
+                                end_time=word.end
+                            ))
+                    else:
+                        # 단어별 타이밍이 없으면 세그먼트 전체 사용
+                        word_timings.append(WordTiming(
+                            word=segment.text.strip(),
+                            start_time=segment.start,
+                            end_time=segment.end
+                        ))
 
-                    word_timings.append(WordTiming(
-                        word=word,
-                        start_time=start_time,
-                        end_time=end_time
-                    ))
+            else:
+                # openai-whisper 사용
+                result = self.model.transcribe(
+                    audio_path,
+                    language="ko",
+                    word_timestamps=True,
+                )
+
+                for segment in result.get("segments", []):
+                    for word_info in segment.get("words", []):
+                        word_timings.append(WordTiming(
+                            word=word_info["word"].strip(),
+                            start_time=word_info["start"],
+                            end_time=word_info["end"]
+                        ))
 
             print(f"[STTSubtitleEngine] Extracted {len(word_timings)} words")
             return word_timings
 
         except Exception as e:
             print(f"[STTSubtitleEngine] Transcription error: {e}")
-            return []
-
-    def transcribe_long_audio(self, audio_path: str) -> List[WordTiming]:
-        """
-        긴 오디오 파일 처리 (1분 이상)
-
-        Google Speech-to-Text의 동기 API는 1분 제한이 있음
-        긴 파일은 LongRunningRecognize 사용
-        """
-        if not self.client:
-            return []
-
-        # 파일 크기 확인 (약 1분 = 1.5MB for MP3)
-        file_size = os.path.getsize(audio_path)
-
-        if file_size < 1_500_000:  # 1.5MB 미만이면 일반 처리
-            return self.transcribe_audio(audio_path)
-
-        try:
-            # GCS에 업로드하거나 청크로 나누어 처리
-            # 여기서는 간단히 오디오를 청크로 나누어 처리
-            print(f"[STTSubtitleEngine] Long audio detected, processing in chunks...")
-
-            # TODO: 긴 오디오 처리 구현
-            # 현재는 일반 처리로 fallback
-            return self.transcribe_audio(audio_path)
-
-        except Exception as e:
-            print(f"[STTSubtitleEngine] Long audio error: {e}")
+            import traceback
+            traceback.print_exc()
             return []
 
     def words_to_segments(self, word_timings: List[WordTiming]) -> List[SubtitleSegment]:
@@ -257,7 +268,7 @@ class STTSubtitleEngine:
         all_segments = []
         current_offset = 0.0
 
-        print(f"[STTSubtitleEngine] Processing {len(audio_files)} audio files...")
+        print(f"[STTSubtitleEngine] Processing {len(audio_files)} audio files with Whisper...")
 
         for idx, audio_info in enumerate(audio_files):
             audio_path = audio_info.get("path")
@@ -266,7 +277,7 @@ class STTSubtitleEngine:
                 current_offset += audio_info.get("duration", 0)
                 continue
 
-            # 음성에서 단어 타이밍 추출
+            # Whisper로 음성에서 단어 타이밍 추출
             word_timings = self.transcribe_audio(audio_path)
 
             if word_timings:
@@ -283,7 +294,7 @@ class STTSubtitleEngine:
 
                 print(f"  Scene {idx}: {len(segments)} segments extracted")
             else:
-                print(f"  Scene {idx}: No words extracted (using fallback)")
+                print(f"  Scene {idx}: No words extracted")
 
             current_offset += audio_info.get("duration", 0)
 
@@ -307,7 +318,7 @@ class STTSubtitleEngine:
         """ASS 자막 파일 생성"""
 
         ass_content = f"""[Script Info]
-Title: STT-based Subtitles
+Title: Whisper-based Subtitles
 ScriptType: v4.00+
 PlayResX: {video_width}
 PlayResY: {video_height}
@@ -355,7 +366,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         return f"{hours}:{minutes:02d}:{secs:02d}.{centisecs:02d}"
 
 
-# 기존 SubtitleEngine과의 호환성을 위한 래퍼
-def create_stt_subtitle_engine(font_size_preset: str = "medium") -> STTSubtitleEngine:
+# 편의 함수
+def create_stt_subtitle_engine(font_size_preset: str = "medium", model_size: str = "medium") -> STTSubtitleEngine:
     """STT 자막 엔진 생성"""
-    return STTSubtitleEngine(font_size_preset=font_size_preset)
+    return STTSubtitleEngine(font_size_preset=font_size_preset, model_size=model_size)
