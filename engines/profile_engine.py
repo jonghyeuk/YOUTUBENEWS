@@ -29,7 +29,7 @@ class ContentProfileEngine:
                 "max_points": 8,                      # 뉴스 구조
                 "max_tokens": 8000,
                 "tts_engine": "google",               # Google TTS만 사용
-                "tts_voice": "ko-KR-Wavenet-A",       # 여성 아나운서 톤
+                "tts_voice": "ko-KR-Neural2-A",       # 여성 Neural2 (가장 자연스러움)
                 "genre_style": "news_report",
                 "core_emotion": ["객관성", "긴장감", "정보 전달", "신뢰성"],
                 "structure": "헤드라인 → 개요 → 상세내용 → 배경설명 → 전문가의견 → 전망 → 마무리",
@@ -74,7 +74,7 @@ class ContentProfileEngine:
                 "max_points": 10,                      # 더 많은 전개
                 "max_tokens": 10000,
                 "tts_engine": "google",                # Google TTS만 사용
-                "tts_voice": "ko-KR-Wavenet-A",        # 여성 아나운서 톤
+                "tts_voice": "ko-KR-Neural2-A",        # 여성 Neural2 (가장 자연스러움)
                 "genre_style": "tabloid_story",
                 "core_emotion": ["호기심", "긴장감", "놀라움", "흥미"],
                 "structure": "후킹 → 소문소개 → 배경설명 → 진실파헤치기 → 충격적사실 → 반전 → 결론",
@@ -151,10 +151,10 @@ class ContentProfileEngine:
             "narration_style": mode.get("narration_style", "journalistic"),
         }
 
-        # TTS 설정
+        # TTS 설정 (Wavenet 4종 + Neural2 3종 = 7종만 지원)
         extra["tts_config"] = {
             "engine": "google",  # Google TTS만 사용
-            "voice": mode.get("tts_voice", "ko-KR-Wavenet-A"),
+            "voice": mode.get("tts_voice", "ko-KR-Neural2-A"),
             "speed": mode.get("speech_speed", 1.0),
         }
 
