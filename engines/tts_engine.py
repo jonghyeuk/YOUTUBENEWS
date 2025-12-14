@@ -21,17 +21,25 @@ class TTSEngine:
     TTS 음성 합성 엔진 - Google Cloud TTS 전용
 
     뉴스 영상을 위한 중립적인 나레이터 음성 생성
-    - 한국어 여성 아나운서 톤
-    - 객관적이고 신뢰감 있는 음성
+    - Wavenet: 자연스러운 음성 (4종)
+    - Neural2: 최신 고품질 음성 (3종)
     """
 
-    # Google Cloud TTS 음성 옵션 (한국어)
+    # Google Cloud TTS 음성 옵션 (한국어 - Wavenet + Neural2만)
     GOOGLE_VOICES = {
-        "female_a": {"name": "ko-KR-Wavenet-A", "gender": "FEMALE", "desc": "여성 아나운서 A"},
-        "female_b": {"name": "ko-KR-Wavenet-B", "gender": "FEMALE", "desc": "여성 아나운서 B"},
-        "male_c": {"name": "ko-KR-Wavenet-C", "gender": "MALE", "desc": "남성 아나운서 C"},
-        "male_d": {"name": "ko-KR-Wavenet-D", "gender": "MALE", "desc": "남성 아나운서 D"},
+        # Wavenet (4종)
+        "wavenet_a": {"name": "ko-KR-Wavenet-A", "gender": "FEMALE", "desc": "여성 Wavenet A"},
+        "wavenet_b": {"name": "ko-KR-Wavenet-B", "gender": "FEMALE", "desc": "여성 Wavenet B"},
+        "wavenet_c": {"name": "ko-KR-Wavenet-C", "gender": "MALE", "desc": "남성 Wavenet C"},
+        "wavenet_d": {"name": "ko-KR-Wavenet-D", "gender": "MALE", "desc": "남성 Wavenet D"},
+        # Neural2 (3종)
+        "neural2_a": {"name": "ko-KR-Neural2-A", "gender": "FEMALE", "desc": "여성 Neural2 A"},
+        "neural2_b": {"name": "ko-KR-Neural2-B", "gender": "FEMALE", "desc": "여성 Neural2 B"},
+        "neural2_c": {"name": "ko-KR-Neural2-C", "gender": "MALE", "desc": "남성 Neural2 C"},
     }
+
+    # 기본 음성 (뉴스 앵커용)
+    DEFAULT_VOICE = "ko-KR-Neural2-A"  # Neural2 여성 (가장 자연스러움)
 
     def __init__(self):
         """Google Cloud TTS 클라이언트 초기화"""
