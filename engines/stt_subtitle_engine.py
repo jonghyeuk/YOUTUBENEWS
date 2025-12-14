@@ -355,19 +355,43 @@ class STTSubtitleEngine:
         all_segments = []
         current_offset = 0.0
 
-        print(f"[STTSubtitleEngine] Processing {len(audio_files)} audio files...")
+        # ★ 유효성 검사
+        num_audio = len(audio_files)
+        num_scenes = len(scenes) if scenes else 0
+
+        print(f"[STTSubtitleEngine] Processing {num_audio} audio files...")
+        print(f"[STTSubtitleEngine] Scenes provided: {num_scenes}")
         print("[STTSubtitleEngine] Strategy: Whisper timing + Original narration text")
+
+        if num_scenes > 0 and num_audio != num_scenes:
+            print(f"[STTSubtitleEngine] ⚠️ Warning: audio({num_audio}) != scenes({num_scenes})")
 
         for idx, audio_info in enumerate(audio_files):
             audio_path = audio_info.get("path")
             audio_duration = audio_info.get("duration", 0)
+
+            # ★ duration 유효성 검사
+            if audio_duration <= 0:
+                print(f"  Scene {idx}: ⚠️ Invalid duration ({audio_duration}), skipping")
+                continue
 
             # 원본 나레이션 텍스트 가져오기
             original_text = ""
             if scenes and idx < len(scenes):
                 original_text = getattr(scenes[idx], 'narration', '')
 
+            # 오디오 파일이 없거나 없으면 fallback 처리
             if not audio_path or not os.path.exists(audio_path):
+                # ★ 오디오가 없어도 원본 텍스트가 있으면 균등 분할로 자막 생성
+                if original_text:
+                    print(f"  Scene {idx}: No audio, using fallback timing for original text")
+                    segments = self._fallback_split(original_text, audio_duration)
+                    for seg in segments:
+                        all_segments.append(SubtitleSegment(
+                            text=seg.text,
+                            start_time=seg.start_time + current_offset,
+                            end_time=seg.end_time + current_offset
+                        ))
                 current_offset += audio_duration
                 continue
 
@@ -390,7 +414,7 @@ class STTSubtitleEngine:
                 print(f"  Scene {idx}: {len(segments)} segments (Whisper text - no original)")
             else:
                 segments = []
-                print(f"  Scene {idx}: No segments extracted")
+                print(f"  Scene {idx}: ⚠️ No segments extracted (no timing, no original)")
 
             # 오프셋 적용
             for seg in segments:
@@ -401,6 +425,8 @@ class STTSubtitleEngine:
                 ))
 
             current_offset += audio_duration
+
+        print(f"[STTSubtitleEngine] Total segments: {len(all_segments)}, Total duration: {current_offset:.1f}s")
 
         # ASS 자막 파일 생성
         return self._generate_ass_file(
