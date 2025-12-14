@@ -117,8 +117,8 @@ def run_news_pipeline(
         subtitle_path = os.path.join(export_dir, "subtitles.ass")
 
         if use_stt_subtitle:
-            # ★ 새로운 방식: 음성에서 실제 타이밍 추출
-            logger.info("Using STT-based subtitle (extracting timing from audio)...")
+            # ★ Whisper 타이밍 + 원본 나레이션 텍스트
+            logger.info("Using Whisper timing + original narration text...")
             stt_engine = STTSubtitleEngine(font_size_preset=subtitle_size)
 
             stt_engine.generate_subtitles_from_audio(
@@ -126,7 +126,8 @@ def run_news_pipeline(
                 output_path=subtitle_path,
                 video_width=width,
                 video_height=height,
-                subtitle_mode=subtitle_mode
+                subtitle_mode=subtitle_mode,
+                scenes=script.scenes  # ★ 원본 나레이션 전달
             )
         else:
             # 기존 방식: 텍스트 길이로 타이밍 예측 (fallback)

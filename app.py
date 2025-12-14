@@ -444,10 +444,10 @@ def step5_confirm_and_render(
         resolution = os.getenv("VIDEO_RESOLUTION", "1920x1080")
         width, height = map(int, resolution.split("x"))
 
-        # 1) 자막 생성 (STT 기반)
+        # 1) 자막 생성 (STT 기반 - Whisper 타이밍 + 원본 나레이션)
         subtitle_path = None
         if subtitle_mode != "none":
-            progress(0.2, desc="자막 생성 중 (음성 분석)...")
+            progress(0.2, desc="자막 생성 중 (Whisper 타이밍 추출)...")
 
             stt_engine = STTSubtitleEngine(font_size_preset=subtitle_size)
             subtitle_path = os.path.join(export_dir, "subtitles.ass")
@@ -457,7 +457,8 @@ def step5_confirm_and_render(
                 output_path=subtitle_path,
                 video_width=width,
                 video_height=height,
-                subtitle_mode=subtitle_mode
+                subtitle_mode=subtitle_mode,
+                scenes=script.scenes  # ★ 원본 나레이션 전달
             )
 
         # 2) 영상 렌더링

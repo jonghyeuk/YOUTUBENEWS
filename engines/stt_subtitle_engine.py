@@ -2,12 +2,13 @@
 Whisper 기반 자막 엔진
 
 TTS로 생성된 음성 파일에서 Whisper로 정확한 타이밍 추출
-- OpenAI Whisper (로컬 실행, 무료)
-- 단어별 정확한 타임스탬프
+- Whisper: 타이밍만 추출 (언제 말했는지)
+- 원본 나레이션: 자막 텍스트 (정확한 텍스트)
 - 한국어 인식 정확도 높음
 """
 
 import os
+import re
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 
@@ -29,17 +30,17 @@ except ImportError:
 
 
 @dataclass
-class WordTiming:
-    """단어별 타이밍 정보"""
-    word: str
+class TimingInfo:
+    """세그먼트별 타이밍 정보"""
     start_time: float  # 초
     end_time: float    # 초
+    text: str          # Whisper 인식 텍스트 (참조용)
 
 
 @dataclass
 class SubtitleSegment:
     """자막 세그먼트"""
-    text: str
+    text: str          # 원본 나레이션 텍스트
     start_time: float
     end_time: float
 
@@ -48,10 +49,9 @@ class STTSubtitleEngine:
     """
     Whisper 기반 자막 생성 엔진
 
-    음성 파일에서 실제 발화 타이밍을 추출하여 정확한 자막 생성
-    - 무료 (로컬 실행)
-    - 오프라인 가능
-    - 한국어 인식 우수
+    ★ 핵심 전략:
+    - Whisper: 타이밍만 추출 (언제 말했는지)
+    - 원본 나레이션: 자막 텍스트 (맞춤법 정확)
     """
 
     # 자막 크기 프리셋
@@ -69,11 +69,6 @@ class STTSubtitleEngine:
         Args:
             font_size_preset: 자막 크기 (small/medium/large/xlarge)
             model_size: Whisper 모델 크기 (tiny/base/small/medium/large)
-                - tiny: 가장 빠름, 정확도 낮음
-                - base: 빠름
-                - small: 균형
-                - medium: 권장 (한국어 좋음)
-                - large: 가장 정확, 느림
         """
         self.model = None
         self.model_size = model_size
@@ -83,9 +78,8 @@ class STTSubtitleEngine:
         if FASTER_WHISPER_AVAILABLE:
             print(f"[STTSubtitleEngine] Loading faster-whisper model: {model_size}")
             try:
-                # GPU 사용 가능하면 cuda, 아니면 cpu
                 self.model = WhisperModel(model_size, device="auto", compute_type="auto")
-                print("[STTSubtitleEngine] faster-whisper loaded (GPU accelerated if available)")
+                print("[STTSubtitleEngine] faster-whisper loaded")
             except Exception as e:
                 print(f"[STTSubtitleEngine] faster-whisper load error: {e}")
                 self.model = None
@@ -101,7 +95,6 @@ class STTSubtitleEngine:
         else:
             print("[STTSubtitleEngine] Warning: No whisper library installed!")
             print("  Install with: pip install faster-whisper")
-            print("  Or: pip install openai-whisper")
 
         # 자막 설정
         preset_size = self.FONT_SIZE_PRESETS.get(font_size_preset, 80)
@@ -110,20 +103,20 @@ class STTSubtitleEngine:
         self.highlight_large_size = int(preset_size * 1.25)
 
         # 자막 분할 설정
-        self.max_chars_per_segment = 30  # 한 자막당 최대 글자수
-        self.max_segment_duration = 4.0  # 한 자막당 최대 표시 시간 (초)
+        self.max_chars_per_segment = 30
+        self.max_segment_duration = 4.0
 
         print(f"[STTSubtitleEngine] Font size: {font_size_preset} ({preset_size}px)")
 
-    def transcribe_audio(self, audio_path: str) -> List[WordTiming]:
+    def extract_timing(self, audio_path: str) -> List[TimingInfo]:
         """
-        음성 파일에서 단어별 타이밍 추출 (Whisper)
+        음성 파일에서 세그먼트별 타이밍 추출 (Whisper)
 
         Args:
-            audio_path: 오디오 파일 경로 (MP3/WAV)
+            audio_path: 오디오 파일 경로
 
         Returns:
-            WordTiming 리스트
+            TimingInfo 리스트 (시작/끝 시간)
         """
         if self.model is None:
             print("[STTSubtitleEngine] No model loaded")
@@ -134,37 +127,25 @@ class STTSubtitleEngine:
             return []
 
         try:
-            print(f"[STTSubtitleEngine] Transcribing: {audio_path}")
+            print(f"[STTSubtitleEngine] Extracting timing: {audio_path}")
 
-            word_timings = []
+            timings = []
 
             if self.use_faster_whisper:
-                # faster-whisper 사용
                 segments, info = self.model.transcribe(
                     audio_path,
                     language="ko",
                     word_timestamps=True,
-                    vad_filter=True,  # 음성 활동 감지로 정확도 향상
+                    vad_filter=True,
                 )
 
                 for segment in segments:
-                    if segment.words:
-                        for word in segment.words:
-                            word_timings.append(WordTiming(
-                                word=word.word.strip(),
-                                start_time=word.start,
-                                end_time=word.end
-                            ))
-                    else:
-                        # 단어별 타이밍이 없으면 세그먼트 전체 사용
-                        word_timings.append(WordTiming(
-                            word=segment.text.strip(),
-                            start_time=segment.start,
-                            end_time=segment.end
-                        ))
-
+                    timings.append(TimingInfo(
+                        start_time=segment.start,
+                        end_time=segment.end,
+                        text=segment.text.strip()
+                    ))
             else:
-                # openai-whisper 사용
                 result = self.model.transcribe(
                     audio_path,
                     language="ko",
@@ -172,75 +153,177 @@ class STTSubtitleEngine:
                 )
 
                 for segment in result.get("segments", []):
-                    for word_info in segment.get("words", []):
-                        word_timings.append(WordTiming(
-                            word=word_info["word"].strip(),
-                            start_time=word_info["start"],
-                            end_time=word_info["end"]
-                        ))
+                    timings.append(TimingInfo(
+                        start_time=segment["start"],
+                        end_time=segment["end"],
+                        text=segment["text"].strip()
+                    ))
 
-            print(f"[STTSubtitleEngine] Extracted {len(word_timings)} words")
-            return word_timings
+            print(f"[STTSubtitleEngine] Extracted {len(timings)} timing segments")
+            return timings
 
         except Exception as e:
-            print(f"[STTSubtitleEngine] Transcription error: {e}")
+            print(f"[STTSubtitleEngine] Timing extraction error: {e}")
             import traceback
             traceback.print_exc()
             return []
 
-    def words_to_segments(self, word_timings: List[WordTiming]) -> List[SubtitleSegment]:
+    def align_text_to_timing(
+        self,
+        original_text: str,
+        timings: List[TimingInfo],
+        audio_duration: float
+    ) -> List[SubtitleSegment]:
         """
-        단어 타이밍을 자막 세그먼트로 변환
+        원본 텍스트를 Whisper 타이밍에 맞춰 정렬
 
-        자연스러운 문장 단위로 묶음
-        - 최대 글자수 제한
-        - 최대 표시 시간 제한
-        - 문장 부호에서 끊기
+        ★ 핵심: Whisper 타이밍 + 원본 텍스트
+
+        Args:
+            original_text: 원본 나레이션 텍스트
+            timings: Whisper에서 추출한 타이밍
+            audio_duration: 오디오 총 길이
+
+        Returns:
+            SubtitleSegment 리스트
         """
-        if not word_timings:
+        if not timings or not original_text:
+            # 타이밍이 없으면 균등 분할
+            return self._fallback_split(original_text, audio_duration)
+
+        # 원본 텍스트를 문장으로 분할
+        sentences = self._split_to_sentences(original_text)
+
+        if not sentences:
             return []
 
         segments = []
-        current_words = []
-        current_start = word_timings[0].start_time
 
-        for i, wt in enumerate(word_timings):
-            current_words.append(wt.word)
-            current_text = " ".join(current_words)
-            current_duration = wt.end_time - current_start
+        # 타이밍 개수와 문장 개수가 비슷하면 1:1 매핑
+        if len(timings) >= len(sentences):
+            # 각 문장에 타이밍 할당
+            for i, sentence in enumerate(sentences):
+                if i < len(timings):
+                    timing = timings[i]
+                else:
+                    # 남은 문장은 마지막 타이밍 이후로
+                    timing = timings[-1]
 
-            # 세그먼트 종료 조건
-            should_break = False
+                segments.append(SubtitleSegment(
+                    text=sentence,
+                    start_time=timing.start_time,
+                    end_time=timing.end_time
+                ))
+        else:
+            # 타이밍이 적으면 문장을 타이밍에 맞춰 그룹화
+            sentences_per_timing = len(sentences) / len(timings)
 
-            # 1. 문장 부호로 끝나는 경우
-            if wt.word.endswith(('.', '?', '!', '。')):
-                should_break = True
+            for i, timing in enumerate(timings):
+                start_idx = int(i * sentences_per_timing)
+                end_idx = int((i + 1) * sentences_per_timing)
 
-            # 2. 최대 글자수 초과
-            elif len(current_text.replace(" ", "")) >= self.max_chars_per_segment:
-                should_break = True
+                grouped_text = " ".join(sentences[start_idx:end_idx])
 
-            # 3. 최대 표시 시간 초과
-            elif current_duration >= self.max_segment_duration:
-                should_break = True
+                if grouped_text:
+                    segments.append(SubtitleSegment(
+                        text=grouped_text,
+                        start_time=timing.start_time,
+                        end_time=timing.end_time
+                    ))
 
-            # 4. 쉼표에서 끊기 (글자가 충분히 많으면)
-            elif wt.word.endswith(',') and len(current_text.replace(" ", "")) >= 15:
-                should_break = True
+        # 긴 세그먼트 분할
+        final_segments = []
+        for seg in segments:
+            if len(seg.text) > self.max_chars_per_segment:
+                # 긴 세그먼트를 여러 개로 분할
+                split_segs = self._split_long_segment(seg)
+                final_segments.extend(split_segs)
+            else:
+                final_segments.append(seg)
 
-            if should_break or i == len(word_timings) - 1:
-                # 세그먼트 생성
-                segment = SubtitleSegment(
-                    text=current_text.strip(),
-                    start_time=current_start,
-                    end_time=wt.end_time
-                )
-                segments.append(segment)
+        return final_segments
 
-                # 초기화
-                current_words = []
-                if i + 1 < len(word_timings):
-                    current_start = word_timings[i + 1].start_time
+    def _split_to_sentences(self, text: str) -> List[str]:
+        """텍스트를 문장 단위로 분할"""
+        # 화자 태그 제거
+        text = re.sub(r'\[NARRATOR\d*\]\s*', '', text)
+        text = re.sub(r'\[화자\d*\]\s*', '', text)
+
+        # 문장 분리
+        sentences = re.split(r'([.!?])\s*', text)
+
+        result = []
+        i = 0
+        while i < len(sentences):
+            sent = sentences[i].strip()
+            if sent:
+                # 다음 요소가 구두점이면 붙이기
+                if i + 1 < len(sentences) and sentences[i + 1] in '.!?':
+                    sent += sentences[i + 1]
+                    i += 1
+                if len(sent) >= 5:  # 너무 짧은 문장 제외
+                    result.append(sent)
+            i += 1
+
+        return result
+
+    def _split_long_segment(self, segment: SubtitleSegment) -> List[SubtitleSegment]:
+        """긴 세그먼트를 여러 개로 분할"""
+        text = segment.text
+        duration = segment.end_time - segment.start_time
+
+        # 쉼표나 공백에서 분할
+        parts = re.split(r'[,，]\s*|\s+', text)
+
+        # 적절한 크기로 그룹화
+        groups = []
+        current_group = []
+        current_len = 0
+
+        for part in parts:
+            if current_len + len(part) > self.max_chars_per_segment and current_group:
+                groups.append(" ".join(current_group))
+                current_group = [part]
+                current_len = len(part)
+            else:
+                current_group.append(part)
+                current_len += len(part) + 1
+
+        if current_group:
+            groups.append(" ".join(current_group))
+
+        # 시간 분배
+        if not groups:
+            return [segment]
+
+        time_per_group = duration / len(groups)
+        result = []
+
+        for i, group_text in enumerate(groups):
+            result.append(SubtitleSegment(
+                text=group_text,
+                start_time=segment.start_time + (i * time_per_group),
+                end_time=segment.start_time + ((i + 1) * time_per_group)
+            ))
+
+        return result
+
+    def _fallback_split(self, text: str, duration: float) -> List[SubtitleSegment]:
+        """타이밍이 없을 때 균등 분할 (fallback)"""
+        sentences = self._split_to_sentences(text)
+
+        if not sentences:
+            return []
+
+        time_per_sentence = duration / len(sentences)
+        segments = []
+
+        for i, sentence in enumerate(sentences):
+            segments.append(SubtitleSegment(
+                text=sentence,
+                start_time=i * time_per_sentence,
+                end_time=(i + 1) * time_per_sentence
+            ))
 
         return segments
 
@@ -250,10 +333,13 @@ class STTSubtitleEngine:
         output_path: str,
         video_width: int = 1920,
         video_height: int = 1080,
-        subtitle_mode: str = "full"
+        subtitle_mode: str = "full",
+        scenes: List = None  # ★ 원본 나레이션을 위한 Scene 리스트
     ) -> str:
         """
         오디오 파일들에서 자막 생성
+
+        ★ Whisper 타이밍 + 원본 나레이션 텍스트
 
         Args:
             audio_files: 오디오 파일 정보 리스트 [{path, duration}, ...]
@@ -261,6 +347,7 @@ class STTSubtitleEngine:
             video_width: 영상 너비
             video_height: 영상 높이
             subtitle_mode: 자막 모드 (full/highlight/full_highlight)
+            scenes: Scene 리스트 (원본 나레이션 텍스트용)
 
         Returns:
             생성된 자막 파일 경로
@@ -268,35 +355,52 @@ class STTSubtitleEngine:
         all_segments = []
         current_offset = 0.0
 
-        print(f"[STTSubtitleEngine] Processing {len(audio_files)} audio files with Whisper...")
+        print(f"[STTSubtitleEngine] Processing {len(audio_files)} audio files...")
+        print("[STTSubtitleEngine] Strategy: Whisper timing + Original narration text")
 
         for idx, audio_info in enumerate(audio_files):
             audio_path = audio_info.get("path")
+            audio_duration = audio_info.get("duration", 0)
+
+            # 원본 나레이션 텍스트 가져오기
+            original_text = ""
+            if scenes and idx < len(scenes):
+                original_text = getattr(scenes[idx], 'narration', '')
 
             if not audio_path or not os.path.exists(audio_path):
-                current_offset += audio_info.get("duration", 0)
+                current_offset += audio_duration
                 continue
 
-            # Whisper로 음성에서 단어 타이밍 추출
-            word_timings = self.transcribe_audio(audio_path)
+            # 1) Whisper로 타이밍만 추출
+            timings = self.extract_timing(audio_path)
 
-            if word_timings:
-                # 단어를 자막 세그먼트로 변환
-                segments = self.words_to_segments(word_timings)
-
-                # 오프셋 적용
-                for seg in segments:
-                    all_segments.append(SubtitleSegment(
-                        text=seg.text,
-                        start_time=seg.start_time + current_offset,
-                        end_time=seg.end_time + current_offset
-                    ))
-
-                print(f"  Scene {idx}: {len(segments)} segments extracted")
+            # 2) 원본 텍스트를 타이밍에 맞춰 정렬
+            if original_text:
+                segments = self.align_text_to_timing(original_text, timings, audio_duration)
+                print(f"  Scene {idx}: {len(segments)} segments (original text + Whisper timing)")
+            elif timings:
+                # 원본이 없으면 Whisper 텍스트 사용 (fallback)
+                segments = [
+                    SubtitleSegment(
+                        text=t.text,
+                        start_time=t.start_time,
+                        end_time=t.end_time
+                    ) for t in timings
+                ]
+                print(f"  Scene {idx}: {len(segments)} segments (Whisper text - no original)")
             else:
-                print(f"  Scene {idx}: No words extracted")
+                segments = []
+                print(f"  Scene {idx}: No segments extracted")
 
-            current_offset += audio_info.get("duration", 0)
+            # 오프셋 적용
+            for seg in segments:
+                all_segments.append(SubtitleSegment(
+                    text=seg.text,
+                    start_time=seg.start_time + current_offset,
+                    end_time=seg.end_time + current_offset
+                ))
+
+            current_offset += audio_duration
 
         # ASS 자막 파일 생성
         return self._generate_ass_file(
@@ -318,7 +422,7 @@ class STTSubtitleEngine:
         """ASS 자막 파일 생성"""
 
         ass_content = f"""[Script Info]
-Title: Whisper-based Subtitles
+Title: Whisper-timed Subtitles
 ScriptType: v4.00+
 PlayResX: {video_width}
 PlayResY: {video_height}
