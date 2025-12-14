@@ -8,6 +8,7 @@ from engines.image_engine import ImageEngine
 from engines.tts_engine import TTSEngine
 from engines.video_engine import VideoRenderEngine
 from engines.subtitle_engine import SubtitleEngine
+from engines.stt_subtitle_engine import STTSubtitleEngine
 from models.types import TitleThumbnailResult, TopicScore
 from utils.logger import setup_logger
 
@@ -103,46 +104,62 @@ def run_news_pipeline(
         logger.error(f"TTS Error: {e}")
         return None
 
-    # 6) 자막 생성
+    # 6) 자막 생성 (STT 기반 - 음성에서 타이밍 추출)
     subtitle_mode = os.getenv("SUBTITLE_MODE", "full_highlight")
     subtitle_size = os.getenv("SUBTITLE_SIZE", "medium")
+    use_stt_subtitle = os.getenv("USE_STT_SUBTITLE", "true").lower() == "true"
     resolution = os.getenv("VIDEO_RESOLUTION", "1920x1080")
     width, height = map(int, resolution.split("x"))
 
     subtitle_path = None
     if subtitle_mode != "none":
         logger.info(f"[5/6] Generating subtitles ({subtitle_mode})...")
-        subtitle_engine = SubtitleEngine(font_size_preset=subtitle_size)
-
         subtitle_path = os.path.join(export_dir, "subtitles.ass")
 
-        if subtitle_mode == "full_highlight":
-            subtitle_engine.generate_full_highlight_subtitles(
-                script.scenes, audio_files, subtitle_path, width, height
+        if use_stt_subtitle:
+            # ★ 새로운 방식: 음성에서 실제 타이밍 추출
+            logger.info("Using STT-based subtitle (extracting timing from audio)...")
+            stt_engine = STTSubtitleEngine(font_size_preset=subtitle_size)
+
+            stt_engine.generate_subtitles_from_audio(
+                audio_files=audio_files,
+                output_path=subtitle_path,
+                video_width=width,
+                video_height=height,
+                subtitle_mode=subtitle_mode
             )
-        elif subtitle_mode == "full":
-            subtitle_engine.generate_full_subtitles(
-                script.scenes, audio_files, subtitle_path, width, height
-            )
-        elif subtitle_mode == "highlight":
-            all_subtitles = []
-            current_offset = 0.0
-            for idx, scene in enumerate(script.scenes):
-                if idx < len(audio_files):
-                    scene_duration = audio_files[idx].get("duration", scene.duration_sec)
-                else:
-                    scene_duration = scene.duration_sec
-                scene_subs = subtitle_engine.generate_scene_subtitles(
-                    narration=scene.narration,
-                    scene_id=scene.scene_id,
-                    scene_duration=scene_duration,
-                    start_offset=current_offset,
-                    emotion_tag=getattr(scene, 'emotion_tag', 'neutral')
+        else:
+            # 기존 방식: 텍스트 길이로 타이밍 예측 (fallback)
+            logger.info("Using prediction-based subtitle (fallback)...")
+            subtitle_engine = SubtitleEngine(font_size_preset=subtitle_size)
+
+            if subtitle_mode == "full_highlight":
+                subtitle_engine.generate_full_highlight_subtitles(
+                    script.scenes, audio_files, subtitle_path, width, height
                 )
-                all_subtitles.extend(scene_subs)
-                current_offset += scene_duration
-            if all_subtitles:
-                subtitle_engine.save_ass_file(all_subtitles, subtitle_path, width, height)
+            elif subtitle_mode == "full":
+                subtitle_engine.generate_full_subtitles(
+                    script.scenes, audio_files, subtitle_path, width, height
+                )
+            elif subtitle_mode == "highlight":
+                all_subtitles = []
+                current_offset = 0.0
+                for idx, scene in enumerate(script.scenes):
+                    if idx < len(audio_files):
+                        scene_duration = audio_files[idx].get("duration", scene.duration_sec)
+                    else:
+                        scene_duration = scene.duration_sec
+                    scene_subs = subtitle_engine.generate_scene_subtitles(
+                        narration=scene.narration,
+                        scene_id=scene.scene_id,
+                        scene_duration=scene_duration,
+                        start_offset=current_offset,
+                        emotion_tag=getattr(scene, 'emotion_tag', 'neutral')
+                    )
+                    all_subtitles.extend(scene_subs)
+                    current_offset += scene_duration
+                if all_subtitles:
+                    subtitle_engine.save_ass_file(all_subtitles, subtitle_path, width, height)
 
         logger.info("Subtitles generated")
 
