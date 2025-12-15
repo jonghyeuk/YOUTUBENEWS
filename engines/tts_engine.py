@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import tempfile
+import requests
 from pathlib import Path
 from typing import List, Dict
 
@@ -18,11 +19,17 @@ except ImportError:
 
 class TTSEngine:
     """
-    TTS 음성 합성 엔진 - Google Cloud TTS 전용
+    TTS 음성 합성 엔진 - Google Cloud TTS + ElevenLabs
 
     뉴스 영상을 위한 중립적인 나레이터 음성 생성
+
+    ★ Google Cloud TTS (7종)
     - Wavenet: 자연스러운 음성 (4종)
     - Neural2: 최신 고품질 음성 (3종)
+
+    ★ ElevenLabs (다국어 지원, 고품질)
+    - 한국어 포함 다국어 지원
+    - 자연스럽고 감정 표현 우수
     """
 
     # Google Cloud TTS 음성 옵션 (한국어 - Wavenet + Neural2만)
@@ -38,19 +45,53 @@ class TTSEngine:
         "neural2_c": {"name": "ko-KR-Neural2-C", "gender": "MALE", "desc": "남성 Neural2 C"},
     }
 
-    # 기본 음성 (뉴스 앵커용)
-    DEFAULT_VOICE = "ko-KR-Neural2-A"  # Neural2 여성 (가장 자연스러움)
+    # ElevenLabs 음성 옵션
+    # voice_id는 ElevenLabs 대시보드에서 확인 가능
+    ELEVENLABS_VOICES = {
+        # 기본 제공 음성 (한국어 지원)
+        "eleven_rachel": {"voice_id": "21m00Tcm4TlvDq8ikWAM", "desc": "Rachel - 차분한 여성"},
+        "eleven_drew": {"voice_id": "29vD33N1CtxCmqQRPOHJ", "desc": "Drew - 침착한 남성"},
+        "eleven_clyde": {"voice_id": "2EiwWnXFnvU5JabPnv8n", "desc": "Clyde - 깊은 남성"},
+        "eleven_paul": {"voice_id": "5Q0t7uMcjvnagumLfvZi", "desc": "Paul - 뉴스 앵커 남성"},
+        "eleven_domi": {"voice_id": "AZnzlk1XvdvUeBnXmlld", "desc": "Domi - 밝은 여성"},
+        "eleven_bella": {"voice_id": "EXAVITQu4vr4xnSDxMaL", "desc": "Bella - 부드러운 여성"},
+        "eleven_antoni": {"voice_id": "ErXwobaYiN019PkySvjV", "desc": "Antoni - 따뜻한 남성"},
+        "eleven_elli": {"voice_id": "MF3mGyEYCl7XYWbV9V6O", "desc": "Elli - 젊은 여성"},
+        "eleven_josh": {"voice_id": "TxGEqnHWrfWFTfGW9XjX", "desc": "Josh - 젊은 남성"},
+        "eleven_arnold": {"voice_id": "VR6AewLTigWG4xSOukaG", "desc": "Arnold - 힘있는 남성"},
+        "eleven_adam": {"voice_id": "pNInz6obpgDQGcFmaJgB", "desc": "Adam - 깊고 내레이션용 남성"},
+        "eleven_sam": {"voice_id": "yoZ06aMxZJJ28mfd3POQ", "desc": "Sam - 활기찬 남성"},
+    }
+
+    # 허용된 음성 목록 (검증용)
+    ALLOWED_VOICES = [
+        # Google TTS
+        "ko-KR-Wavenet-A", "ko-KR-Wavenet-B", "ko-KR-Wavenet-C", "ko-KR-Wavenet-D",
+        "ko-KR-Neural2-A", "ko-KR-Neural2-B", "ko-KR-Neural2-C",
+        # ElevenLabs
+        "eleven_rachel", "eleven_drew", "eleven_clyde", "eleven_paul",
+        "eleven_domi", "eleven_bella", "eleven_antoni", "eleven_elli",
+        "eleven_josh", "eleven_arnold", "eleven_adam", "eleven_sam",
+    ]
 
     def __init__(self):
-        """Google Cloud TTS 클라이언트 초기화"""
-        self.client = None
+        """TTS 클라이언트 초기화"""
+        self.google_client = None
+        self.elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
 
+        # Google Cloud TTS 초기화
         if GOOGLE_TTS_AVAILABLE:
             try:
-                self.client = texttospeech.TextToSpeechClient()
+                self.google_client = texttospeech.TextToSpeechClient()
                 print("[TTSEngine] Google Cloud TTS initialized")
             except Exception as e:
                 print(f"[TTSEngine] Google Cloud TTS init error: {e}")
+
+        # ElevenLabs 확인
+        if self.elevenlabs_api_key:
+            print("[TTSEngine] ElevenLabs API key found")
+        else:
+            print("[TTSEngine] Warning: ELEVENLABS_API_KEY not set")
 
     def generate_audio(
         self,
@@ -72,10 +113,22 @@ class TTSEngine:
         os.makedirs(output_dir, exist_ok=True)
         audio_files = []
 
-        # 음성 설정
-        voice_config = profile.extra.get("tts_config", {})
-        voice_name = voice_config.get("voice", "ko-KR-Wavenet-A")
+        # 음성 설정 (fallback 없음 - 반드시 설정되어야 함)
+        voice_config = profile.extra.get("tts_config")
+        if not voice_config:
+            raise ValueError("TTS 설정이 없습니다. profile.extra['tts_config'] 필수")
+
+        voice_name = voice_config.get("voice")
+        if not voice_name:
+            raise ValueError("음성이 설정되지 않았습니다. tts_config['voice'] 필수")
+
+        if voice_name not in self.ALLOWED_VOICES:
+            raise ValueError(f"허용되지 않은 음성: {voice_name}. 허용 목록: {self.ALLOWED_VOICES}")
+
         speech_speed = voice_config.get("speed", 1.0)
+
+        # 엔진 결정 (voice_name 기준)
+        is_elevenlabs = voice_name.startswith("eleven_")
 
         for idx, scene in enumerate(scenes):
             narration = self._clean_narration(scene.narration)
@@ -88,23 +141,31 @@ class TTSEngine:
             output_path = os.path.join(output_dir, f"scene_{idx:03d}.mp3")
 
             try:
-                duration = self._generate_google_tts(
-                    text=narration,
-                    output_path=output_path,
-                    voice_name=voice_name,
-                    speaking_rate=speech_speed
-                )
+                if is_elevenlabs:
+                    duration = self._generate_elevenlabs_tts(
+                        text=narration,
+                        output_path=output_path,
+                        voice_key=voice_name
+                    )
+                else:
+                    duration = self._generate_google_tts(
+                        text=narration,
+                        output_path=output_path,
+                        voice_name=voice_name,
+                        speaking_rate=speech_speed
+                    )
 
                 audio_files.append({
                     "path": output_path,
                     "duration": duration
                 })
 
-                print(f"[TTSEngine] Scene {idx}: {duration:.1f}s - {output_path}")
+                engine_name = "ElevenLabs" if is_elevenlabs else "Google"
+                print(f"[TTSEngine] Scene {idx}: {duration:.1f}s ({engine_name}) - {output_path}")
 
             except Exception as e:
                 print(f"[TTSEngine] Scene {idx} Error: {e}")
-                audio_files.append({"path": None, "duration": scene.duration_sec})
+                raise  # fail fast - 에러 발생시 즉시 중단
 
         return audio_files
 
@@ -112,7 +173,7 @@ class TTSEngine:
         self,
         text: str,
         output_path: str,
-        voice_name: str = "ko-KR-Wavenet-A",
+        voice_name: str,
         speaking_rate: float = 1.0
     ) -> float:
         """
@@ -121,13 +182,13 @@ class TTSEngine:
         Args:
             text: 나레이션 텍스트
             output_path: 출력 파일 경로
-            voice_name: 음성 이름
+            voice_name: 음성 이름 (필수, ALLOWED_VOICES 중 하나)
             speaking_rate: 말하기 속도 (0.25 ~ 4.0)
 
         Returns:
             오디오 길이 (초)
         """
-        if not self.client:
+        if not self.google_client:
             raise RuntimeError("Google Cloud TTS client not initialized")
 
         # 입력 텍스트 설정
@@ -147,7 +208,7 @@ class TTSEngine:
         )
 
         # TTS 요청
-        response = self.client.synthesize_speech(
+        response = self.google_client.synthesize_speech(
             input=synthesis_input,
             voice=voice,
             audio_config=audio_config
@@ -156,6 +217,66 @@ class TTSEngine:
         # 파일 저장
         with open(output_path, "wb") as f:
             f.write(response.audio_content)
+
+        # 오디오 길이 측정
+        duration = self._get_audio_duration(output_path)
+
+        return duration
+
+    def _generate_elevenlabs_tts(
+        self,
+        text: str,
+        output_path: str,
+        voice_key: str
+    ) -> float:
+        """
+        ElevenLabs TTS로 음성 생성
+
+        Args:
+            text: 나레이션 텍스트
+            output_path: 출력 파일 경로
+            voice_key: 음성 키 (eleven_rachel, eleven_adam 등)
+
+        Returns:
+            오디오 길이 (초)
+        """
+        if not self.elevenlabs_api_key:
+            raise RuntimeError("ELEVENLABS_API_KEY not set")
+
+        voice_info = self.ELEVENLABS_VOICES.get(voice_key)
+        if not voice_info:
+            raise ValueError(f"Unknown ElevenLabs voice: {voice_key}")
+
+        voice_id = voice_info["voice_id"]
+
+        # ElevenLabs API 호출
+        url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+
+        headers = {
+            "Accept": "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": self.elevenlabs_api_key
+        }
+
+        data = {
+            "text": text,
+            "model_id": "eleven_multilingual_v2",  # 다국어 모델 (한국어 지원)
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.75,
+                "style": 0.0,
+                "use_speaker_boost": True
+            }
+        }
+
+        response = requests.post(url, json=data, headers=headers)
+
+        if response.status_code != 200:
+            raise RuntimeError(f"ElevenLabs API error: {response.status_code} - {response.text}")
+
+        # 파일 저장
+        with open(output_path, "wb") as f:
+            f.write(response.content)
 
         # 오디오 길이 측정
         duration = self._get_audio_duration(output_path)

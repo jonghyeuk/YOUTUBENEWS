@@ -152,9 +152,14 @@ class ContentProfileEngine:
         }
 
         # TTS 설정 (Wavenet 4종 + Neural2 3종 = 7종만 지원)
+        # ★ fallback 없음 - 모드에 tts_voice가 반드시 설정되어야 함
+        tts_voice = mode.get("tts_voice")
+        if not tts_voice:
+            raise ValueError(f"모드 '{news_mode}'에 tts_voice가 설정되지 않았습니다.")
+
         extra["tts_config"] = {
-            "engine": "google",  # Google TTS만 사용
-            "voice": mode.get("tts_voice", "ko-KR-Neural2-A"),
+            "engine": "google",
+            "voice": tts_voice,
             "speed": mode.get("speech_speed", 1.0),
         }
 
