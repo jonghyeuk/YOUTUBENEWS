@@ -38,8 +38,11 @@ class TTSEngine:
         "neural2_c": {"name": "ko-KR-Neural2-C", "gender": "MALE", "desc": "남성 Neural2 C"},
     }
 
-    # 기본 음성 (뉴스 앵커용)
-    DEFAULT_VOICE = "ko-KR-Neural2-A"  # Neural2 여성 (가장 자연스러움)
+    # 허용된 음성 목록 (검증용)
+    ALLOWED_VOICES = [
+        "ko-KR-Wavenet-A", "ko-KR-Wavenet-B", "ko-KR-Wavenet-C", "ko-KR-Wavenet-D",
+        "ko-KR-Neural2-A", "ko-KR-Neural2-B", "ko-KR-Neural2-C"
+    ]
 
     def __init__(self):
         """Google Cloud TTS 클라이언트 초기화"""
@@ -72,9 +75,18 @@ class TTSEngine:
         os.makedirs(output_dir, exist_ok=True)
         audio_files = []
 
-        # 음성 설정
-        voice_config = profile.extra.get("tts_config", {})
-        voice_name = voice_config.get("voice", "ko-KR-Wavenet-A")
+        # 음성 설정 (fallback 없음 - 반드시 설정되어야 함)
+        voice_config = profile.extra.get("tts_config")
+        if not voice_config:
+            raise ValueError("TTS 설정이 없습니다. profile.extra['tts_config'] 필수")
+
+        voice_name = voice_config.get("voice")
+        if not voice_name:
+            raise ValueError("음성이 설정되지 않았습니다. tts_config['voice'] 필수")
+
+        if voice_name not in self.ALLOWED_VOICES:
+            raise ValueError(f"허용되지 않은 음성: {voice_name}. 허용 목록: {self.ALLOWED_VOICES}")
+
         speech_speed = voice_config.get("speed", 1.0)
 
         for idx, scene in enumerate(scenes):
@@ -112,7 +124,7 @@ class TTSEngine:
         self,
         text: str,
         output_path: str,
-        voice_name: str = "ko-KR-Wavenet-A",
+        voice_name: str,
         speaking_rate: float = 1.0
     ) -> float:
         """
@@ -121,7 +133,7 @@ class TTSEngine:
         Args:
             text: 나레이션 텍스트
             output_path: 출력 파일 경로
-            voice_name: 음성 이름
+            voice_name: 음성 이름 (필수, ALLOWED_VOICES 중 하나)
             speaking_rate: 말하기 속도 (0.25 ~ 4.0)
 
         Returns:
