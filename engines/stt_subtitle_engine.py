@@ -445,22 +445,35 @@ class STTSubtitleEngine:
         video_height: int,
         subtitle_mode: str
     ) -> str:
-        """ASS 자막 파일 생성"""
+        """
+        ASS 자막 파일 생성
+
+        ★ 뉴스 스타일 자막:
+        - 하단 중앙: 흰색 텍스트 + 검정 외곽선 + 반투명 배경
+        - 깔끔하고 가독성 좋은 스타일
+        """
+
+        # 자막 마진 (하단 여백)
+        margin_v = 50
 
         ass_content = f"""[Script Info]
-Title: Whisper-timed Subtitles
+Title: News Style Subtitles
 ScriptType: v4.00+
 PlayResX: {video_width}
 PlayResY: {video_height}
 ScaledBorderAndShadow: yes
+YCbCr Matrix: TV.709
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-; 하단 전체 자막 스타일
-Style: FullSub,NanumGothic,{self.full_sub_size},&H00FFFFFF,&H000000FF,&H00000000,&HC0000000,1,0,0,0,100,100,0,0,3,3,3,2,60,60,40,1
-; 중앙 하이라이트 스타일
-Style: Highlight,Nanum Pen Script,{self.highlight_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,3,2,5,50,50,100,1
-Style: HighlightLarge,Nanum Pen Script,{self.highlight_large_size},&H0000FFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,3,5,50,50,100,1
+; ★ 뉴스 스타일 - 하단 중앙, 반투명 박스 배경
+Style: FullSub,NanumGothic,{self.full_sub_size},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,1,0,3,2.5,0,2,80,80,{margin_v},1
+; ★ 깔끔한 외곽선 스타일 (배경 없음)
+Style: CleanSub,NanumGothic,{self.full_sub_size},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,1,0,1,3,1.5,2,80,80,{margin_v},1
+; ★ 강조 키워드 스타일 (노란색)
+Style: Keyword,NanumGothic,{self.highlight_size},&H00FFFF00,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,3,1.5,2,80,80,{margin_v},1
+; ★ 상단 제목 스타일
+Style: Title,NanumGothic,{self.highlight_large_size},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,2,0,1,4,2,8,80,80,50,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -473,12 +486,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             # 텍스트 정리
             text = seg.text.replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}")
 
-            # 페이드 효과
-            fade_effect = "{\\fad(200,200)}"
+            # ★ 부드러운 페이드 인/아웃 (150ms)
+            fade_effect = "{\\fad(150,150)}"
 
             # 전체 자막 (Layer 0, 하단)
             if subtitle_mode in ["full", "full_highlight"]:
                 ass_content += f"Dialogue: 0,{start_str},{end_str},FullSub,,0,0,0,,{fade_effect}{text}\n"
+
+            # 깔끔한 스타일 (배경 없이 외곽선만)
+            elif subtitle_mode == "clean":
+                ass_content += f"Dialogue: 0,{start_str},{end_str},CleanSub,,0,0,0,,{fade_effect}{text}\n"
 
         # 파일 저장
         with open(output_path, 'w', encoding='utf-8') as f:
