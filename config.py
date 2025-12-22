@@ -2,12 +2,15 @@
 파이프라인 설정 - 길이별 규격 및 기본값
 """
 
-# 길이별 컷/그리드 규격 (고정)
+# 길이별 그리드 규격 (정서 단락 기반 배치)
+# panels_per_scene은 기본값일 뿐, 실제로는 정서 전환점 분석으로 배치
 DURATION_SPECS = {
-    5: {"panels": 4, "rows": 2, "cols": 2, "scenes": 2, "panels_per_scene": 2},
-    10: {"panels": 8, "rows": 2, "cols": 4, "scenes": 4, "panels_per_scene": 2},
-    15: {"panels": 12, "rows": 3, "cols": 4, "scenes": 6, "panels_per_scene": 2},
-    20: {"panels": 16, "rows": 4, "cols": 4, "scenes": 8, "panels_per_scene": 2},
+    5: {"panels": 9, "rows": 3, "cols": 3},    # 3x3 = 9장
+    10: {"panels": 16, "rows": 4, "cols": 4},  # 4x4 = 16장
+    15: {"panels": 25, "rows": 5, "cols": 5},  # 5x5 = 25장
+    20: {"panels": 36, "rows": 6, "cols": 6},  # 6x6 = 36장
+    30: {"panels": 49, "rows": 7, "cols": 7},  # 7x7 = 49장
+    40: {"panels": 64, "rows": 8, "cols": 8},  # 8x8 = 64장
 }
 
 # TTS 설정 (시니어 타겟 최적화)

@@ -7,6 +7,7 @@ from .video_engine import VideoEngine
 from .audio_utils import get_audio_duration, calculate_image_durations
 from .trend_engine import TrendEngine, TrendVideo
 from .transcript_engine import TranscriptEngine, ExtractedScript
+from .emotional_engine import EmotionalTransitionEngine, TransitionPoint, ImagePlacementPlan
 
 __all__ = [
     "ScriptEngine",
@@ -21,4 +22,7 @@ __all__ = [
     "TrendVideo",
     "TranscriptEngine",
     "ExtractedScript",
+    "EmotionalTransitionEngine",
+    "TransitionPoint",
+    "ImagePlacementPlan",
 ]

@@ -1,5 +1,6 @@
 """
 메인 파이프라인 - 전체 영상 생성 프로세스 제어
+정서 단락 전환점 기반 이미지 배치 워크플로우
 """
 import os
 from datetime import datetime
@@ -12,7 +13,9 @@ from engines import (
     ImageEngine,
     ImageSplitter,
     SubtitleEngine,
-    VideoEngine
+    VideoEngine,
+    EmotionalTransitionEngine,
+    ImagePlacementPlan
 )
 from config import DURATION_SPECS
 
@@ -27,9 +30,13 @@ class Pipeline:
         self.image_splitter = ImageSplitter()
         self.subtitle_engine = SubtitleEngine()
         self.video_engine = VideoEngine()
+        self.emotional_engine = EmotionalTransitionEngine()
 
         # 현재 프로젝트
         self.project: Optional[Project] = None
+
+        # 이미지 배치 계획 (정서 전환점 기반)
+        self.placement_plan: Optional[ImagePlacementPlan] = None
 
         # 진행 콜백 (UI 업데이트용)
         self.on_progress: Optional[Callable] = None
@@ -95,17 +102,70 @@ class Pipeline:
         self._log(f"TTS 생성 완료: {total_duration:.1f}초")
         return audio_path
 
-    def step3_generate_images(self, style: str = "korean webtoon") -> str:
-        """3단계: 합본 이미지 생성"""
+    def step2b_analyze_transitions(self) -> ImagePlacementPlan:
+        """2-B단계: 정서 단락 전환점 분석"""
+        self._log("2-B단계: 정서 전환점 분석 중...")
+
+        plan = self.emotional_engine.analyze_transitions(
+            script=self.project.script,
+            audio_segments=self.project.audio_segments,
+            duration_min=self.project.duration_min
+        )
+
+        self.placement_plan = plan
+
+        # 분석 결과 저장
+        plan_path = self._get_path("transition_plan.json")
+        import json
+        with open(plan_path, "w", encoding="utf-8") as f:
+            plan_data = {
+                "total_panels": plan.total_panels,
+                "duration_seconds": plan.duration_seconds,
+                "transitions": [
+                    {
+                        "panel_id": t.panel_id,
+                        "time_start": t.time_start,
+                        "time_end": t.time_end,
+                        "type": t.transition_type,
+                        "description_ko": t.description_ko,
+                        "description_en": t.description_en,
+                        "scene_id": t.scene_id
+                    }
+                    for t in plan.transitions
+                ]
+            }
+            json.dump(plan_data, f, ensure_ascii=False, indent=2)
+
+        self._log(f"정서 전환점 분석 완료: {len(plan.transitions)}개 전환점")
+        return plan
+
+    def step3_generate_images(self, style: str = "cinematic") -> str:
+        """3단계: 합본 이미지 생성 (정서 전환점 기반)"""
         self._log("3단계: 스토리보드 이미지 생성 중...")
 
         sheet_path = self._get_path("sheet.png")
 
-        self.image_engine.generate_sheet(
-            script=self.project.script,
-            output_path=sheet_path,
-            style=style
-        )
+        # 정서 전환점 분석이 있으면 해당 설명 사용
+        if self.placement_plan and self.placement_plan.transitions:
+            transition_descriptions = [
+                t.description_en for t in self.placement_plan.transitions
+            ]
+            self._log(f"정서 전환점 기반 {len(transition_descriptions)}개 패널 프롬프트 사용")
+
+            self.image_engine.generate_sheet_with_transitions(
+                script=self.project.script,
+                output_path=sheet_path,
+                transition_descriptions=transition_descriptions,
+                style=style
+            )
+        else:
+            # 폴백: 대본 기반 자동 생성
+            self._log("대본 기반 자동 비트 생성")
+            self.image_engine.generate_sheet(
+                script=self.project.script,
+                output_path=sheet_path,
+                style=style
+            )
 
         self.project.sheet_image_path = sheet_path
         self.project.current_step = 3
@@ -132,16 +192,36 @@ class Pipeline:
         return cut_paths
 
     def step5_assign_scenes(self) -> dict:
-        """5단계: 씬별 이미지 배분"""
+        """5단계: 씬별 이미지 배분 (정서 전환점 기반)"""
         self._log("5단계: 씬별 이미지 배분 중...")
 
         scenes_dir = self._get_path("scenes")
 
-        scene_images = self.image_splitter.assign_to_scenes(
-            cut_paths=self.project.cut_paths,
-            scenes_dir=scenes_dir,
-            duration_min=self.project.duration_min
-        )
+        # 정서 전환점 계획이 있으면 그것 사용
+        if self.placement_plan and self.placement_plan.transitions:
+            scene_panels = self.emotional_engine.assign_panels_to_scenes(
+                plan=self.placement_plan,
+                script=self.project.script
+            )
+
+            # 패널 ID를 실제 이미지 경로로 변환
+            scene_images = {}
+            for scene_id, panel_ids in scene_panels.items():
+                scene_images[scene_id] = [
+                    self.project.cut_paths[pid - 1]
+                    for pid in panel_ids
+                    if pid <= len(self.project.cut_paths)
+                ]
+
+            self._log("정서 전환점 기반 배분 완료")
+        else:
+            # 폴백: 기존 균등 배분 방식
+            scene_images = self.image_splitter.assign_to_scenes(
+                cut_paths=self.project.cut_paths,
+                scenes_dir=scenes_dir,
+                duration_min=self.project.duration_min
+            )
+            self._log("균등 배분 방식 사용")
 
         # 씬에 이미지 경로 할당
         for scene in self.project.script.scenes:
@@ -240,16 +320,44 @@ class Pipeline:
         self._log("최종 영상 생성 완료!")
         return final_path
 
-    def run_all(self, topic: str, duration_min: int, tts_engine: str = "wavenet", style: str = "korean webtoon") -> str:
-        """전체 파이프라인 실행"""
+    def run_all(
+        self,
+        topic: str,
+        duration_min: int,
+        tts_engine: str = "wavenet",
+        style: str = "cinematic",
+        use_emotional_analysis: bool = True,
+        use_ken_burns: bool = True,
+        use_bgm: bool = False
+    ) -> str:
+        """
+        전체 파이프라인 실행
+
+        Args:
+            topic: 영상 주제
+            duration_min: 영상 길이 (5, 10, 15, 20, 30, 40)
+            tts_engine: TTS 엔진 (wavenet, elevenlabs, openai)
+            style: 이미지 스타일 (cinematic, oil_painting, watercolor, anime, webtoon, realistic)
+            use_emotional_analysis: 정서 전환점 분석 사용 여부
+            use_ken_burns: Ken Burns 효과 사용 여부
+            use_bgm: 배경음악 사용 여부
+
+        Returns:
+            최종 영상 경로
+        """
         self.create_project(topic, duration_min)
         self.step1_generate_script()
         self.step2_generate_tts(tts_engine)
+
+        # 정서 전환점 분석 (선택적)
+        if use_emotional_analysis:
+            self.step2b_analyze_transitions()
+
         self.step3_generate_images(style)
         self.step4_split_images()
         self.step5_assign_scenes()
         self.step6_generate_subtitles()
-        self.step7_render_video()
+        self.step7_render_video(use_ken_burns=use_ken_burns, use_bgm=use_bgm)
         return self.step8_burn_subtitles()
 
     def _get_path(self, filename: str) -> str:
