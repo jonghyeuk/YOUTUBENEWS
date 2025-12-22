@@ -1,5 +1,6 @@
 """
 Gradio UI - 단계별 영상 생성 인터페이스
+FFmpeg 자동화 파이프라인 (Ken Burns + BGM 믹싱)
 """
 import gradio as gr
 from PIL import Image
@@ -60,7 +61,7 @@ def generate_tts(engine: str):
         audio_path = pipeline.step2_generate_tts(engine)
         total_duration = sum(s.duration for s in pipeline.project.audio_segments)
 
-        return f"✅ TTS 생성 완료 ({total_duration:.1f}초)", audio_path
+        return f"✅ TTS 생성 완료 ({total_duration:.1f}초) - 엔진: {engine}", audio_path
 
     except Exception as e:
         return f"❌ 오류: {str(e)}", None
@@ -97,32 +98,44 @@ def split_images():
         return f"❌ 오류: {str(e)}", None
 
 
-def generate_subtitles():
+def generate_subtitles(use_whisper: bool):
     """자막 생성"""
     if not pipeline.project or not pipeline.project.audio_segments:
         return "❌ 먼저 TTS를 생성해주세요", None
 
     try:
-        subtitle_path = pipeline.step6_generate_subtitles()
+        subtitle_path = pipeline.step6_generate_subtitles(use_whisper=use_whisper)
 
         # SRT 내용 미리보기
         with open(subtitle_path, "r", encoding="utf-8") as f:
             srt_content = f.read()
 
-        return "✅ 자막 생성 완료", srt_content[:2000]  # 앞부분만
+        method = "Whisper" if use_whisper else "대본 기반"
+        return f"✅ 자막 생성 완료 ({method})", srt_content[:2000]
 
     except Exception as e:
         return f"❌ 오류: {str(e)}", None
 
 
-def render_video():
+def render_video(use_ken_burns: bool, use_bgm: bool):
     """영상 렌더링"""
     if not pipeline.project or not pipeline.project.cut_paths:
         return "❌ 먼저 이미지를 분할해주세요", None
 
     try:
-        video_path = pipeline.step7_render_video()
-        return "✅ 영상 렌더링 완료", video_path
+        video_path = pipeline.step7_render_video(
+            use_ken_burns=use_ken_burns,
+            use_bgm=use_bgm
+        )
+
+        effects = []
+        if use_ken_burns:
+            effects.append("Ken Burns")
+        if use_bgm:
+            effects.append("BGM")
+        effect_str = " + ".join(effects) if effects else "기본"
+
+        return f"✅ 영상 렌더링 완료 ({effect_str})", video_path
 
     except Exception as e:
         return f"❌ 오류: {str(e)}", None
@@ -144,7 +157,7 @@ def finalize_video():
 # Gradio 인터페이스
 with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as app:
     gr.Markdown("# 🎬 자동 스토리 영상 생성기")
-    gr.Markdown("대본 → TTS → 이미지 → 자막 → 영상을 단계별로 생성합니다.")
+    gr.Markdown("FFmpeg 기반 AI 영상 자동화 파이프라인 (Ken Burns Effect + BGM 믹싱)")
 
     with gr.Row():
         # 왼쪽: 컨트롤 패널
@@ -166,30 +179,55 @@ with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as ap
             create_btn = gr.Button("1️⃣ 프로젝트 생성", variant="primary")
 
             gr.Markdown("---")
+            gr.Markdown("### 대본 & TTS")
 
             script_btn = gr.Button("2️⃣ 대본 생성")
 
             tts_engine = gr.Radio(
-                choices=["wavenet", "elevenlabs"],
+                choices=["wavenet", "elevenlabs", "openai"],
                 value="wavenet",
-                label="TTS 엔진"
+                label="TTS 엔진",
+                info="WaveNet(기본), ElevenLabs, OpenAI TTS"
             )
             tts_btn = gr.Button("3️⃣ TTS 생성")
+
+            gr.Markdown("---")
+            gr.Markdown("### 이미지")
 
             image_style = gr.Textbox(
                 label="이미지 스타일",
                 value="korean webtoon, colorful, expressive",
                 lines=1
             )
-            image_btn = gr.Button("4️⃣ 이미지 생성")
+            image_btn = gr.Button("4️⃣ 이미지 생성 (DALL·E)")
 
             split_btn = gr.Button("5️⃣ 이미지 분할")
 
+            gr.Markdown("---")
+            gr.Markdown("### 자막 & 영상")
+
+            use_whisper = gr.Checkbox(
+                label="Whisper 타임스탬프 사용",
+                value=False,
+                info="체크 해제 시 대본 기반 계산"
+            )
             subtitle_btn = gr.Button("6️⃣ 자막 생성")
+
+            with gr.Row():
+                use_ken_burns = gr.Checkbox(
+                    label="Ken Burns Effect",
+                    value=True,
+                    info="줌인/줌아웃 효과"
+                )
+                use_bgm = gr.Checkbox(
+                    label="BGM 믹싱",
+                    value=False,
+                    info="배경음악 추가"
+                )
 
             render_btn = gr.Button("7️⃣ 영상 렌더링")
 
-            final_btn = gr.Button("8️⃣ 최종 영상", variant="primary")
+            final_btn = gr.Button("8️⃣ 최종 영상 (자막 번인)", variant="primary")
 
         # 오른쪽: 미리보기 패널
         with gr.Column(scale=2):
@@ -202,33 +240,33 @@ with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as ap
             )
 
             with gr.Tabs():
-                with gr.Tab("대본"):
+                with gr.Tab("📝 대본"):
                     script_preview = gr.Markdown()
 
-                with gr.Tab("오디오"):
+                with gr.Tab("🔊 오디오"):
                     audio_preview = gr.Audio(label="TTS 미리듣기")
 
-                with gr.Tab("스토리보드"):
+                with gr.Tab("🎨 스토리보드"):
                     sheet_preview = gr.Image(label="합본 이미지")
 
-                with gr.Tab("컷 분할"):
+                with gr.Tab("✂️ 컷 분할"):
                     cuts_preview = gr.Gallery(
                         label="분할된 컷",
                         columns=4,
                         height="auto"
                     )
 
-                with gr.Tab("자막"):
+                with gr.Tab("📄 자막"):
                     subtitle_preview = gr.Textbox(
                         label="SRT 미리보기",
                         lines=15,
                         interactive=False
                     )
 
-                with gr.Tab("영상"):
+                with gr.Tab("🎥 영상"):
                     video_preview = gr.Video(label="렌더링된 영상")
 
-                with gr.Tab("최종"):
+                with gr.Tab("✅ 최종"):
                     final_preview = gr.Video(label="최종 영상 (자막 포함)")
 
     # 이벤트 연결
@@ -262,11 +300,13 @@ with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as ap
 
     subtitle_btn.click(
         generate_subtitles,
+        inputs=[use_whisper],
         outputs=[status_output, subtitle_preview]
     )
 
     render_btn.click(
         render_video,
+        inputs=[use_ken_burns, use_bgm],
         outputs=[status_output, video_preview]
     )
 

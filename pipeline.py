@@ -152,16 +152,20 @@ class Pipeline:
         self._log("씬별 이미지 배분 완료")
         return scene_images
 
-    def step6_generate_subtitles(self) -> str:
+    def step6_generate_subtitles(self, use_whisper: bool = False) -> str:
         """6단계: 자막 생성"""
-        self._log("6단계: 자막 생성 중...")
+        method = "Whisper" if use_whisper else "대본 기반"
+        self._log(f"6단계: 자막 생성 중... ({method})")
 
+        # Whisper 사용 시 새 SubtitleEngine 생성
+        subtitle_engine = SubtitleEngine(use_whisper=use_whisper)
         subtitle_path = self._get_path("subtitles.srt")
 
-        self.subtitle_engine.generate_srt(
+        subtitle_engine.generate_srt(
             script=self.project.script,
             audio_segments=self.project.audio_segments,
-            output_path=subtitle_path
+            output_path=subtitle_path,
+            audio_path=self.project.audio_path if use_whisper else None
         )
 
         self.project.subtitle_path = subtitle_path
@@ -170,9 +174,15 @@ class Pipeline:
         self._log("자막 생성 완료")
         return subtitle_path
 
-    def step7_render_video(self) -> str:
+    def step7_render_video(self, use_ken_burns: bool = True, use_bgm: bool = False) -> str:
         """7단계: 영상 렌더링"""
-        self._log("7단계: 영상 렌더링 중...")
+        effects = []
+        if use_ken_burns:
+            effects.append("Ken Burns")
+        if use_bgm:
+            effects.append("BGM")
+        effect_str = " + ".join(effects) if effects else "기본"
+        self._log(f"7단계: 영상 렌더링 중... ({effect_str})")
 
         clips_dir = self._get_path("clips")
 
@@ -181,19 +191,28 @@ class Pipeline:
         for scene in self.project.script.scenes:
             scene_images[scene.scene_id] = scene.image_paths
 
-        # 씬별 클립 생성
+        # 씬별 클립 생성 (Ken Burns 옵션)
         clip_paths = self.video_engine.render_scene_clips(
             scene_images=scene_images,
             audio_segments=self.project.audio_segments,
-            output_dir=clips_dir
+            output_dir=clips_dir,
+            use_ken_burns=use_ken_burns
         )
 
-        # 클립 합치기 + 오디오
+        # BGM 경로 (사용 시)
+        bgm_path = None
+        if use_bgm:
+            bgm_path = self.video_engine.get_random_bgm()
+            if bgm_path:
+                self._log(f"BGM 선택: {os.path.basename(bgm_path)}")
+
+        # 클립 합치기 + 오디오 (+ BGM)
         video_path = self._get_path("video_no_sub.mp4")
         self.video_engine.concat_clips(
             clip_paths=clip_paths,
             audio_path=self.project.audio_path,
-            output_path=video_path
+            output_path=video_path,
+            bgm_path=bgm_path
         )
 
         self.project.video_path = video_path

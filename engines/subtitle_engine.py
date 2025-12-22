@@ -1,39 +1,97 @@
 """
-자막 생성 엔진 - 대본 기반 SRT 생성
+자막 생성 엔진 - 대본 기반 SRT + Whisper 타임스탬프 옵션
 """
+import os
 import re
-from typing import List
+from typing import List, Optional
 
 from models.types import Script, AudioSegment
 
 
 class SubtitleEngine:
-    """대본 텍스트 기반 SRT 자막 생성"""
+    """자막 생성 (대본 기반 / Whisper 타임스탬프)"""
 
-    def __init__(self, chars_per_second: float = 5.0):
+    def __init__(self, use_whisper: bool = False):
         """
         Args:
-            chars_per_second: 초당 글자 수 (읽기 속도 기반)
+            use_whisper: Whisper로 정확한 타임스탬프 추출 (True) 또는 대본 기반 계산 (False)
         """
-        self.chars_per_second = chars_per_second
+        self.use_whisper = use_whisper
+
+        if use_whisper:
+            self._init_whisper()
+
+    def _init_whisper(self):
+        """Whisper 모델 초기화"""
+        try:
+            import whisper
+            self.whisper_model = whisper.load_model("base")
+            print("[SubtitleEngine] Whisper 모델 로드 완료")
+        except ImportError:
+            print("[SubtitleEngine] Whisper 미설치, 대본 기반 모드로 전환")
+            self.use_whisper = False
 
     def generate_srt(
         self,
         script: Script,
         audio_segments: List[AudioSegment],
-        output_path: str
+        output_path: str,
+        audio_path: Optional[str] = None
     ) -> str:
         """
-        대본과 오디오 세그먼트를 기반으로 SRT 생성
+        SRT 자막 파일 생성
 
         Args:
             script: Script 객체
             audio_segments: 씬별 오디오 세그먼트
             output_path: SRT 출력 경로
+            audio_path: 오디오 파일 경로 (Whisper 사용 시 필요)
 
         Returns:
             SRT 파일 경로
         """
+        if self.use_whisper and audio_path:
+            return self._generate_srt_whisper(audio_path, output_path)
+        else:
+            return self._generate_srt_text_based(script, audio_segments, output_path)
+
+    def _generate_srt_whisper(self, audio_path: str, output_path: str) -> str:
+        """Whisper로 정확한 타임스탬프 추출하여 SRT 생성"""
+        import whisper
+
+        print("[SubtitleEngine] Whisper 타임스탬프 추출 중...")
+
+        result = self.whisper_model.transcribe(
+            audio_path,
+            language="ko",
+            task="transcribe"
+        )
+
+        srt_entries = []
+
+        for i, segment in enumerate(result["segments"], 1):
+            start_time = segment["start"]
+            end_time = segment["end"]
+            text = segment["text"].strip()
+
+            if text:
+                srt_entry = self._format_srt_entry(i, start_time, end_time, text)
+                srt_entries.append(srt_entry)
+
+        srt_content = "\n".join(srt_entries)
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(srt_content)
+
+        print(f"[SubtitleEngine] Whisper SRT 저장: {output_path} ({len(srt_entries)} entries)")
+        return output_path
+
+    def _generate_srt_text_based(
+        self,
+        script: Script,
+        audio_segments: List[AudioSegment],
+        output_path: str
+    ) -> str:
+        """대본 텍스트 기반으로 SRT 생성 (시간 비례 계산)"""
         srt_entries = []
         entry_num = 1
 
@@ -78,7 +136,7 @@ class SubtitleEngine:
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(srt_content)
 
-        print(f"[SubtitleEngine] SRT saved: {output_path} ({entry_num - 1} entries)")
+        print(f"[SubtitleEngine] 대본 기반 SRT 저장: {output_path} ({entry_num - 1} entries)")
         return output_path
 
     def _split_sentences(self, text: str) -> List[str]:
