@@ -30,12 +30,33 @@ DEFAULT_SCRIPT_PROMPT = """당신은 YouTube 영상 스크립트 작성 전문�
 3. 씬 단위로 구분하여 작성
 4. 각 씬에는 제목과 나레이션 텍스트 포함
 
+## 이미지 배분 규칙 (중요!)
+각 씬마다 필요한 이미지 개수(image_count)와 중요도(importance)를 지정하세요:
+- image_count: 씬 길이와 감정 변화에 따라 1~5장
+  - 짧은 소개/전환 씬: 1장
+  - 일반 씬: 2장
+  - 감정 고조 씬: 3~4장
+  - 클라이막스: 4~5장
+- importance: 1~5 (5가 가장 중요)
+  - 클라이막스, 반전, 감동 장면 = 5
+  - 핵심 사건 = 4
+  - 일반 전개 = 3
+  - 배경 설명 = 2
+  - 단순 전환 = 1
+
 ## 출력 형식 (JSON)
 ```json
 {{
   "title": "영상 제목",
+  "total_images": 15,
   "scenes": [
-    {{"scene_id": 1, "title": "씬 제목", "text": "나레이션 텍스트"}},
+    {{
+      "scene_id": 1,
+      "title": "씬 제목",
+      "text": "나레이션 텍스트",
+      "image_count": 2,
+      "importance": 3
+    }},
     ...
   ]
 }}
@@ -165,22 +186,33 @@ def generate_script_with_prompt(prompt: str):
                 Scene(
                     scene_id=s["scene_id"],
                     title=s["title"],
-                    text=s["text"]
+                    text=s["text"],
+                    image_count=s.get("image_count", 1),
+                    importance=s.get("importance", 3)
                 )
                 for s in data["scenes"]
             ]
+
+            total_images = sum(s.image_count for s in scenes)
+
             script = Script(
                 title=data["title"],
                 scenes=scenes,
-                duration_min=pipeline.project.duration_min
+                duration_min=pipeline.project.duration_min,
+                total_panels=total_images
             )
             pipeline.project.script = script
 
-            # 미리보기 생성
+            # 미리보기 생성 (이미지 배분 정보 포함)
             preview = f"# {script.title}\n\n"
+            preview += f"**총 이미지: {total_images}장**\n\n"
+
             for scene in script.scenes:
+                importance_stars = "⭐" * scene.importance
                 preview += f"## 씬 {scene.scene_id}: {scene.title}\n"
+                preview += f"🖼️ 이미지 {scene.image_count}장 | 중요도: {importance_stars}\n\n"
                 preview += f"{scene.text}\n\n"
+                preview += "---\n\n"
 
             return "✅ 스크립트 생성 완료", preview, result_text
 
@@ -229,42 +261,72 @@ def prepare_image_prompts(style_prefix: str):
     return "✅ 프롬프트 준비 완료", "\n".join(prompts)
 
 
-def generate_image_prompts_with_claude(master_prompt: str):
-    """Claude로 이미지 프롬프트 일괄 생성"""
+def get_image_allocation_summary():
+    """씬별 이미지 배분 요약 생성"""
     if not pipeline.project or not pipeline.project.script:
-        return "❌ 스크립트 생성 필요", ""
+        return "스크립트 생성 후 확인 가능"
+
+    summary = "## 📊 이미지 배분 현황\n\n"
+    total = 0
+
+    for scene in pipeline.project.script.scenes:
+        importance_stars = "⭐" * scene.importance
+        bar = "█" * scene.image_count + "░" * (5 - scene.image_count)
+        summary += f"**씬 {scene.scene_id}**: {scene.title}\n"
+        summary += f"  - {bar} {scene.image_count}장 | {importance_stars}\n\n"
+        total += scene.image_count
+
+    summary += f"---\n**총 이미지: {total}장**"
+    return summary
+
+
+def generate_image_prompts_with_claude(master_prompt: str):
+    """Claude로 이미지 프롬프트 일괄 생성 (씬별 image_count 반영)"""
+    if not pipeline.project or not pipeline.project.script:
+        return "❌ 스크립트 생성 필요", "", "스크립트 생성 후 확인 가능"
 
     try:
         from anthropic import Anthropic
         client = Anthropic()
 
-        # 전체 스크립트 텍스트
+        # 전체 스크립트 텍스트 (image_count 포함)
         script_text = ""
+        total_images = 0
         for scene in pipeline.project.script.scenes:
-            script_text += f"[씬 {scene.scene_id}: {scene.title}]\n{scene.text}\n\n"
+            importance_stars = "⭐" * scene.importance
+            script_text += f"[씬 {scene.scene_id}: {scene.title}]\n"
+            script_text += f"이미지 개수: {scene.image_count}장 | 중요도: {importance_stars}\n"
+            script_text += f"{scene.text}\n\n"
+            total_images += scene.image_count
 
         prompt = f"""{master_prompt}
 
-## 스크립트
+## 스크립트 (총 {total_images}장 이미지 필요)
 {script_text}
 
-## 출력 형식
-각 씬별로 이미지 프롬프트를 영어로 작성해주세요:
-씬 1: [프롬프트]
-씬 2: [프롬프트]
-..."""
+## 출력 형식 (중요!)
+각 씬별로 지정된 개수만큼 이미지 프롬프트를 영어로 작성해주세요.
+이미지 번호는 연속으로 매깁니다:
+
+이미지 1: [씬1 첫번째 프롬프트]
+이미지 2: [씬1 두번째 프롬프트]
+이미지 3: [씬2 첫번째 프롬프트]
+...
+
+각 씬 내 이미지들은 시간 순서대로 장면을 묘사해야 합니다."""
 
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=4096,
+            max_tokens=8192,
             messages=[{"role": "user", "content": prompt}]
         )
 
         result = response.content[0].text
-        return "✅ 이미지 프롬프트 생성 완료", result
+        allocation = get_image_allocation_summary()
+        return f"✅ 이미지 프롬프트 생성 완료 (총 {total_images}장)", result, allocation
 
     except Exception as e:
-        return f"❌ 오류: {e}", ""
+        return f"❌ 오류: {e}", "", get_image_allocation_summary()
 
 
 def parse_and_show_image_prompts(prompts_text: str):
@@ -274,16 +336,16 @@ def parse_and_show_image_prompts(prompts_text: str):
 
     for line in lines:
         line = line.strip()
-        if line.startswith("씬") or line.startswith("Scene"):
-            # "씬 1: 프롬프트" 형식 파싱
+        # "이미지 1: 프롬프트" 또는 "Image 1: 프롬프트" 형식 파싱
+        if line.startswith("이미지") or line.startswith("Image") or line.startswith("씬") or line.startswith("Scene"):
             if ":" in line:
                 parts = line.split(":", 1)
-                if len(parts) == 2:
+                if len(parts) == 2 and parts[1].strip():
                     parsed.append(parts[1].strip())
 
     if not parsed:
-        # 줄별로 그냥 사용
-        parsed = [l.strip() for l in lines if l.strip() and not l.startswith("#")]
+        # 줄별로 그냥 사용 (빈 줄 제외)
+        parsed = [l.strip() for l in lines if l.strip() and not l.startswith("#") and len(l.strip()) > 20]
 
     return parsed
 
@@ -436,7 +498,16 @@ with gr.Blocks(title="콘텐츠 생성기", theme=gr.themes.Soft()) as app:
             gr.Markdown("*Claude로 이미지 프롬프트를 생성하거나, 직접 작성할 수 있습니다*")
 
             with gr.Row():
-                with gr.Column():
+                with gr.Column(scale=2):
+                    # 이미지 배분 현황
+                    allocation_display = gr.Markdown(
+                        value="스크립트 생성 후 이미지 배분 현황이 표시됩니다",
+                        label="이미지 배분 현황"
+                    )
+                    refresh_allocation_btn = gr.Button("🔄 배분 현황 새로고침", size="sm")
+
+                    gr.Markdown("---")
+
                     style_prefix_input = gr.Textbox(
                         label="스타일 프리픽스",
                         placeholder="예: Cinematic, Korean traditional, warm lighting",
@@ -445,26 +516,31 @@ with gr.Blocks(title="콘텐츠 생성기", theme=gr.themes.Soft()) as app:
 
                     image_master_prompt = gr.Textbox(
                         label="🔧 이미지 프롬프트 생성 마스터 프롬프트",
-                        lines=10,
+                        lines=12,
                         value="""당신은 이미지 프롬프트 전문가입니다.
-각 씬에 맞는 이미지 프롬프트를 영어로 작성해주세요.
+각 씬에 지정된 이미지 개수만큼 프롬프트를 영어로 작성해주세요.
 
-규칙:
+## 규칙
 - 400자 이내
 - 장면 연출에 초점
 - 일관된 스타일 유지
-- 구체적인 시각적 묘사"""
+- 구체적인 시각적 묘사
+
+## 이미지 배분 원칙
+- 중요 씬(importance 4-5): 감정 변화별로 다른 장면
+- 일반 씬(importance 2-3): 핵심 순간 위주
+- 클라이막스 씬: 다양한 앵글과 감정 포착"""
                     )
 
-                    gen_prompts_btn = gr.Button("🤖 Claude로 프롬프트 생성")
+                    gen_prompts_btn = gr.Button("🤖 Claude로 프롬프트 생성", variant="primary")
 
-                with gr.Column():
+                with gr.Column(scale=3):
                     image_prompts_output = gr.Textbox(
                         label="📝 이미지 프롬프트 (편집 가능)",
-                        lines=15,
-                        placeholder="씬 1: [프롬프트]\n씬 2: [프롬프트]\n..."
+                        lines=20,
+                        placeholder="이미지 1: [프롬프트]\n이미지 2: [프롬프트]\n..."
                     )
-                    gr.Markdown("*위 프롬프트를 직접 수정할 수 있습니다*")
+                    gr.Markdown("*위 프롬프트를 직접 수정할 수 있습니다. 각 줄이 하나의 이미지입니다.*")
 
         # ─────────────────────────────────────────────
         # Tab 5: 이미지 생성
@@ -545,10 +621,16 @@ with gr.Blocks(title="콘텐츠 생성기", theme=gr.themes.Soft()) as app:
     tts_btn.click(generate_tts, [tts_engine], [status, audio_preview])
 
     # Tab 4: 이미지 프롬프트 생성
+    refresh_allocation_btn.click(
+        get_image_allocation_summary,
+        [],
+        [allocation_display]
+    )
+
     gen_prompts_btn.click(
         generate_image_prompts_with_claude,
         [image_master_prompt],
-        [status, image_prompts_output]
+        [status, image_prompts_output, allocation_display]
     )
 
     # Tab 4 → Tab 5: 프롬프트 복사
