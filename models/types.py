@@ -24,6 +24,7 @@ class Scene:
     scene_id: int
     title: str
     text: str  # 나레이션 텍스트
+    image_prompt: str = ""  # DALL-E 이미지 생성용 프롬프트 (영어)
     panel_ids: List[int] = field(default_factory=list)
     start_time: float = 0.0
     end_time: float = 0.0

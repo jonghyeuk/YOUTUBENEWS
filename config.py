@@ -10,18 +10,46 @@ DURATION_SPECS = {
     20: {"panels": 16, "rows": 4, "cols": 4, "scenes": 8, "panels_per_scene": 2},
 }
 
-# TTS 설정
+# TTS 설정 (시니어 타겟 최적화)
 TTS_CONFIG = {
-    "default_engine": "wavenet",
-    "wavenet_voice": "ko-KR-Wavenet-D",
-    "elevenlabs_voice": "Josh",  # 기본 ElevenLabs 음성
+    "default_engine": "elevenlabs",  # ElevenLabs 기본 (고품질)
+
+    # Google WaveNet
+    "wavenet_voice": "ko-KR-Wavenet-D",  # 남성, 따뜻한 목소리
+
+    # ElevenLabs (시니어 타겟용)
+    "elevenlabs_voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 따뜻하고 신뢰감 있는 남성
+    "elevenlabs_voice_id_female": "21m00Tcm4TlvDq8ikWAM",  # Rachel - 부드러운 여성
+
+    # OpenAI TTS
+    "openai_voice": "onyx",  # 깊고 따뜻한 남성 목소리
 }
 
 # 이미지 설정
 IMAGE_CONFIG = {
-    "size": "1792x1024",  # DALL-E 3 가로형
+    # DALL-E 3 규격
+    "size_landscape": "1792x1024",  # 롱폼 (16:9)
+    "size_portrait": "1024x1792",   # 쇼츠 (9:16)
     "quality": "hd",
     "style": "vivid",
+}
+
+# 이미지 스타일 가이드 (일관성 유지용)
+IMAGE_STYLE_GUIDES = {
+    "oil_painting": "Oil painting style, warm colors, soft brushstrokes, classical art feeling",
+    "cinematic": "Cinematic photorealistic, dramatic lighting, movie still quality, 4K resolution",
+    "watercolor": "Watercolor illustration style, soft pastel colors, gentle artistic feeling",
+    "anime": "High quality anime style, Studio Ghibli inspired, warm and nostalgic feeling",
+    "webtoon": "Korean webtoon illustration style, clean line art, expressive characters",
+    "realistic": "Photorealistic, professional photography, natural lighting, high detail",
+}
+
+# 타겟별 기본 스타일
+TARGET_STYLES = {
+    "senior": "cinematic",      # 시니어: 사실적이고 친숙한
+    "family": "watercolor",     # 가족: 따뜻하고 부드러운
+    "drama": "oil_painting",    # 드라마: 예술적이고 감성적
+    "kids": "anime",            # 키즈: 애니메이션 스타일
 }
 
 # 영상 설정
