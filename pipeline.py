@@ -216,10 +216,12 @@ class Pipeline:
             self._log("정서 전환점 기반 배분 완료")
         else:
             # 폴백: 기존 균등 배분 방식
+            num_scenes = len(self.project.script.scenes)
             scene_images = self.image_splitter.assign_to_scenes(
                 cut_paths=self.project.cut_paths,
                 scenes_dir=scenes_dir,
-                duration_min=self.project.duration_min
+                duration_min=self.project.duration_min,
+                num_scenes=num_scenes
             )
             self._log("균등 배분 방식 사용")
 

@@ -9,13 +9,13 @@ from config import DURATION_SPECS
 
 
 class ImageSplitter:
-    """그리드 기반 합본 이미지 분할"""
+    """그리드 기반 합본 이미지 분할 (16:9 비율 지원)"""
 
-    def __init__(self, margin_ratio: float = 0.02, gutter_ratio: float = 0.02):
+    def __init__(self, margin_ratio: float = 0.0, gutter_ratio: float = 0.0):
         """
         Args:
-            margin_ratio: 외곽 여백 비율 (기본 2%)
-            gutter_ratio: 패널 간 거터 비율 (기본 2%)
+            margin_ratio: 외곽 여백 비율 (기본 0% - 여백 없음)
+            gutter_ratio: 패널 간 거터 비율 (기본 0% - 거터 없음)
         """
         self.margin_ratio = margin_ratio
         self.gutter_ratio = gutter_ratio
@@ -100,22 +100,24 @@ class ImageSplitter:
         self,
         cut_paths: List[str],
         scenes_dir: str,
-        duration_min: int
+        duration_min: int,
+        num_scenes: int = 4
     ) -> dict:
         """
-        컷을 씬별로 배분
+        컷을 씬별로 균등 배분 (폴백용)
+        정서 전환점 기반 배분은 EmotionalTransitionEngine 사용 권장
 
         Args:
             cut_paths: 컷 이미지 경로 리스트
             scenes_dir: 씬 디렉토리 기본 경로
             duration_min: 영상 길이
+            num_scenes: 씬 개수 (기본 4개)
 
         Returns:
-            씬별 이미지 경로 딕셔너리
+            씬별 이미지 경로 딕셔너리 {scene_id: [이미지 경로들]}
         """
-        spec = DURATION_SPECS.get(duration_min)
-        panels_per_scene = spec["panels_per_scene"]
-        num_scenes = spec["scenes"]
+        total_panels = len(cut_paths)
+        panels_per_scene = max(1, total_panels // num_scenes)
 
         scene_images = {}
 
@@ -124,17 +126,15 @@ class ImageSplitter:
             os.makedirs(scene_dir, exist_ok=True)
 
             start_idx = (scene_id - 1) * panels_per_scene
-            end_idx = start_idx + panels_per_scene
+            # 마지막 씬은 남은 모든 패널 포함
+            if scene_id == num_scenes:
+                end_idx = total_panels
+            else:
+                end_idx = start_idx + panels_per_scene
 
             scene_cuts = cut_paths[start_idx:end_idx]
 
-            # 씬 디렉토리에 복사/링크
-            scene_paths = []
-            for i, cut_path in enumerate(scene_cuts):
-                # 심볼릭 링크 대신 경로만 저장 (효율성)
-                scene_paths.append(cut_path)
-
-            scene_images[scene_id] = scene_paths
-            print(f"[ImageSplitter] Scene {scene_id}: {len(scene_paths)} images")
+            scene_images[scene_id] = scene_cuts
+            print(f"[ImageSplitter] Scene {scene_id}: {len(scene_cuts)} images (균등 배분)")
 
         return scene_images

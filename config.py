@@ -96,22 +96,22 @@ BGM_CONFIG = {
 }
 
 # DALL-E 합본 이미지 마스터 프롬프트
-DALLE_MASTER_PROMPT = """You are creating a SINGLE storyboard sheet image that contains EXACTLY {rows} rows × {cols} columns panels (total {panels} panels).
-Each panel must be a separate illustration for a continuous story. The panels must be aligned to a perfect grid.
+DALLE_MASTER_PROMPT = """You are creating a SINGLE storyboard sheet image.
+The image MUST be divided into EXACTLY {rows} rows × {cols} columns = {panels} panels.
 
-ABSOLUTE LAYOUT RULES:
-- Perfect grid: {rows} rows × {cols} columns, evenly sized panels.
-- Thick, uniform gutters between panels (pure white), and an outer white margin.
-- Each panel has a thin black rectangular border.
-- No panel overlaps, no irregular shapes, no tilted panels.
-- Do NOT merge panels. Do NOT vary panel sizes.
+CRITICAL LAYOUT RULES:
+- Perfect grid layout: {rows} rows × {cols} columns.
+- ALL panels must be EXACTLY the same size.
+- NO margins, NO gutters, NO borders, NO gaps between panels.
+- Panels must fill the ENTIRE image edge-to-edge.
+- Reading order: left-to-right, top-to-bottom (panel 1 is top-left).
 
 CONTENT RULES:
 - One consistent art style across all panels.
-- Same main characters across all panels with consistent appearance.
-- Consistent background world and color tone.
-- No text, no captions, no speech bubbles, no numbers, no watermarks, no logos.
+- Same main characters with consistent appearance (clothing, hair, features).
+- Consistent world-building, color palette, and lighting.
+- NO text, NO captions, NO speech bubbles, NO numbers, NO watermarks.
 
-STORY BEATS (one beat per panel, reading order left-to-right, top-to-bottom):
+STORY BEATS (one beat per panel):
 {beats_list}
 """
