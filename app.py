@@ -1,6 +1,6 @@
 """
-Gradio UI - 단계별 영상 생성 인터페이스
-FFmpeg 자동화 파이프라인 (Ken Burns + BGM 믹싱)
+Gradio UI - 인기 영상 분석 기반 콘텐츠 생성
+개별 이미지 생성 (fal.ai/DALL-E/Imagen)
 """
 import gradio as gr
 from PIL import Image
@@ -20,33 +20,64 @@ def create_project(topic: str, duration: int):
         return "❌ 주제를 입력해주세요", None, None
 
     project = pipeline.create_project(topic, duration)
-    spec = DURATION_SPECS[duration]
 
     info = f"""✅ 프로젝트 생성 완료
 
 📁 ID: {project.project_id}
 ⏱️ 길이: {duration}분
-🎬 씬 수: {spec['scenes']}개
-🖼️ 컷 수: {spec['panels']}개 ({spec['rows']}x{spec['cols']} 그리드)
 """
     return info, None, None
 
 
-def generate_script():
-    """대본 생성"""
+def analyze_trend(keyword: str):
+    """트렌드 분석"""
+    if not keyword.strip():
+        return "❌ 키워드를 입력해주세요", None
+
+    try:
+        videos = pipeline.step1_analyze_trend(keyword)
+
+        result = "## 🔥 인기 영상\n\n"
+        for i, v in enumerate(videos[:5], 1):
+            result += f"{i}. **{v.title}**\n"
+            result += f"   - 조회수: {v.view_count:,}\n"
+            result += f"   - ID: `{v.video_id}`\n\n"
+
+        return "✅ 트렌드 분석 완료", result
+
+    except Exception as e:
+        return f"❌ 오류: {str(e)}", None
+
+
+def extract_transcript(video_id: str):
+    """자막 추출"""
+    if not video_id.strip():
+        return "❌ 영상 ID를 입력해주세요", None
+
+    try:
+        data = pipeline.step1b_extract_transcript(video_id)
+        transcript = data["transcript"]
+
+        return f"✅ 자막 추출 완료 ({len(transcript.text)}자)", transcript.text[:2000]
+
+    except Exception as e:
+        return f"❌ 오류: {str(e)}", None
+
+
+def generate_script(source_text: str = None):
+    """스크립트 생성"""
     if not pipeline.project:
         return "❌ 먼저 프로젝트를 생성해주세요", None
 
     try:
-        script = pipeline.step1_generate_script()
+        script = pipeline.step2_generate_script(source_text if source_text else None)
 
-        # 대본 미리보기 텍스트
         preview = f"# {script.title}\n\n"
         for scene in script.scenes:
             preview += f"## 씬 {scene.scene_id}: {scene.title}\n"
             preview += f"{scene.text}\n\n"
 
-        return "✅ 대본 생성 완료", preview
+        return "✅ 스크립트 생성 완료", preview
 
     except Exception as e:
         return f"❌ 오류: {str(e)}", None
@@ -55,44 +86,33 @@ def generate_script():
 def generate_tts(engine: str):
     """TTS 생성"""
     if not pipeline.project or not pipeline.project.script:
-        return "❌ 먼저 대본을 생성해주세요", None
+        return "❌ 먼저 스크립트를 생성해주세요", None
 
     try:
-        audio_path = pipeline.step2_generate_tts(engine)
+        audio_path = pipeline.step3_generate_tts(engine)
         total_duration = sum(s.duration for s in pipeline.project.audio_segments)
 
-        return f"✅ TTS 생성 완료 ({total_duration:.1f}초) - 엔진: {engine}", audio_path
+        return f"✅ TTS 생성 완료 ({total_duration:.1f}초)", audio_path
 
     except Exception as e:
         return f"❌ 오류: {str(e)}", None
 
 
-def generate_images(style: str):
+def generate_images(engine: str, style_prefix: str):
     """이미지 생성"""
     if not pipeline.project or not pipeline.project.script:
-        return "❌ 먼저 대본을 생성해주세요", None
+        return "❌ 먼저 스크립트를 생성해주세요", None
 
     try:
-        sheet_path = pipeline.step3_generate_images(style)
-        return "✅ 스토리보드 이미지 생성 완료", sheet_path
+        image_paths = pipeline.step4_generate_images(
+            engine=engine,
+            style_prefix=style_prefix
+        )
 
-    except Exception as e:
-        return f"❌ 오류: {str(e)}", None
+        # 이미지 갤러리용
+        images = [Image.open(p) for p in image_paths[:8]]
 
-
-def split_images():
-    """이미지 분할"""
-    if not pipeline.project or not pipeline.project.sheet_image_path:
-        return "❌ 먼저 이미지를 생성해주세요", None
-
-    try:
-        cut_paths = pipeline.step4_split_images()
-        pipeline.step5_assign_scenes()
-
-        # 분할된 이미지들 미리보기
-        images = [Image.open(p) for p in cut_paths[:8]]  # 최대 8개만 표시
-
-        return f"✅ 이미지 분할 완료 ({len(cut_paths)}개 컷)", images
+        return f"✅ 이미지 생성 완료 ({len(image_paths)}장, 엔진: {engine})", images
 
     except Exception as e:
         return f"❌ 오류: {str(e)}", None
@@ -104,9 +124,8 @@ def generate_subtitles(use_whisper: bool):
         return "❌ 먼저 TTS를 생성해주세요", None
 
     try:
-        subtitle_path = pipeline.step6_generate_subtitles(use_whisper=use_whisper)
+        subtitle_path = pipeline.step5_generate_subtitles(use_whisper=use_whisper)
 
-        # SRT 내용 미리보기
         with open(subtitle_path, "r", encoding="utf-8") as f:
             srt_content = f.read()
 
@@ -120,10 +139,10 @@ def generate_subtitles(use_whisper: bool):
 def render_video(use_ken_burns: bool, use_bgm: bool):
     """영상 렌더링"""
     if not pipeline.project or not pipeline.project.cut_paths:
-        return "❌ 먼저 이미지를 분할해주세요", None
+        return "❌ 먼저 이미지를 생성해주세요", None
 
     try:
-        video_path = pipeline.step7_render_video(
+        video_path = pipeline.step6_render_video(
             use_ken_burns=use_ken_burns,
             use_bgm=use_bgm
         )
@@ -147,7 +166,7 @@ def finalize_video():
         return "❌ 먼저 영상을 렌더링해주세요", None
 
     try:
-        final_path = pipeline.step8_burn_subtitles()
+        final_path = pipeline.step7_burn_subtitles()
         return "✅ 최종 영상 생성 완료!", final_path
 
     except Exception as e:
@@ -155,9 +174,9 @@ def finalize_video():
 
 
 # Gradio 인터페이스
-with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as app:
-    gr.Markdown("# 🎬 자동 스토리 영상 생성기")
-    gr.Markdown("FFmpeg 기반 AI 영상 자동화 파이프라인 (Ken Burns Effect + BGM 믹싱)")
+with gr.Blocks(title="인기 영상 분석 콘텐츠 생성기", theme=gr.themes.Soft()) as app:
+    gr.Markdown("# 🎬 인기 영상 분석 콘텐츠 생성기")
+    gr.Markdown("YouTube 트렌드 분석 → 스크립트 리라이트 → 이미지 생성 → 영상 제작")
 
     with gr.Row():
         # 왼쪽: 컨트롤 패널
@@ -165,8 +184,8 @@ with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as ap
             gr.Markdown("## 📋 설정")
 
             topic_input = gr.Textbox(
-                label="주제",
-                placeholder="예: 토끼와 거북이",
+                label="주제 / 키워드",
+                placeholder="예: 조선시대 이야기",
                 lines=2
             )
 
@@ -179,55 +198,64 @@ with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as ap
             create_btn = gr.Button("1️⃣ 프로젝트 생성", variant="primary")
 
             gr.Markdown("---")
-            gr.Markdown("### 대본 & TTS")
+            gr.Markdown("### 🔍 트렌드 분석 (선택)")
 
-            script_btn = gr.Button("2️⃣ 대본 생성")
+            trend_btn = gr.Button("트렌드 분석")
+
+            video_id_input = gr.Textbox(
+                label="참조 영상 ID",
+                placeholder="예: dQw4w9WgXcQ",
+                lines=1
+            )
+
+            extract_btn = gr.Button("자막 추출")
+
+            gr.Markdown("---")
+            gr.Markdown("### 📝 스크립트 & TTS")
+
+            script_btn = gr.Button("2️⃣ 스크립트 생성")
 
             tts_engine = gr.Radio(
                 choices=["wavenet", "elevenlabs", "openai"],
                 value="wavenet",
-                label="TTS 엔진",
-                info="WaveNet(기본), ElevenLabs, OpenAI TTS"
+                label="TTS 엔진"
             )
             tts_btn = gr.Button("3️⃣ TTS 생성")
 
             gr.Markdown("---")
-            gr.Markdown("### 이미지")
+            gr.Markdown("### 🎨 이미지 생성")
 
-            image_style = gr.Textbox(
-                label="이미지 스타일",
-                value="korean webtoon, colorful, expressive",
-                lines=1
+            image_engine = gr.Radio(
+                choices=["fal", "dalle", "imagen"],
+                value="fal",
+                label="이미지 엔진",
+                info="fal.ai(빠름), DALL-E(고품질), Imagen"
             )
-            image_btn = gr.Button("4️⃣ 이미지 생성 (DALL·E)")
 
-            split_btn = gr.Button("5️⃣ 이미지 분할")
+            style_prefix = gr.Textbox(
+                label="스타일 프리픽스 (선택)",
+                placeholder="예: Cinematic, warm lighting, Korean traditional style",
+                lines=2
+            )
+
+            image_btn = gr.Button("4️⃣ 이미지 생성")
 
             gr.Markdown("---")
-            gr.Markdown("### 자막 & 영상")
+            gr.Markdown("### 📄 자막 & 영상")
 
             use_whisper = gr.Checkbox(
-                label="Whisper 타임스탬프 사용",
-                value=False,
-                info="체크 해제 시 대본 기반 계산"
+                label="Whisper 타임스탬프",
+                value=False
             )
-            subtitle_btn = gr.Button("6️⃣ 자막 생성")
+            subtitle_btn = gr.Button("5️⃣ 자막 생성")
 
             with gr.Row():
-                use_ken_burns = gr.Checkbox(
-                    label="Ken Burns Effect",
-                    value=True,
-                    info="줌인/줌아웃 효과"
-                )
-                use_bgm = gr.Checkbox(
-                    label="BGM 믹싱",
-                    value=False,
-                    info="배경음악 추가"
-                )
+                use_ken_burns = gr.Checkbox(label="Ken Burns", value=True)
+                use_bgm = gr.Checkbox(label="BGM", value=False)
 
-            render_btn = gr.Button("7️⃣ 영상 렌더링")
+            render_btn = gr.Button("6️⃣ 영상 렌더링")
 
-            final_btn = gr.Button("8️⃣ 최종 영상 (자막 번인)", variant="primary")
+            final_btn = gr.Button("7️⃣ 최종 영상", variant="primary")
 
         # 오른쪽: 미리보기 패널
         with gr.Column(scale=2):
@@ -235,30 +263,37 @@ with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as ap
 
             status_output = gr.Textbox(
                 label="상태",
-                lines=6,
+                lines=4,
                 interactive=False
             )
 
             with gr.Tabs():
-                with gr.Tab("📝 대본"):
+                with gr.Tab("🔥 트렌드"):
+                    trend_preview = gr.Markdown()
+
+                with gr.Tab("📜 원본 자막"):
+                    transcript_preview = gr.Textbox(
+                        label="추출된 자막",
+                        lines=10,
+                        interactive=False
+                    )
+
+                with gr.Tab("📝 스크립트"):
                     script_preview = gr.Markdown()
 
                 with gr.Tab("🔊 오디오"):
                     audio_preview = gr.Audio(label="TTS 미리듣기")
 
-                with gr.Tab("🎨 스토리보드"):
-                    sheet_preview = gr.Image(label="합본 이미지")
-
-                with gr.Tab("✂️ 컷 분할"):
-                    cuts_preview = gr.Gallery(
-                        label="분할된 컷",
+                with gr.Tab("🎨 이미지"):
+                    images_preview = gr.Gallery(
+                        label="생성된 이미지",
                         columns=4,
                         height="auto"
                     )
 
                 with gr.Tab("📄 자막"):
                     subtitle_preview = gr.Textbox(
-                        label="SRT 미리보기",
+                        label="SRT",
                         lines=15,
                         interactive=False
                     )
@@ -267,7 +302,7 @@ with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as ap
                     video_preview = gr.Video(label="렌더링된 영상")
 
                 with gr.Tab("✅ 최종"):
-                    final_preview = gr.Video(label="최종 영상 (자막 포함)")
+                    final_preview = gr.Video(label="최종 영상")
 
     # 이벤트 연결
     create_btn.click(
@@ -276,8 +311,21 @@ with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as ap
         outputs=[status_output, script_preview, audio_preview]
     )
 
+    trend_btn.click(
+        analyze_trend,
+        inputs=[topic_input],
+        outputs=[status_output, trend_preview]
+    )
+
+    extract_btn.click(
+        extract_transcript,
+        inputs=[video_id_input],
+        outputs=[status_output, transcript_preview]
+    )
+
     script_btn.click(
         generate_script,
+        inputs=[transcript_preview],
         outputs=[status_output, script_preview]
     )
 
@@ -289,13 +337,8 @@ with gr.Blocks(title="스토리 영상 생성기", theme=gr.themes.Soft()) as ap
 
     image_btn.click(
         generate_images,
-        inputs=[image_style],
-        outputs=[status_output, sheet_preview]
-    )
-
-    split_btn.click(
-        split_images,
-        outputs=[status_output, cuts_preview]
+        inputs=[image_engine, style_prefix],
+        outputs=[status_output, images_preview]
     )
 
     subtitle_btn.click(
