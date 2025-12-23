@@ -5,12 +5,12 @@
 # 길이별 그리드 규격 (정서 단락 기반 배치)
 # panels_per_scene은 기본값일 뿐, 실제로는 정서 전환점 분석으로 배치
 DURATION_SPECS = {
-    5: {"panels": 9, "rows": 3, "cols": 3},    # 3x3 = 9장
-    10: {"panels": 16, "rows": 4, "cols": 4},  # 4x4 = 16장
-    15: {"panels": 25, "rows": 5, "cols": 5},  # 5x5 = 25장
-    20: {"panels": 36, "rows": 6, "cols": 6},  # 6x6 = 36장
-    30: {"panels": 49, "rows": 7, "cols": 7},  # 7x7 = 49장
-    40: {"panels": 64, "rows": 8, "cols": 8},  # 8x8 = 64장
+    5: {"panels": 9, "rows": 3, "cols": 3, "scenes": 5, "panels_per_scene": 2},
+    10: {"panels": 16, "rows": 4, "cols": 4, "scenes": 8, "panels_per_scene": 2},
+    15: {"panels": 25, "rows": 5, "cols": 5, "scenes": 10, "panels_per_scene": 3},
+    20: {"panels": 36, "rows": 6, "cols": 6, "scenes": 12, "panels_per_scene": 3},
+    30: {"panels": 49, "rows": 7, "cols": 7, "scenes": 15, "panels_per_scene": 3},
+    40: {"panels": 64, "rows": 8, "cols": 8, "scenes": 18, "panels_per_scene": 4},
 }
 
 # TTS 설정 (시니어 타겟 최적화)

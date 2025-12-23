@@ -24,10 +24,22 @@ class Scene:
     scene_id: int
     title: str
     text: str  # 나레이션 텍스트
-    image_prompt: str = ""  # DALL-E 이미지 생성용 프롬프트 (영어)
-    panel_ids: List[int] = field(default_factory=list)
+
+    # 이미지 배분 (균등 X, 감정/중요도 기반)
+    image_count: int = 1  # 이 씬에 필요한 이미지 개수
+    importance: int = 1   # 중요도 (1~5, 5가 가장 중요)
+
+    # 이미지 프롬프트들 (image_count만큼)
+    image_prompts: List[str] = field(default_factory=list)
+    image_prompt: str = ""  # 단일 프롬프트 (호환성)
+
+    # 시간 정보
     start_time: float = 0.0
     end_time: float = 0.0
+    duration: float = 0.0  # 씬 길이 (초)
+
+    # 생성된 이미지 경로들
+    panel_ids: List[int] = field(default_factory=list)
     image_paths: List[str] = field(default_factory=list)
 
 
