@@ -2,9 +2,12 @@
 Gradio UI - 프롬프트 편집 가능한 콘텐츠 생성기
 각 단계별 입력 프롬프트 표시 및 수정 기능
 """
+import os
+from dotenv import load_dotenv
+load_dotenv()  # .env 파일 로드
+
 import gradio as gr
 from PIL import Image
-import os
 import json
 
 from pipeline import Pipeline
