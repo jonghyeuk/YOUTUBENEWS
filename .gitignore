@@ -49,9 +49,10 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Project specific - SeniorVideoFactory
+# Project specific - YOUTUBENEWS
 export/
 outputs/
+projects/
 *.mp4
 *.mp3
 *.wav

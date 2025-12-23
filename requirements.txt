@@ -8,9 +8,11 @@ google-cloud-texttospeech>=2.14.0
 elevenlabs>=1.0.0
 pydub>=0.25.1
 
-# Image Processing
+# Image Generation
 Pillow>=10.0.0
 requests>=2.31.0
+fal-client>=0.4.0          # fal.ai (기본 이미지 엔진)
+google-generativeai>=0.3.0  # Google Imagen
 
 # Audio/Video
 # ffmpeg (system install required)
@@ -22,10 +24,3 @@ openai-whisper>=20231117
 # YouTube (trend analysis & transcript extraction)
 google-api-python-client>=2.100.0
 youtube-transcript-api>=0.6.1
-
-# Note: Set environment variables:
-# - ANTHROPIC_API_KEY (Claude for script generation)
-# - OPENAI_API_KEY (DALL-E for images, OpenAI TTS, GPT analysis)
-# - GOOGLE_APPLICATION_CREDENTIALS (WaveNet TTS)
-# - ELEVENLABS_API_KEY (ElevenLabs TTS)
-# - YOUTUBE_API_KEY (trend analysis)
