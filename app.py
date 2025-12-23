@@ -2,9 +2,12 @@
 Gradio UI - 프롬프트 편집 가능한 콘텐츠 생성기
 각 단계별 입력 프롬프트 표시 및 수정 기능
 """
+import os
+from dotenv import load_dotenv
+load_dotenv()  # .env 파일 로드
+
 import gradio as gr
 from PIL import Image
-import os
 import json
 
 from pipeline import Pipeline
@@ -112,17 +115,59 @@ def create_project(topic: str, duration: int):
 def analyze_trend(keyword: str):
     """트렌드 분석"""
     if not keyword.strip():
-        return "❌ 키워드 입력 필요", ""
+        return "❌ 키워드 입력 필요", "", []
 
     try:
         videos = pipeline.step1_analyze_trend(keyword)
         result = "## 🔥 인기 영상\n\n"
+        choices = []
+
         for i, v in enumerate(videos[:5], 1):
             result += f"{i}. **{v.title}**\n"
-            result += f"   - 조회수: {v.view_count:,} | ID: `{v.video_id}`\n\n"
-        return "✅ 트렌드 분석 완료", result
+            result += f"   - 조회수: {v.view_count:,} | 좋아요: {v.like_count:,} | 댓글: {v.comment_count:,}\n"
+            result += f"   - ID: `{v.video_id}`\n\n"
+            choices.append((f"{i}. {v.title[:40]}...", v.video_id))
+
+        # 영상 목록을 전역에 저장
+        pipeline._trend_videos = videos
+
+        return "✅ 트렌드 분석 완료", result, gr.update(choices=choices, value=choices[0][1] if choices else None)
     except Exception as e:
-        return f"❌ 오류: {e}", ""
+        return f"❌ 오류: {e}", "", []
+
+
+def on_video_select(video_id: str):
+    """영상 선택 시 자막 추출 + 댓글 분석"""
+    if not video_id:
+        return "영상을 선택하세요", "", ""
+
+    try:
+        # 자막 추출
+        data = pipeline.step1b_extract_transcript(video_id)
+        transcript_text = data["transcript"].text
+
+        # 댓글 분석
+        comments_md = ""
+        if hasattr(pipeline, '_trend_videos'):
+            for v in pipeline._trend_videos:
+                if v.video_id == video_id:
+                    # 참여도 분석
+                    analysis = pipeline.trend_engine.analyze_engagement(v)
+
+                    comments_md = f"## 📊 참여도 분석\n\n"
+                    comments_md += f"- **바이럴 점수**: {analysis['viral_score']}/100\n"
+                    comments_md += f"- **참여율**: {analysis['engagement_rate']}%\n\n"
+
+                    comments_md += "## 💬 인기 댓글 TOP 5\n\n"
+                    for j, c in enumerate(analysis['top_comments'][:5], 1):
+                        comments_md += f"{j}. {c['text'][:100]}...\n"
+                        comments_md += f"   - 👍 {c['like_count']:,}\n\n"
+                    break
+
+        return f"✅ 자막 추출 완료 ({len(transcript_text)}자)", transcript_text, comments_md
+
+    except Exception as e:
+        return f"❌ 오류: {e}", "", ""
 
 
 def extract_transcript(video_id: str):
@@ -439,19 +484,34 @@ with gr.Blocks(title="콘텐츠 생성기", theme=gr.themes.Soft()) as app:
         # ─────────────────────────────────────────────
         with gr.Tab("1️⃣ 프로젝트 & 트렌드"):
             with gr.Row():
-                with gr.Column():
+                with gr.Column(scale=1):
                     topic_input = gr.Textbox(label="주제 / 키워드", placeholder="예: 조선시대 이야기")
                     duration_input = gr.Radio([5, 10, 15, 20], value=10, label="영상 길이 (분)")
                     create_btn = gr.Button("프로젝트 생성", variant="primary")
 
                     gr.Markdown("---")
-                    trend_btn = gr.Button("🔍 트렌드 분석")
-                    video_id_input = gr.Textbox(label="참조 영상 ID", placeholder="예: dQw4w9WgXcQ")
-                    extract_btn = gr.Button("📜 자막 추출")
+                    trend_btn = gr.Button("🔍 트렌드 분석", variant="secondary")
 
-                with gr.Column():
+                    gr.Markdown("---")
+                    video_select = gr.Dropdown(
+                        label="📹 영상 선택",
+                        choices=[],
+                        interactive=True
+                    )
+                    extract_btn = gr.Button("📜 자막 추출 + 댓글 분석", variant="primary")
+
+                    gr.Markdown("---")
+                    video_id_input = gr.Textbox(label="직접 입력 (영상 ID)", placeholder="예: dQw4w9WgXcQ")
+                    manual_extract_btn = gr.Button("📜 직접 추출")
+
+                with gr.Column(scale=2):
                     trend_result = gr.Markdown(label="트렌드 결과")
-                    transcript_result = gr.Textbox(label="추출된 자막", lines=10)
+
+                    with gr.Row():
+                        with gr.Column():
+                            transcript_result = gr.Textbox(label="추출된 자막", lines=12)
+                        with gr.Column():
+                            comments_result = gr.Markdown(label="댓글 분석")
 
         # ─────────────────────────────────────────────
         # Tab 2: 스크립트 생성 (프롬프트 편집)
@@ -597,8 +657,9 @@ with gr.Blocks(title="콘텐츠 생성기", theme=gr.themes.Soft()) as app:
 
     # Tab 1
     create_btn.click(create_project, [topic_input, duration_input], [status, trend_result])
-    trend_btn.click(analyze_trend, [topic_input], [status, trend_result])
-    extract_btn.click(extract_transcript, [video_id_input], [status, transcript_result])
+    trend_btn.click(analyze_trend, [topic_input], [status, trend_result, video_select])
+    extract_btn.click(on_video_select, [video_select], [status, transcript_result, comments_result])
+    manual_extract_btn.click(extract_transcript, [video_id_input], [status, transcript_result])
 
     # Tab 2: 자막 → 프롬프트 준비
     def prep_script(transcript, duration):
