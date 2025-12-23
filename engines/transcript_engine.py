@@ -31,7 +31,8 @@ class TranscriptEngine:
     def __init__(self):
         try:
             from youtube_transcript_api import YouTubeTranscriptApi
-            self.transcript_api = YouTubeTranscriptApi
+            # 버전 1.x: 인스턴스 생성 필요
+            self.transcript_api = YouTubeTranscriptApi()
             print("[TranscriptEngine] YouTube Transcript API 초기화 완료")
         except ImportError:
             self.transcript_api = None
@@ -47,13 +48,6 @@ class TranscriptEngine:
     ) -> ExtractedScript:
         """
         YouTube 영상에서 자막/트랜스크립트 추출
-
-        Args:
-            video_id: YouTube 영상 ID (URL에서 추출)
-            languages: 선호 언어 리스트 (예: ["ko", "en", "ja"])
-
-        Returns:
-            ExtractedScript 객체
         """
         if not self.transcript_api:
             raise RuntimeError("youtube_transcript_api가 설치되지 않았습니다")
@@ -65,44 +59,33 @@ class TranscriptEngine:
             languages = ["ko", "en", "ja", "zh"]
 
         try:
-            # 자막 리스트 조회
-            transcript_list = self.transcript_api.list_transcripts(video_id)
-
-            # 수동 자막 우선, 없으면 자동 생성 자막
-            transcript = None
+            # 버전 1.x API: fetch() 사용
+            transcript_data = None
             detected_lang = None
 
-            # 수동 자막 시도
+            # 언어별로 시도
             for lang in languages:
                 try:
-                    transcript = transcript_list.find_transcript([lang])
+                    transcript_data = self.transcript_api.fetch(video_id, languages=[lang])
                     detected_lang = lang
                     break
-                except:
+                except Exception:
                     continue
 
-            # 자동 생성 자막 시도
-            if not transcript:
-                for lang in languages:
-                    try:
-                        transcript = transcript_list.find_generated_transcript([lang])
-                        detected_lang = lang
-                        break
-                    except:
-                        continue
-
-            if not transcript:
-                raise RuntimeError(f"사용 가능한 자막이 없습니다: {video_id}")
-
-            # 자막 데이터 가져오기
-            transcript_data = transcript.fetch()
+            # 언어 지정 없이 시도
+            if not transcript_data:
+                try:
+                    transcript_data = self.transcript_api.fetch(video_id)
+                    detected_lang = "auto"
+                except Exception as e:
+                    raise RuntimeError(f"사용 가능한 자막이 없습니다: {video_id} - {e}")
 
             # 세그먼트 변환
             segments = [
                 TranscriptSegment(
-                    text=seg["text"],
-                    start=seg["start"],
-                    duration=seg["duration"]
+                    text=seg.text,
+                    start=seg.start,
+                    duration=seg.duration
                 )
                 for seg in transcript_data
             ]
