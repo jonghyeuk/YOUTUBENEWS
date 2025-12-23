@@ -144,7 +144,7 @@ def on_video_select(video_id: str):
     try:
         # 자막 추출
         data = pipeline.step1b_extract_transcript(video_id)
-        transcript_text = data["transcript"].text
+        transcript_text = data["transcript"].original_text
 
         # 댓글 분석
         comments_md = ""
@@ -177,7 +177,7 @@ def extract_transcript(video_id: str):
 
     try:
         data = pipeline.step1b_extract_transcript(video_id)
-        text = data["transcript"].text
+        text = data["transcript"].original_text
         return f"✅ 자막 추출 완료 ({len(text)}자)", text
     except Exception as e:
         return f"❌ 오류: {e}", ""
