@@ -243,14 +243,15 @@ class Pipeline:
     def step6_render_video(
         self,
         use_ken_burns: bool = True,
-        use_bgm: bool = False
+        bgm_path: Optional[str] = None,
+        bgm_volume: float = 0.15
     ) -> str:
         """6단계: 영상 렌더링"""
         effects = []
         if use_ken_burns:
             effects.append("Ken Burns")
-        if use_bgm:
-            effects.append("BGM")
+        if bgm_path:
+            effects.append(f"BGM({int(bgm_volume*100)}%)")
         effect_str = " + ".join(effects) if effects else "기본"
         self._log(f"6단계: 영상 렌더링 중... ({effect_str})")
 
@@ -269,12 +270,11 @@ class Pipeline:
             use_ken_burns=use_ken_burns
         )
 
-        # BGM 경로 (사용 시)
-        bgm_path = None
-        if use_bgm:
-            bgm_path = self.video_engine.get_random_bgm()
-            if bgm_path:
-                self._log(f"BGM 선택: {os.path.basename(bgm_path)}")
+        # BGM 경로 로깅
+        if bgm_path and os.path.exists(bgm_path):
+            self._log(f"BGM 적용: {os.path.basename(bgm_path)}")
+        else:
+            bgm_path = None  # 경로가 없으면 None으로 처리
 
         # 클립 합치기 + 오디오 (+ BGM)
         video_path = self._get_path("video_no_sub.mp4")
@@ -282,7 +282,8 @@ class Pipeline:
             clip_paths=clip_paths,
             audio_path=self.project.audio_path,
             output_path=video_path,
-            bgm_path=bgm_path
+            bgm_path=bgm_path,
+            bgm_volume=bgm_volume
         )
 
         self.project.video_path = video_path
@@ -326,7 +327,7 @@ class Pipeline:
         image_engine: str = "fal",
         style_prefix: str = "",
         use_ken_burns: bool = True,
-        use_bgm: bool = False
+        bgm_path: Optional[str] = None
     ) -> str:
         """
         전체 파이프라인 실행
@@ -338,7 +339,7 @@ class Pipeline:
             image_engine: 이미지 엔진 (fal, dalle, imagen)
             style_prefix: 이미지 스타일 접두사
             use_ken_burns: Ken Burns 효과 사용 여부
-            use_bgm: 배경음악 사용 여부
+            bgm_path: 배경음악 파일 경로
 
         Returns:
             최종 영상 경로
@@ -348,7 +349,7 @@ class Pipeline:
         self.step3_generate_tts(tts_engine)
         self.step4_generate_images(engine=image_engine, style_prefix=style_prefix)
         self.step5_generate_subtitles()
-        self.step6_render_video(use_ken_burns=use_ken_burns, use_bgm=use_bgm)
+        self.step6_render_video(use_ken_burns=use_ken_burns, bgm_path=bgm_path)
         return self.step7_burn_subtitles()
 
     def run_from_trend(
@@ -360,7 +361,7 @@ class Pipeline:
         image_engine: str = "fal",
         style_prefix: str = "",
         use_ken_burns: bool = True,
-        use_bgm: bool = False
+        bgm_path: Optional[str] = None
     ) -> str:
         """
         인기 영상 분석 기반 파이프라인 실행
@@ -369,7 +370,7 @@ class Pipeline:
             keyword: 검색 키워드
             video_id: 참조할 YouTube 영상 ID
             duration_min: 영상 길이 (분)
-            ...
+            bgm_path: 배경음악 파일 경로
 
         Returns:
             최종 영상 경로
@@ -385,7 +386,7 @@ class Pipeline:
         self.step3_generate_tts(tts_engine)
         self.step4_generate_images(engine=image_engine, style_prefix=style_prefix)
         self.step5_generate_subtitles()
-        self.step6_render_video(use_ken_burns=use_ken_burns, use_bgm=use_bgm)
+        self.step6_render_video(use_ken_burns=use_ken_burns, bgm_path=bgm_path)
         return self.step7_burn_subtitles()
 
     # ─────────────────────────────────────────────

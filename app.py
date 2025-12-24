@@ -12,7 +12,7 @@ import json
 
 from pipeline import Pipeline
 from engines import ScriptEngine, ImageEngine
-from config import DURATION_SPECS
+from config import DURATION_SPECS, BGM_CONFIG
 
 # 전역 파이프라인 인스턴스
 pipeline = Pipeline()
@@ -324,12 +324,60 @@ def generate_subtitles(use_whisper: bool):
         return f"❌ 오류: {e}", ""
 
 
-def render_video(use_ken_burns: bool, use_bgm: bool):
+def get_bgm_list():
+    """BGM 폴더에서 사용 가능한 파일 목록 가져오기"""
+    bgm_folder = BGM_CONFIG.get("folder", "assets/bgm")
+    if not os.path.exists(bgm_folder):
+        os.makedirs(bgm_folder, exist_ok=True)
+        return []
+
+    bgm_files = []
+    for f in os.listdir(bgm_folder):
+        if f.endswith((".mp3", ".wav", ".m4a")):
+            bgm_files.append(f)
+    return sorted(bgm_files)
+
+
+def refresh_bgm_list():
+    """BGM 목록 새로고침"""
+    bgm_files = get_bgm_list()
+    if not bgm_files:
+        return gr.update(choices=["(BGM 없음 - assets/bgm 폴더에 추가)"], value=None), None
+    choices = ["(BGM 없음)"] + bgm_files
+    return gr.update(choices=choices, value=None), None
+
+
+def preview_bgm(selected_bgm: str):
+    """BGM 미리듣기"""
+    if not selected_bgm or selected_bgm.startswith("("):
+        return None
+    bgm_folder = BGM_CONFIG.get("folder", "assets/bgm")
+    bgm_path = os.path.join(bgm_folder, selected_bgm)
+    if os.path.exists(bgm_path):
+        return bgm_path
+    return None
+
+
+def render_video(use_ken_burns: bool, selected_bgm: str, bgm_volume: float):
     if not pipeline.project or not pipeline.project.cut_paths:
         return "❌ 이미지 생성 필요", None
     try:
-        video_path = pipeline.step6_render_video(use_ken_burns, use_bgm)
-        return "✅ 렌더링 완료", video_path
+        # BGM 경로 결정
+        bgm_path = None
+        if selected_bgm and not selected_bgm.startswith("("):
+            bgm_folder = BGM_CONFIG.get("folder", "assets/bgm")
+            bgm_path = os.path.join(bgm_folder, selected_bgm)
+            if not os.path.exists(bgm_path):
+                bgm_path = None
+
+        video_path = pipeline.step6_render_video(
+            use_ken_burns,
+            bgm_path=bgm_path,
+            bgm_volume=bgm_volume
+        )
+
+        bgm_status = f" + BGM: {selected_bgm} (볼륨 {int(bgm_volume*100)}%)" if bgm_path else ""
+        return f"✅ 렌더링 완료{bgm_status}", video_path
     except Exception as e:
         return f"❌ 오류: {e}", None
 
@@ -500,8 +548,29 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
 
                     gr.Markdown("---")
                     use_ken_burns = gr.Checkbox(label="Ken Burns 효과", value=True)
-                    use_bgm = gr.Checkbox(label="BGM", value=False)
-                    render_btn = gr.Button("🎬 렌더링")
+
+                    gr.Markdown("### 🎵 BGM 선택")
+                    with gr.Row():
+                        bgm_selector = gr.Dropdown(
+                            label="배경음악",
+                            choices=["(BGM 없음)"] + get_bgm_list(),
+                            value=None,
+                            info="assets/bgm 폴더에 mp3/wav 파일 추가"
+                        )
+                        bgm_refresh_btn = gr.Button("🔄", scale=0)
+
+                    bgm_volume = gr.Slider(
+                        minimum=0.0,
+                        maximum=0.5,
+                        value=0.15,
+                        step=0.05,
+                        label="🔊 BGM 볼륨",
+                        info="TTS 대비 음량 (0.15 권장)"
+                    )
+
+                    bgm_preview = gr.Audio(label="🎧 BGM 미리듣기", interactive=False)
+
+                    render_btn = gr.Button("🎬 렌더링", variant="primary")
                     final_btn = gr.Button("✅ 최종 영상", variant="primary")
 
                 with gr.Column():
@@ -559,7 +628,12 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
 
     # Tab 4: 영상
     subtitle_btn.click(generate_subtitles, [use_whisper], [status, subtitle_preview])
-    render_btn.click(render_video, [use_ken_burns, use_bgm], [status, video_preview])
+
+    # BGM 관련 이벤트
+    bgm_refresh_btn.click(refresh_bgm_list, [], [bgm_selector, bgm_preview])
+    bgm_selector.change(preview_bgm, [bgm_selector], [bgm_preview])
+
+    render_btn.click(render_video, [use_ken_burns, bgm_selector, bgm_volume], [status, video_preview])
     final_btn.click(finalize_video, [], [status, final_video])
 
     # Tab 5: 트렌드

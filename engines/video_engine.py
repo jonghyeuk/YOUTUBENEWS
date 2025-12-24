@@ -129,11 +129,15 @@ class VideoEngine:
         """간단한 슬라이드쇼 씬 클립 생성"""
         list_path = output_path.replace(".mp4", "_list.txt")
 
-        with open(list_path, "w") as f:
+        with open(list_path, "w", encoding="utf-8") as f:
             for img_path in images:
-                f.write(f"file '{os.path.abspath(img_path)}'\n")
+                # Windows 호환: 경로를 forward slash로 변환
+                abs_path = os.path.abspath(img_path).replace("\\", "/")
+                f.write(f"file '{abs_path}'\n")
                 f.write(f"duration {duration_per_image}\n")
-            f.write(f"file '{os.path.abspath(images[-1])}'\n")
+            # 마지막 이미지 참조
+            last_abs_path = os.path.abspath(images[-1]).replace("\\", "/")
+            f.write(f"file '{last_abs_path}'\n")
 
         cmd = [
             "ffmpeg", "-y",
@@ -152,11 +156,16 @@ class VideoEngine:
 
     def _concat_clips_simple(self, clip_paths: List[str], output_path: str):
         """클립들을 단순 합치기"""
+        if not clip_paths:
+            raise ValueError("No clips to concatenate")
+
         list_path = output_path.replace(".mp4", "_concat.txt")
 
-        with open(list_path, "w") as f:
+        with open(list_path, "w", encoding="utf-8") as f:
             for clip_path in clip_paths:
-                f.write(f"file '{os.path.abspath(clip_path)}'\n")
+                # Windows 호환: 경로를 forward slash로 변환
+                abs_path = os.path.abspath(clip_path).replace("\\", "/")
+                f.write(f"file '{abs_path}'\n")
 
         cmd = [
             "ffmpeg", "-y",
@@ -167,7 +176,11 @@ class VideoEngine:
             output_path
         ]
 
-        subprocess.run(cmd, check=True, capture_output=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"[VideoEngine] FFmpeg error: {result.stderr}")
+            raise RuntimeError(f"FFmpeg concat failed: {result.stderr}")
+
         os.remove(list_path)
 
     def concat_clips(
@@ -175,7 +188,8 @@ class VideoEngine:
         clip_paths: List[str],
         audio_path: str,
         output_path: str,
-        bgm_path: Optional[str] = None
+        bgm_path: Optional[str] = None,
+        bgm_volume: float = 0.15
     ) -> str:
         """
         씬 클립들을 합치고 오디오 추가 (BGM 믹싱 옵션)
@@ -185,6 +199,7 @@ class VideoEngine:
             audio_path: TTS 오디오 파일 경로
             output_path: 출력 영상 경로
             bgm_path: BGM 파일 경로 (없으면 TTS만 사용)
+            bgm_volume: BGM 볼륨 (0.0 ~ 0.5, 기본 0.15)
 
         Returns:
             최종 영상 경로
@@ -192,9 +207,11 @@ class VideoEngine:
         # 비디오 합치기
         list_path = output_path.replace(".mp4", "_concat.txt")
 
-        with open(list_path, "w") as f:
+        with open(list_path, "w", encoding="utf-8") as f:
             for clip_path in clip_paths:
-                f.write(f"file '{os.path.abspath(clip_path)}'\n")
+                # Windows 호환: 경로를 forward slash로 변환
+                abs_path = os.path.abspath(clip_path).replace("\\", "/")
+                f.write(f"file '{abs_path}'\n")
 
         temp_video = output_path.replace(".mp4", "_temp.mp4")
 
@@ -211,7 +228,7 @@ class VideoEngine:
 
         # 오디오 추가 (BGM 믹싱 여부에 따라)
         if bgm_path and os.path.exists(bgm_path):
-            self._add_audio_with_bgm(temp_video, audio_path, bgm_path, output_path)
+            self._add_audio_with_bgm(temp_video, audio_path, bgm_path, output_path, bgm_volume)
         else:
             self._add_audio_simple(temp_video, audio_path, output_path)
 
@@ -240,19 +257,21 @@ class VideoEngine:
         video_path: str,
         tts_path: str,
         bgm_path: str,
-        output_path: str
+        output_path: str,
+        bgm_volume: float = 0.15
     ):
-        """TTS + BGM 믹싱하여 추가"""
+        """TTS + BGM 믹싱하여 추가 (BGM 자동 반복)"""
         # 오디오 길이 확인
         tts_duration = get_audio_duration(tts_path)
 
         # BGM에 페이드 아웃 적용하고 TTS와 믹싱
         fade_out = BGM_CONFIG.get("fade_out", 3)
-        bgm_volume = BGM_CONFIG.get("volume", 0.15)
 
+        # BGM 반복 + 볼륨 + 페이드아웃 적용
         filter_complex = (
             f"[1:a]volume=1.0[tts];"
-            f"[2:a]volume={bgm_volume},afade=t=out:st={tts_duration - fade_out}:d={fade_out}[bgm];"
+            f"[2:a]aloop=loop=-1:size=2e+09,volume={bgm_volume},"
+            f"afade=t=out:st={max(0, tts_duration - fade_out)}:d={fade_out}[bgm];"
             f"[tts][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]"
         )
 
@@ -270,7 +289,12 @@ class VideoEngine:
             output_path
         ]
 
-        subprocess.run(cmd, check=True, capture_output=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"[VideoEngine] BGM 믹싱 오류: {result.stderr}")
+            # 실패 시 BGM 없이 재시도
+            print("[VideoEngine] BGM 없이 재시도...")
+            self._add_audio_simple(video_path, tts_path, output_path)
 
     def get_random_bgm(self) -> Optional[str]:
         """BGM 폴더에서 무작위 BGM 선택"""
