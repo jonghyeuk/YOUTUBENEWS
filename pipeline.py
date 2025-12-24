@@ -195,6 +195,16 @@ class Pipeline:
             output_dir=images_dir
         )
 
+        # 씬에 이미지 경로 할당 (씬별 image_count에 맞게 분배)
+        image_idx = 0
+        for scene in self.project.script.scenes:
+            count = getattr(scene, 'image_count', 1)
+            scene.image_paths = []
+            for _ in range(count):
+                if image_idx < len(image_paths):
+                    scene.image_paths.append(image_paths[image_idx])
+                    image_idx += 1
+
         self.project.cut_paths = image_paths
         self.project.current_step = 4
 
