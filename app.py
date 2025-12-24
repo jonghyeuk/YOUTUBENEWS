@@ -341,7 +341,7 @@ def parse_image_prompts(prompts_text: str):
     return parsed
 
 
-def generate_images_from_text(prompts_text: str, engine: str):
+def generate_images_from_text(prompts_text: str, engine: str, model: str):
     if not pipeline.project:
         return "❌ 스크립트 먼저 생성하세요", []
     try:
@@ -349,11 +349,41 @@ def generate_images_from_text(prompts_text: str, engine: str):
         if not prompts:
             return "❌ 프롬프트 파싱 실패", []
 
-        image_paths = pipeline.step4_generate_images_from_prompts(prompts=prompts, engine=engine)
+        image_paths = pipeline.step4_generate_images_from_prompts(
+            prompts=prompts,
+            engine=engine,
+            model=model
+        )
         images = [Image.open(p) for p in image_paths]
-        return f"✅ 이미지 생성 완료 ({len(images)}장)", images
+        return f"✅ 이미지 생성 완료 ({len(images)}장, 모델: {model})", images
     except Exception as e:
         return f"❌ 오류: {e}", []
+
+
+# 엔진별 모델 옵션
+IMAGE_MODEL_OPTIONS = {
+    "fal": [
+        ("flux-schnell (빠름/$0.003)", "flux-schnell"),
+        ("flux-dev (균형/$0.025)", "flux-dev"),
+        ("flux-pro (고품질/$0.05)", "flux-pro"),
+        ("flux-pro-v1.1 (최신/$0.05)", "flux-pro-v1.1"),
+        ("flux-ultra (최고품질/$0.06)", "flux-ultra"),
+    ],
+    "imagen": [
+        ("imagen-3-fast (빠름/저렴)", "imagen-3-fast"),
+        ("imagen-3 (고품질)", "imagen-3"),
+    ],
+    "dalle": [
+        ("DALL-E 3", "dall-e-3"),
+    ],
+}
+
+
+def update_model_choices(engine: str):
+    """엔진 변경시 모델 선택 옵션 업데이트"""
+    choices = IMAGE_MODEL_OPTIONS.get(engine, IMAGE_MODEL_OPTIONS["fal"])
+    default_value = choices[0][1] if choices else None
+    return gr.update(choices=choices, value=default_value)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -712,6 +742,21 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         value="fal",
                         label="이미지 엔진"
                     )
+
+                    # 엔진별 모델 선택
+                    image_model = gr.Dropdown(
+                        label="모델 선택",
+                        choices=[
+                            ("flux-schnell (빠름/$0.003)", "flux-schnell"),
+                            ("flux-dev (균형/$0.025)", "flux-dev"),
+                            ("flux-pro (고품질/$0.05)", "flux-pro"),
+                            ("flux-pro-v1.1 (최신/$0.05)", "flux-pro-v1.1"),
+                            ("flux-ultra (최고품질/$0.06)", "flux-ultra"),
+                        ],
+                        value="flux-schnell",
+                        info="fal.ai 모델 (엔진 변경시 자동 변경)"
+                    )
+
                     final_prompts = gr.Textbox(
                         label="이미지 프롬프트",
                         lines=8,
@@ -905,9 +950,10 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     tts_btn.click(generate_tts, [tts_engine], [status, audio_preview, tts_script_preview])
 
     # Tab 3: 이미지 생성
+    image_engine.change(update_model_choices, [image_engine], [image_model])
     gen_images_btn.click(
         generate_images_from_text,
-        [final_prompts, image_engine],
+        [final_prompts, image_engine, image_model],
         [status, images_gallery]
     )
 

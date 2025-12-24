@@ -197,12 +197,14 @@ class Pipeline:
     def step4_generate_images_from_prompts(
         self,
         prompts: List[str],
-        engine: str = "fal"
+        engine: str = "fal",
+        model: str = None
     ) -> List[str]:
         """4단계 (대안): 프롬프트 리스트로 이미지 생성"""
-        self._log(f"4단계: 프롬프트 기반 이미지 생성 중... ({len(prompts)}장)")
+        model_info = f", 모델: {model}" if model else ""
+        self._log(f"4단계: 이미지 생성 중... ({len(prompts)}장, 엔진: {engine}{model_info})")
 
-        self.image_engine = ImageEngine(engine=engine)
+        self.image_engine = ImageEngine(engine=engine, model=model)
         images_dir = self._get_path("images")
 
         image_paths = self.image_engine.generate_images_from_prompts(
