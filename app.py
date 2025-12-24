@@ -12,10 +12,12 @@ import json
 
 from pipeline import Pipeline
 from engines import ScriptEngine, ImageEngine
+from engines.thumbnail_engine import ThumbnailEngine
 from config import DURATION_SPECS, BGM_CONFIG
 
 # 전역 파이프라인 인스턴스
 pipeline = Pipeline()
+thumbnail_engine = ThumbnailEngine()
 
 # ═══════════════════════════════════════════════════════════════
 # 스타일별 프롬프트 템플릿
@@ -261,17 +263,63 @@ def generate_script_and_images(topic: str, duration: int, style: str):
 # TTS 생성
 # ═══════════════════════════════════════════════════════════════
 
+def preview_tts_script(engine: str):
+    """TTS에 입력될 대사 미리보기"""
+    if not pipeline.project or not pipeline.project.script:
+        return "❌ 스크립트를 먼저 생성하세요"
+
+    script = pipeline.project.script
+    style = getattr(pipeline.project, 'style', None)
+    total_scenes = len(script.scenes)
+
+    # EMOTION_TAGS 가져오기
+    from config import EMOTION_TAGS
+
+    preview = f"## 🎙️ TTS 입력 대사 미리보기\n"
+    preview += f"**엔진**: {engine} | **스타일**: {style or '없음'} | **씬**: {total_scenes}개\n\n"
+    preview += "---\n\n"
+
+    for i, scene in enumerate(script.scenes):
+        position = i / total_scenes
+
+        # 감정 태그 결정 (ElevenLabs + 스타일일 때만)
+        tag = ""
+        if engine == "elevenlabs" and style and style in EMOTION_TAGS:
+            tags = EMOTION_TAGS[style]
+            if position < 0.15:
+                tag = tags.get("intro", "")
+            elif position < 0.5:
+                tag = tags.get("body_sad", tags.get("body", ""))
+            elif position < 0.75:
+                tag = tags.get("body_hope", tags.get("climax", ""))
+            elif position < 0.9:
+                tag = tags.get("climax", "")
+            else:
+                tag = tags.get("ending", "")
+
+        preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
+        if tag:
+            preview += f"🎭 **감정태그**: `{tag}`\n\n"
+        preview += f"```\n{tag} {scene.text}\n```\n\n"
+
+    return preview
+
+
 def generate_tts(engine: str):
     if not pipeline.project or not pipeline.project.script:
-        return "❌ 스크립트 생성 필요", None
+        return "❌ 스크립트 생성 필요", None, ""
     try:
         # 프로젝트에 저장된 스타일 가져오기
         style = getattr(pipeline.project, 'style', None)
         audio_path = pipeline.step3_generate_tts(engine, style=style)
         total = sum(s.duration for s in pipeline.project.audio_segments)
-        return f"✅ TTS 완료 ({total:.1f}초)", audio_path
+
+        # TTS 입력 대사 로그
+        tts_log = preview_tts_script(engine)
+
+        return f"✅ TTS 완료 ({total:.1f}초)", audio_path, tts_log
     except Exception as e:
-        return f"❌ 오류: {e}", None
+        return f"❌ 오류: {e}", None, ""
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -293,7 +341,7 @@ def parse_image_prompts(prompts_text: str):
     return parsed
 
 
-def generate_images_from_text(prompts_text: str, engine: str):
+def generate_images_from_text(prompts_text: str, engine: str, model: str):
     if not pipeline.project:
         return "❌ 스크립트 먼저 생성하세요", []
     try:
@@ -301,11 +349,41 @@ def generate_images_from_text(prompts_text: str, engine: str):
         if not prompts:
             return "❌ 프롬프트 파싱 실패", []
 
-        image_paths = pipeline.step4_generate_images_from_prompts(prompts=prompts, engine=engine)
+        image_paths = pipeline.step4_generate_images_from_prompts(
+            prompts=prompts,
+            engine=engine,
+            model=model
+        )
         images = [Image.open(p) for p in image_paths]
-        return f"✅ 이미지 생성 완료 ({len(images)}장)", images
+        return f"✅ 이미지 생성 완료 ({len(images)}장, 모델: {model})", images
     except Exception as e:
         return f"❌ 오류: {e}", []
+
+
+# 엔진별 모델 옵션
+IMAGE_MODEL_OPTIONS = {
+    "fal": [
+        ("flux-schnell (빠름/$0.003)", "flux-schnell"),
+        ("flux-dev (균형/$0.025)", "flux-dev"),
+        ("flux-pro (고품질/$0.05)", "flux-pro"),
+        ("flux-pro-v1.1 (최신/$0.05)", "flux-pro-v1.1"),
+        ("flux-ultra (최고품질/$0.06)", "flux-ultra"),
+    ],
+    "imagen": [
+        ("imagen-3-fast (빠름/저렴)", "imagen-3-fast"),
+        ("imagen-3 (고품질)", "imagen-3"),
+    ],
+    "dalle": [
+        ("DALL-E 3", "dall-e-3"),
+    ],
+}
+
+
+def update_model_choices(engine: str):
+    """엔진 변경시 모델 선택 옵션 업데이트"""
+    choices = IMAGE_MODEL_OPTIONS.get(engine, IMAGE_MODEL_OPTIONS["fal"])
+    default_value = choices[0][1] if choices else None
+    return gr.update(choices=choices, value=default_value)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -452,6 +530,128 @@ def extract_transcript_and_comments(selection: str):
 
 
 # ═══════════════════════════════════════════════════════════════
+# 썸네일 생성
+# ═══════════════════════════════════════════════════════════════
+
+def get_background_images():
+    """프로젝트 이미지 목록 가져오기"""
+    if not pipeline.project or not pipeline.project.cut_paths:
+        return []
+    return pipeline.project.cut_paths
+
+
+def generate_thumbnail(
+    bg_image,
+    main_text: str,
+    sub_text: str,
+    bottom_text: str,
+    darken: float
+):
+    """썸네일 생성"""
+    if not main_text.strip():
+        return "❌ 메인 텍스트를 입력하세요", None
+
+    # 배경 이미지 결정
+    if bg_image is not None:
+        # 업로드된 이미지 사용
+        bg_path = bg_image
+    elif pipeline.project and pipeline.project.cut_paths:
+        # 프로젝트 첫 번째 이미지
+        bg_path = pipeline.project.cut_paths[0]
+    else:
+        return "❌ 배경 이미지를 업로드하거나 이미지를 먼저 생성하세요", None
+
+    try:
+        style = getattr(pipeline.project, 'style', '정보') if pipeline.project else '정보'
+
+        # 출력 경로
+        if pipeline.project:
+            output_path = pipeline._get_path("thumbnail.jpg")
+        else:
+            output_path = "thumbnail_output.jpg"
+
+        thumbnail_path = thumbnail_engine.create_thumbnail(
+            background_image=bg_path,
+            main_text=main_text,
+            sub_text=sub_text,
+            bottom_text=bottom_text,
+            style=style,
+            darken=darken,
+            output_path=output_path
+        )
+
+        return f"✅ 썸네일 생성 완료!", thumbnail_path
+    except Exception as e:
+        return f"❌ 오류: {e}", None
+
+
+def use_project_image(img_index: int):
+    """프로젝트 이미지 선택"""
+    if not pipeline.project or not pipeline.project.cut_paths:
+        return None
+    if 0 <= img_index < len(pipeline.project.cut_paths):
+        return pipeline.project.cut_paths[img_index]
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════
+# YouTube 업로드 준비
+# ═══════════════════════════════════════════════════════════════
+
+def prepare_youtube_upload():
+    """YouTube 업로드용 정보 생성"""
+    if not pipeline.project:
+        return "❌ 프로젝트 없음", "", "", "", "", None, None
+
+    project = pipeline.project
+    script = project.script
+
+    # 제목
+    title = script.title if script else project.title
+
+    # 설명 생성
+    description = f"""🙏 {title}
+
+"""
+    if script:
+        # 씬 요약
+        for scene in script.scenes[:3]:
+            description += f"• {scene.title}\n"
+        description += "\n"
+
+    description += """═══════════════════════════════════════
+📢 구독과 좋아요 부탁드립니다!
+🔔 알림 설정으로 새 영상을 받아보세요
+
+#명상 #불교 #마음치유 #힐링 #위로
+═══════════════════════════════════════"""
+
+    # 태그
+    style = getattr(project, 'style', '정보')
+    base_tags = {
+        "불교종교": "명상, 불교, 마음치유, 힐링, 위로, 잠잘때듣는, 부처님말씀, 인생명언",
+        "뉴스": "뉴스, 이슈, 시사, 정보, 핫이슈, 트렌드",
+        "정보": "정보, 꿀팁, 생활정보, 유용한정보, 알아두면좋은",
+        "믿거나말거나": "미스터리, 충격, 믿거나말거나, 신기한이야기, 소름",
+    }
+    tags = base_tags.get(style, "")
+
+    # 파일 경로
+    video_path = getattr(project, 'final_video_path', None) or getattr(project, 'video_path', None)
+    thumbnail_path = pipeline._get_path("thumbnail.jpg") if os.path.exists(pipeline._get_path("thumbnail.jpg")) else None
+
+    return (
+        "✅ 업로드 정보 준비 완료",
+        title,
+        description,
+        tags,
+        f"📁 {project.project_id}" if project else "",
+        video_path,
+        thumbnail_path
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
 # Gradio UI - 간소화된 버전
 # ═══════════════════════════════════════════════════════════════
 
@@ -507,15 +707,29 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         # ─────────────────────────────────────────────
         with gr.Tab("2️⃣ TTS"):
             with gr.Row():
-                with gr.Column():
+                with gr.Column(scale=1):
                     tts_engine = gr.Radio(
                         ["wavenet", "elevenlabs", "openai"],
                         value="wavenet",
                         label="TTS 엔진"
                     )
+                    gr.Markdown("""
+                    **엔진 설명**:
+                    - `wavenet`: Google Cloud TTS (자연스러움)
+                    - `elevenlabs`: 감정 태그 지원 ⭐
+                    - `openai`: OpenAI TTS
+                    """)
+                    tts_preview_btn = gr.Button("👁️ 대사 미리보기")
                     tts_btn = gr.Button("🔊 TTS 생성", variant="primary")
-                with gr.Column():
+
+                with gr.Column(scale=1):
                     audio_preview = gr.Audio(label="생성된 오디오")
+
+            gr.Markdown("---")
+            tts_script_preview = gr.Markdown(
+                label="TTS 입력 대사",
+                value="*TTS 엔진 선택 후 '대사 미리보기' 클릭*"
+            )
 
         # ─────────────────────────────────────────────
         # Tab 3: 이미지 생성
@@ -528,6 +742,21 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         value="fal",
                         label="이미지 엔진"
                     )
+
+                    # 엔진별 모델 선택
+                    image_model = gr.Dropdown(
+                        label="모델 선택",
+                        choices=[
+                            ("flux-schnell (빠름/$0.003)", "flux-schnell"),
+                            ("flux-dev (균형/$0.025)", "flux-dev"),
+                            ("flux-pro (고품질/$0.05)", "flux-pro"),
+                            ("flux-pro-v1.1 (최신/$0.05)", "flux-pro-v1.1"),
+                            ("flux-ultra (최고품질/$0.06)", "flux-ultra"),
+                        ],
+                        value="flux-schnell",
+                        info="fal.ai 모델 (엔진 변경시 자동 변경)"
+                    )
+
                     final_prompts = gr.Textbox(
                         label="이미지 프롬프트",
                         lines=8,
@@ -579,7 +808,107 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     final_video = gr.Video(label="최종 영상")
 
         # ─────────────────────────────────────────────
-        # Tab 5: 트렌드 분석 (참고용)
+        # Tab 5: 썸네일 생성
+        # ─────────────────────────────────────────────
+        with gr.Tab("5️⃣ 썸네일"):
+            gr.Markdown("### 🖼️ 썸네일 생성")
+            gr.Markdown("*배경 이미지 + 텍스트 오버레이*")
+
+            with gr.Row():
+                with gr.Column(scale=1):
+                    thumb_bg = gr.Image(
+                        label="배경 이미지",
+                        type="filepath",
+                        sources=["upload"],
+                        info="업로드하거나 비워두면 프로젝트 이미지 사용"
+                    )
+
+                    thumb_sub = gr.Textbox(
+                        label="상단 텍스트 (작은 글씨)",
+                        placeholder="예: 잠자면서 듣는",
+                        lines=1
+                    )
+
+                    thumb_main = gr.Textbox(
+                        label="메인 텍스트 (큰 글씨) ⭐",
+                        placeholder="예: 부처님말씀 2시간",
+                        lines=2
+                    )
+
+                    thumb_bottom = gr.Textbox(
+                        label="하단 텍스트",
+                        placeholder="예: 노후에는 다 부질없다 이렇게만 살아라",
+                        lines=1
+                    )
+
+                    thumb_darken = gr.Slider(
+                        minimum=0.0,
+                        maximum=0.8,
+                        value=0.4,
+                        step=0.1,
+                        label="배경 어둡게"
+                    )
+
+                    thumb_btn = gr.Button("🎨 썸네일 생성", variant="primary")
+
+                with gr.Column(scale=1):
+                    thumb_preview = gr.Image(label="썸네일 미리보기")
+                    thumb_download = gr.File(label="📥 다운로드")
+
+        # ─────────────────────────────────────────────
+        # Tab 6: YouTube 업로드
+        # ─────────────────────────────────────────────
+        with gr.Tab("6️⃣ YouTube 업로드"):
+            gr.Markdown("### 📤 YouTube 업로드 준비")
+            gr.Markdown("*복사하여 YouTube Studio에 붙여넣기*")
+
+            prepare_btn = gr.Button("📋 업로드 정보 준비", variant="primary")
+
+            with gr.Row():
+                with gr.Column():
+                    yt_title = gr.Textbox(
+                        label="📌 제목",
+                        lines=2,
+                        interactive=True,
+                        info="클릭 후 Ctrl+A, Ctrl+C로 복사"
+                    )
+
+                    yt_description = gr.Textbox(
+                        label="📝 설명",
+                        lines=10,
+                        interactive=True
+                    )
+
+                    yt_tags = gr.Textbox(
+                        label="🏷️ 태그",
+                        lines=2,
+                        interactive=True,
+                        info="쉼표로 구분"
+                    )
+
+                    yt_project = gr.Textbox(
+                        label="📁 프로젝트",
+                        interactive=False
+                    )
+
+                with gr.Column():
+                    yt_video = gr.Video(label="🎬 영상 파일")
+                    yt_thumb = gr.Image(label="🖼️ 썸네일")
+
+            gr.Markdown("""
+            ---
+            ### 📋 YouTube Studio 업로드 순서
+            1. **제목** 복사 → YouTube Studio에 붙여넣기
+            2. **설명** 복사 → 붙여넣기
+            3. **태그** 복사 → '더보기' 클릭 후 태그 입력
+            4. **썸네일** 우클릭 저장 후 업로드
+            5. 영상 파일 선택하여 업로드
+
+            *🔜 향후 자동 업로드 기능 추가 예정!*
+            """)
+
+        # ─────────────────────────────────────────────
+        # Tab 7: 트렌드 분석 (참고용)
         # ─────────────────────────────────────────────
         with gr.Tab("📊 트렌드 (참고)"):
             gr.Markdown("### 🔍 YouTube 트렌드 분석")
@@ -617,12 +946,14 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     image_prompts.change(lambda x: x, [image_prompts], [final_prompts])
 
     # Tab 2: TTS
-    tts_btn.click(generate_tts, [tts_engine], [status, audio_preview])
+    tts_preview_btn.click(preview_tts_script, [tts_engine], [tts_script_preview])
+    tts_btn.click(generate_tts, [tts_engine], [status, audio_preview, tts_script_preview])
 
     # Tab 3: 이미지 생성
+    image_engine.change(update_model_choices, [image_engine], [image_model])
     gen_images_btn.click(
         generate_images_from_text,
-        [final_prompts, image_engine],
+        [final_prompts, image_engine, image_model],
         [status, images_gallery]
     )
 
@@ -636,7 +967,27 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     render_btn.click(render_video, [use_ken_burns, bgm_selector, bgm_volume], [status, video_preview])
     final_btn.click(finalize_video, [], [status, final_video])
 
-    # Tab 5: 트렌드
+    # Tab 5: 썸네일
+    def thumb_generate_wrapper(bg, main, sub, bottom, darken):
+        status_msg, thumb_path = generate_thumbnail(bg, main, sub, bottom, darken)
+        if thumb_path:
+            return status_msg, thumb_path, thumb_path
+        return status_msg, None, None
+
+    thumb_btn.click(
+        thumb_generate_wrapper,
+        [thumb_bg, thumb_main, thumb_sub, thumb_bottom, thumb_darken],
+        [status, thumb_preview, thumb_download]
+    )
+
+    # Tab 6: YouTube 업로드
+    prepare_btn.click(
+        prepare_youtube_upload,
+        [],
+        [status, yt_title, yt_description, yt_tags, yt_project, yt_video, yt_thumb]
+    )
+
+    # Tab 7: 트렌드
     trend_btn.click(analyze_trend, [trend_keyword], [status, trend_result, video_selector])
     extract_btn.click(extract_transcript_and_comments, [video_selector], [status, transcript_result, comments_result])
 

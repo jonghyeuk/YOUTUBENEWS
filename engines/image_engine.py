@@ -27,14 +27,25 @@ class ImageGenerator(ABC):
 class FalGenerator(ImageGenerator):
     """fal.ai 이미지 생성기 (기본)"""
 
-    def __init__(self):
+    # 사용 가능한 모델들
+    MODELS = {
+        "flux-schnell": "fal-ai/flux/schnell",       # 빠름, 저렴
+        "flux-dev": "fal-ai/flux/dev",               # 균형
+        "flux-pro": "fal-ai/flux-pro",               # 고품질
+        "flux-pro-v1.1": "fal-ai/flux-pro/v1.1",     # 최신 프로
+        "flux-ultra": "fal-ai/flux-pro/v1.1-ultra",  # 최고 품질
+    }
+
+    def __init__(self, model: str = "flux-schnell"):
         import fal_client
         self.client = fal_client
+        self.model = self.MODELS.get(model, self.MODELS["flux-schnell"])
+        print(f"[FalGenerator] 모델: {model} → {self.model}")
 
     def generate(self, prompt: str, output_path: str) -> str:
         """fal.ai로 이미지 생성"""
         result = self.client.subscribe(
-            "fal-ai/flux/schnell",
+            self.model,
             arguments={
                 "prompt": prompt,
                 "image_size": "landscape_16_9",
@@ -88,10 +99,18 @@ class DalleGenerator(ImageGenerator):
 class ImagenGenerator(ImageGenerator):
     """Google Imagen 이미지 생성기"""
 
-    def __init__(self):
+    # 사용 가능한 모델들
+    MODELS = {
+        "imagen-3": "imagen-3.0-generate-001",       # 고품질
+        "imagen-3-fast": "imagen-3.0-fast-generate-001",  # 빠름, 저렴
+    }
+
+    def __init__(self, model: str = "imagen-3"):
         import google.generativeai as genai
         genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-        self.model = genai.ImageGenerationModel("imagen-3.0-generate-001")
+        model_id = self.MODELS.get(model, self.MODELS["imagen-3"])
+        self.model = genai.ImageGenerationModel(model_id)
+        print(f"[ImagenGenerator] 모델: {model} → {model_id}")
 
     def generate(self, prompt: str, output_path: str) -> str:
         """Imagen으로 이미지 생성"""
@@ -120,12 +139,32 @@ class ImageEngine:
         "imagen": ImagenGenerator,
     }
 
-    def __init__(self, engine: str = "fal"):
+    # 엔진별 모델 옵션
+    MODEL_OPTIONS = {
+        "fal": {
+            "flux-schnell": "빠름/저렴 ($0.003)",
+            "flux-dev": "균형 ($0.025)",
+            "flux-pro": "고품질 ($0.05)",
+            "flux-pro-v1.1": "최신 프로 ($0.05)",
+            "flux-ultra": "최고 품질 ($0.06)",
+        },
+        "imagen": {
+            "imagen-3-fast": "빠름/저렴",
+            "imagen-3": "고품질",
+        },
+        "dalle": {
+            "dall-e-3": "DALL-E 3",
+        },
+    }
+
+    def __init__(self, engine: str = "fal", model: str = None):
         """
         Args:
             engine: 이미지 생성 엔진 (fal, dalle, imagen)
+            model: 사용할 모델 (엔진별 기본값 사용 가능)
         """
         self.engine_name = engine
+        self.model = model
         self._generator: Optional[ImageGenerator] = None
 
     @property
@@ -135,7 +174,12 @@ class ImageEngine:
             generator_class = self.GENERATORS.get(self.engine_name)
             if not generator_class:
                 raise ValueError(f"지원하지 않는 엔진: {self.engine_name}")
-            self._generator = generator_class()
+
+            # 모델 파라미터가 있는 경우 전달
+            if self.model and self.engine_name in ["fal", "imagen"]:
+                self._generator = generator_class(model=self.model)
+            else:
+                self._generator = generator_class()
         return self._generator
 
     def generate_scene_images(

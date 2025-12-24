@@ -42,7 +42,22 @@ class Pipeline:
     def create_project(self, topic: str, duration_min: int) -> Project:
         """새 프로젝트 생성"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        project_id = f"{topic[:20]}_{timestamp}".replace(" ", "_")
+
+        # 폴더명에 사용할 수 없는 문자 제거
+        safe_topic = topic[:20]
+        # 줄바꿈, 탭 제거
+        safe_topic = safe_topic.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+        # Windows 금지 문자 제거
+        for char in ['/', '\\', ':', '*', '?', '"', '<', '>', '|']:
+            safe_topic = safe_topic.replace(char, "")
+        # 공백을 언더스코어로
+        safe_topic = safe_topic.replace(" ", "_")
+        # 연속 언더스코어 정리
+        while "__" in safe_topic:
+            safe_topic = safe_topic.replace("__", "_")
+        safe_topic = safe_topic.strip("_")
+
+        project_id = f"{safe_topic}_{timestamp}"
 
         project_path = os.path.join(self.project_dir, project_id)
         os.makedirs(project_path, exist_ok=True)
@@ -182,12 +197,29 @@ class Pipeline:
     def step4_generate_images_from_prompts(
         self,
         prompts: List[str],
-        engine: str = "fal"
+        engine: str = "fal",
+        model: str = None
     ) -> List[str]:
         """4단계 (대안): 프롬프트 리스트로 이미지 생성"""
-        self._log(f"4단계: 프롬프트 기반 이미지 생성 중... ({len(prompts)}장)")
+        # 모델별 가격 정보
+        MODEL_PRICES = {
+            "flux-schnell": "$0.003",
+            "flux-dev": "$0.025",
+            "flux-pro": "$0.05",
+            "flux-pro-v1.1": "$0.05",
+            "flux-ultra": "$0.06",
+            "imagen-3-fast": "저렴",
+            "imagen-3": "고품질",
+            "dall-e-3": "$0.04~0.12",
+        }
 
-        self.image_engine = ImageEngine(engine=engine)
+        price = MODEL_PRICES.get(model, "") if model else ""
+        model_info = f", 모델: {model} ({price})" if model else ""
+        total_cost = f" ≈ ${len(prompts) * 0.003:.2f}" if model == "flux-schnell" else ""
+
+        self._log(f"4단계: 이미지 생성 중... ({len(prompts)}장, 엔진: {engine}{model_info}{total_cost})")
+
+        self.image_engine = ImageEngine(engine=engine, model=model)
         images_dir = self._get_path("images")
 
         image_paths = self.image_engine.generate_images_from_prompts(
