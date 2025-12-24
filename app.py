@@ -171,8 +171,9 @@ def generate_script_and_images(topic: str, duration: int, style: str):
         return "❌ 주제를 입력해주세요", "", ""
 
     try:
-        # 프로젝트 생성
+        # 프로젝트 생성 (스타일 저장)
         project = pipeline.create_project(topic, duration)
+        project.style = style  # 스타일 저장
 
         # 분량에 따른 이미지 수 계산
         total_images = duration * 2  # 분당 약 2장
@@ -264,7 +265,9 @@ def generate_tts(engine: str):
     if not pipeline.project or not pipeline.project.script:
         return "❌ 스크립트 생성 필요", None
     try:
-        audio_path = pipeline.step3_generate_tts(engine)
+        # 프로젝트에 저장된 스타일 가져오기
+        style = getattr(pipeline.project, 'style', None)
+        audio_path = pipeline.step3_generate_tts(engine, style=style)
         total = sum(s.duration for s in pipeline.project.audio_segments)
         return f"✅ TTS 완료 ({total:.1f}초)", audio_path
     except Exception as e:

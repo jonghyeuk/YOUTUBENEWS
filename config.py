@@ -28,6 +28,47 @@ TTS_CONFIG = {
     "openai_voice": "onyx",  # 깊고 따뜻한 남성 목소리
 }
 
+# 스타일별 ElevenLabs 음성 설정
+ELEVENLABS_STYLE_VOICES = {
+    "뉴스": {
+        "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 신뢰감 있는 뉴스 앵커 스타일
+        "stability": 0.7,
+        "similarity_boost": 0.8,
+    },
+    "정보": {
+        "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 친근한 설명 스타일
+        "stability": 0.5,
+        "similarity_boost": 0.75,
+    },
+    "믿거나말거나": {
+        "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 미스터리 내레이션
+        "stability": 0.4,
+        "similarity_boost": 0.7,
+    },
+    "불교종교": {
+        "voice_id": "4p0HBzAAGyju0nYfNntV",  # 사용자 지정 - 명상/위로 스타일
+        "stability": 0.35,  # 낮으면 더 감정적
+        "similarity_boost": 0.8,
+    },
+}
+
+# 스타일별 감정 태그 매핑 (씬 위치 기반)
+EMOTION_TAGS = {
+    "불교종교": {
+        "intro": "[차분하고 공감하는 목소리로]",
+        "body_sad": "[슬프고 위로하는 목소리로]",
+        "body_hope": "[따뜻하고 희망찬 목소리로]",
+        "climax": "[깊이 있고 감동적인 목소리로]",
+        "ending": "[평화롭고 위로하는 목소리로]",
+    },
+    "믿거나말거나": {
+        "intro": "[호기심을 자극하는 목소리로]",
+        "body": "[긴장감 있는 목소리로]",
+        "climax": "[충격적인 목소리로]",
+        "ending": "[의미심장한 목소리로]",
+    },
+}
+
 # 이미지 설정
 IMAGE_CONFIG = {
     # DALL-E 3 규격

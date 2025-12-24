@@ -1,13 +1,14 @@
 """
 TTS 엔진 - Google WaveNet (기본) + ElevenLabs + OpenAI TTS
+스타일별 음성 + 감정 태그 지원
 """
 import os
 import io
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from pydub import AudioSegment as PydubSegment
 
 from models.types import Script, Scene, AudioSegment
-from config import TTS_CONFIG
+from config import TTS_CONFIG, ELEVENLABS_STYLE_VOICES, EMOTION_TAGS
 
 
 class TTSEngine:
@@ -15,15 +16,17 @@ class TTSEngine:
 
     ENGINES = ["wavenet", "elevenlabs", "openai"]
 
-    def __init__(self, engine: str = "wavenet"):
+    def __init__(self, engine: str = "wavenet", style: str = None):
         """
         Args:
             engine: "wavenet" (기본), "elevenlabs", 또는 "openai"
+            style: 콘텐츠 스타일 (뉴스/정보/믿거나말거나/불교종교)
         """
         if engine not in self.ENGINES:
             raise ValueError(f"지원하지 않는 엔진: {engine}. 사용 가능: {self.ENGINES}")
 
         self.engine = engine
+        self.style = style
         self._init_engine()
 
     def _init_engine(self):
@@ -51,11 +54,22 @@ class TTSEngine:
         print("[TTSEngine] Google WaveNet 초기화 완료")
 
     def _init_elevenlabs(self):
-        """ElevenLabs 초기화"""
+        """ElevenLabs 초기화 (스타일별 음성 설정)"""
         from elevenlabs.client import ElevenLabs
         self.client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
-        self.voice_id = TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
-        print("[TTSEngine] ElevenLabs 초기화 완료")
+
+        # 스타일별 음성 설정 가져오기
+        if self.style and self.style in ELEVENLABS_STYLE_VOICES:
+            voice_config = ELEVENLABS_STYLE_VOICES[self.style]
+            self.voice_id = voice_config["voice_id"]
+            self.stability = voice_config.get("stability", 0.5)
+            self.similarity_boost = voice_config.get("similarity_boost", 0.75)
+            print(f"[TTSEngine] ElevenLabs 초기화 완료 (스타일: {self.style}, 음성: {self.voice_id})")
+        else:
+            self.voice_id = TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
+            self.stability = 0.5
+            self.similarity_boost = 0.75
+            print("[TTSEngine] ElevenLabs 초기화 완료 (기본 음성)")
 
     def _init_openai(self):
         """OpenAI TTS 초기화"""
@@ -82,14 +96,18 @@ class TTSEngine:
         segments = []
         combined = PydubSegment.empty()
         current_time = 0.0
+        total_scenes = len(script.scenes)
 
-        print(f"[TTSEngine] {len(script.scenes)}개 씬 TTS 생성 시작...")
+        print(f"[TTSEngine] {total_scenes}개 씬 TTS 생성 시작...")
 
         for i, scene in enumerate(script.scenes):
-            print(f"[TTSEngine] 씬 {scene.scene_id}/{len(script.scenes)} 처리 중...")
+            print(f"[TTSEngine] 씬 {scene.scene_id}/{total_scenes} 처리 중...")
+
+            # 감정 태그 추가 (ElevenLabs + 스타일 설정 시)
+            text_with_emotion = self._add_emotion_tag(scene.text, i, total_scenes)
 
             # 씬별 TTS 생성
-            audio_data = self._synthesize(scene.text)
+            audio_data = self._synthesize(text_with_emotion)
             scene_audio = PydubSegment.from_mp3(io.BytesIO(audio_data))
 
             duration = len(scene_audio) / 1000.0  # ms → sec
@@ -116,6 +134,36 @@ class TTSEngine:
 
         return output_path, segments
 
+    def _add_emotion_tag(self, text: str, scene_idx: int, total_scenes: int) -> str:
+        """씬 위치에 따라 감정 태그 추가 (ElevenLabs용)"""
+        if self.engine != "elevenlabs" or not self.style:
+            return text
+
+        if self.style not in EMOTION_TAGS:
+            return text
+
+        tags = EMOTION_TAGS[self.style]
+
+        # 씬 위치에 따른 태그 선택
+        position = scene_idx / total_scenes
+
+        if position < 0.15:  # 도입부 (0-15%)
+            tag = tags.get("intro", "")
+        elif position < 0.5:  # 전개부 (15-50%)
+            tag = tags.get("body_sad", tags.get("body", ""))
+        elif position < 0.75:  # 전환/클라이맥스 (50-75%)
+            tag = tags.get("body_hope", tags.get("climax", ""))
+        elif position < 0.9:  # 클라이맥스 (75-90%)
+            tag = tags.get("climax", "")
+        else:  # 엔딩 (90-100%)
+            tag = tags.get("ending", "")
+
+        if tag:
+            print(f"[TTSEngine] 감정 태그: {tag}")
+            return f"{tag} {text}"
+
+        return text
+
     def _synthesize(self, text: str) -> bytes:
         """텍스트를 음성으로 변환"""
         if self.engine == "wavenet":
@@ -140,11 +188,19 @@ class TTSEngine:
         return response.audio_content
 
     def _synthesize_elevenlabs(self, text: str) -> bytes:
-        """ElevenLabs TTS"""
+        """ElevenLabs TTS (스타일별 음성 설정 적용)"""
+        from elevenlabs import VoiceSettings
+
         audio = self.client.generate(
             text=text,
             voice=self.voice_id,
-            model="eleven_multilingual_v2"
+            model="eleven_multilingual_v2",
+            voice_settings=VoiceSettings(
+                stability=getattr(self, 'stability', 0.5),
+                similarity_boost=getattr(self, 'similarity_boost', 0.75),
+                style=0.5,  # 스타일 강도
+                use_speaker_boost=True
+            )
         )
 
         # generator를 bytes로 변환
