@@ -481,27 +481,88 @@ def finalize_video():
 # 트렌드 분석 (선택적)
 # ═══════════════════════════════════════════════════════════════
 
+# 검색된 영상 목록 저장
+_trend_videos = []
+
+
 def analyze_trend(keyword: str):
     """트렌드 분석"""
+    global _trend_videos
     if not keyword.strip():
-        return "❌ 키워드 입력 필요", ""
+        return "❌ 키워드 입력 필요", "", []
 
     try:
         videos = pipeline.step1_analyze_trend(keyword)
+        _trend_videos = videos
+
         result = "## 🔥 인기 영상\n\n"
+        choices = []
 
         for i, v in enumerate(videos[:10], 1):
             result += f"**{i}. {v.title}**\n"
-            result += f"- 조회수: {v.view_count:,} | 좋아요: {v.like_count:,}\n"
+            result += f"- 조회수: {v.view_count:,} | 좋아요: {v.like_count:,} | 댓글: {v.comment_count:,}\n"
             result += f"- ID: `{v.video_id}`\n\n"
+            choices.append(f"{i}. {v.title[:50]}... ({v.video_id})")
 
-        return "✅ 분석 완료", result
+        return "✅ 분석 완료", result, gr.update(choices=choices, value=None)
     except Exception as e:
-        return f"❌ 오류: {e}", ""
+        return f"❌ 오류: {e}", "", []
+
+
+def extract_transcript_and_comments(selection: str):
+    """선택한 영상의 자막과 댓글 추출"""
+    if not selection:
+        return "❌ 영상을 선택해주세요", "", ""
+
+    # video_id 추출
+    try:
+        video_id = selection.split("(")[-1].replace(")", "").strip()
+    except:
+        return "❌ 영상 ID 파싱 실패", "", ""
+
+    transcript_text = ""
+    comments_text = ""
+    status_msg = []
+
+    # 1. 자막 추출 시도
+    try:
+        data = pipeline.step1b_extract_transcript(video_id)
+        transcript_text = data["transcript"].original_text
+        status_msg.append(f"✅ 자막: {len(transcript_text)}자")
+    except Exception as e:
+        error_str = str(e).lower()
+        if "disabled" in error_str or "unavailable" in error_str:
+            transcript_text = "[⚠️ 이 영상은 자막이 비활성화되어 있습니다]\n\n수동으로 영상 내용을 입력하거나, 다른 영상을 선택하세요."
+            status_msg.append("⚠️ 자막 비활성화")
+        else:
+            transcript_text = f"[❌ 자막 추출 실패: {e}]"
+            status_msg.append("❌ 자막 실패")
+
+    # 2. 댓글 추출
+    try:
+        from engines.trend_engine import TrendEngine
+        trend_engine = TrendEngine()
+        comments = trend_engine.get_top_comments(video_id, max_results=20)
+
+        if comments:
+            comments_text = "## 💬 인기 댓글 (시청자 반응)\n\n"
+            for i, c in enumerate(comments[:15], 1):
+                likes = c.get("like_count", 0)
+                text = c.get("text", "").replace("\n", " ")[:200]
+                comments_text += f"**{i}.** 👍 {likes}\n{text}\n\n"
+            status_msg.append(f"✅ 댓글: {len(comments)}개")
+        else:
+            comments_text = "[댓글이 없거나 비활성화됨]"
+            status_msg.append("⚠️ 댓글 없음")
+    except Exception as e:
+        comments_text = f"[❌ 댓글 추출 실패: {e}]"
+        status_msg.append("❌ 댓글 실패")
+
+    return " | ".join(status_msg), transcript_text, comments_text
 
 
 def extract_transcript(video_id: str):
-    """자막 추출"""
+    """자막 추출 (수동 입력용)"""
     if not video_id.strip():
         return "❌ 영상 ID 입력 필요", ""
 
@@ -510,6 +571,9 @@ def extract_transcript(video_id: str):
         text = data["transcript"].original_text
         return f"✅ 자막 추출 완료 ({len(text)}자)", text
     except Exception as e:
+        error_str = str(e).lower()
+        if "disabled" in error_str or "unavailable" in error_str:
+            return "⚠️ 이 영상은 자막이 비활성화되어 있습니다", ""
         return f"❌ 오류: {e}", ""
 
 
@@ -654,21 +718,50 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         # Tab 7: 트렌드 분석 (선택)
         # ─────────────────────────────────────────────
         with gr.Tab("📊 트렌드 분석"):
-            gr.Markdown("### 🔍 YouTube 트렌드 분석 (선택적 기능)")
-            gr.Markdown("*참고용으로 인기 영상을 검색하고 자막을 추출할 수 있습니다*")
+            gr.Markdown("### 🔍 YouTube 트렌드 분석")
+            gr.Markdown("*인기 영상을 검색하고 자막/댓글을 분석하여 원본 텍스트로 활용*")
 
             with gr.Row():
-                with gr.Column():
-                    trend_keyword = gr.Textbox(label="검색 키워드", placeholder="예: 건강 정보")
-                    trend_btn = gr.Button("🔍 트렌드 분석")
+                # 왼쪽: 검색 및 선택
+                with gr.Column(scale=1):
+                    trend_keyword = gr.Textbox(
+                        label="검색 키워드",
+                        placeholder="예: 삶이 힘들 때, 건강 정보, 미스터리"
+                    )
+                    trend_btn = gr.Button("🔍 트렌드 검색", variant="primary")
 
                     gr.Markdown("---")
-                    video_id_input = gr.Textbox(label="영상 ID", placeholder="예: dQw4w9WgXcQ")
-                    extract_btn = gr.Button("📜 자막 추출")
+                    video_selector = gr.Dropdown(
+                        label="📺 영상 선택",
+                        choices=[],
+                        interactive=True,
+                        info="검색 후 영상을 선택하면 자막/댓글 자동 추출"
+                    )
+                    extract_selected_btn = gr.Button("📥 자막/댓글 추출", variant="secondary")
 
-                with gr.Column():
+                    gr.Markdown("---")
+                    gr.Markdown("**수동 입력**")
+                    video_id_input = gr.Textbox(label="영상 ID", placeholder="예: dQw4w9WgXcQ")
+                    extract_btn = gr.Button("📜 자막만 추출")
+
+                # 오른쪽: 결과
+                with gr.Column(scale=2):
                     trend_result = gr.Markdown(label="검색 결과")
-                    transcript_result = gr.Textbox(label="추출된 자막", lines=10)
+
+                    with gr.Row():
+                        with gr.Column():
+                            transcript_result = gr.Textbox(
+                                label="📝 추출된 자막",
+                                lines=12,
+                                placeholder="영상을 선택하면 자막이 여기 표시됩니다"
+                            )
+                        with gr.Column():
+                            comments_result = gr.Markdown(
+                                label="💬 인기 댓글",
+                                value="*영상을 선택하면 댓글이 표시됩니다*"
+                            )
+
+                    copy_to_source_btn = gr.Button("📋 원본 텍스트로 복사 →", variant="primary")
 
     # ═══════════════════════════════════════════════════════════════
     # 이벤트 연결
@@ -721,9 +814,34 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     render_btn.click(render_video, [use_ken_burns, use_bgm], [status, video_preview])
     final_btn.click(finalize_video, [], [status, final_video])
 
-    # Tab 7: 트렌드 (선택)
-    trend_btn.click(analyze_trend, [trend_keyword], [status, trend_result])
+    # Tab 7: 트렌드 분석
+    trend_btn.click(
+        analyze_trend,
+        [trend_keyword],
+        [status, trend_result, video_selector]
+    )
+
+    # 영상 선택 시 자막/댓글 추출
+    extract_selected_btn.click(
+        extract_transcript_and_comments,
+        [video_selector],
+        [status, transcript_result, comments_result]
+    )
+
+    # 수동 ID 입력
     extract_btn.click(extract_transcript, [video_id_input], [status, transcript_result])
+
+    # 자막을 원본 텍스트로 복사
+    def copy_transcript_to_source(transcript):
+        if transcript and not transcript.startswith("["):
+            return transcript
+        return ""
+
+    copy_to_source_btn.click(
+        copy_transcript_to_source,
+        [transcript_result],
+        [source_input]
+    )
 
 
 if __name__ == "__main__":
