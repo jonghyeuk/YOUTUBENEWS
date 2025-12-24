@@ -1,6 +1,6 @@
 """
-Gradio UI - 정보성 콘텐츠 생성기
-스타일: 뉴스/정보/믿거나말거나
+Gradio UI - AI 콘텐츠 생성기
+스타일: 뉴스/정보/믿거나말거나/불교종교
 """
 import os
 from dotenv import load_dotenv
@@ -24,8 +24,8 @@ pipeline = Pipeline()
 STYLE_PROMPTS = {
     "뉴스": """당신은 뉴스 리포터입니다. 아래 내용을 뉴스 형식으로 전달하세요.
 
-## 원본 내용
-{source_text}
+## 주제/내용
+{topic}
 
 ## 작성 규칙
 1. 객관적이고 사실 중심의 어조
@@ -35,14 +35,14 @@ STYLE_PROMPTS = {
 5. {duration}분 분량으로 작성
 
 ## 구조
-- 도입: 핵심 내용 요약 (누가, 무엇을, 왜)
+- 도입: 핵심 내용 요약
 - 본문: 상세 내용 전개
 - 마무리: 시사점 또는 전망""",
 
-    "정보": """당신은 유익한 정보를 전달하는 전문가입니다. 아래 내용을 정보 영상으로 구성하세요.
+    "정보": """당신은 유익한 정보를 전달하는 전문가입니다.
 
-## 원본 내용
-{source_text}
+## 주제/내용
+{topic}
 
 ## 작성 규칙
 1. 친근하고 이해하기 쉬운 설명
@@ -56,10 +56,10 @@ STYLE_PROMPTS = {
 - 본문: 핵심 정보 1, 2, 3... 순서대로
 - 마무리: 정리 및 실천 방법""",
 
-    "믿거나말거나": """당신은 흥미로운 이야기를 전하는 스토리텔러입니다. 아래 내용을 "믿거나 말거나" 스타일로 구성하세요.
+    "믿거나말거나": """당신은 흥미로운 이야기를 전하는 스토리텔러입니다.
 
-## 원본 내용
-{source_text}
+## 주제/내용
+{topic}
 
 ## 작성 규칙
 1. 호기심을 자극하는 미스터리한 어조
@@ -75,47 +75,42 @@ STYLE_PROMPTS = {
 
     "불교종교": """당신은 불교적 관점에서 삶의 지혜를 전하는 스토리텔러입니다.
 
-## 원본 내용 (사람의 상태/인생 상황)
-{source_text}
+## 주제/내용 (사람의 상태/인생 상황)
+{topic}
 
 ## 1단계: 감정 코드 분석
 원본 내용이 건드리는 핵심 감정 코드를 파악하세요:
 - 불안 / 죄책감 / 후회 / 구원욕구 / 희망 / 분노 / 고립 / 관계집착
 
 ## 2단계: 인생 상황 매핑
-이 내용이 대변하는 '인생 상황'을 파악하세요:
 - 삶이 힘들 때 → 위로
 - 돈이 안 풀릴 때 → 마음 다스림
 - 관계가 자꾸 깨질 때 → 인연의 의미
 - 불안해서 잠이 안 올 때 → 명상/평안
 
 ## 3단계: 불교적 서사 생성
-파악한 감정코드 + 인생상황을 기반으로 불교/명상/신비스러운 톤의 일상 사연 서사를 만드세요.
+파악한 감정코드 + 인생상황을 기반으로 불교/명상/신비스러운 톤의 서사를 만드세요.
 
 ## 작성 규칙
 1. 명상적이고 신비로운 어조
 2. "~입니다", "~합니다" 차분한 문체
 3. 불교적 지혜/교훈 포함 (업보, 인연, 무상, 집착 등)
 4. 시청자의 감정에 공감하며 위로
-5. 일상적 사연 → 불교적 깨달음 흐름
-6. {duration}분 분량으로 작성
+5. {duration}분 분량으로 작성
 
 ## 구조
-- 도입: 공감되는 인생 상황 제시 (누구나 한번쯤 겪는 힘든 순간)
-- 본문: 불교적 관점에서 풀어가는 이야기 (스님 말씀, 경전 인용, 명상 등)
+- 도입: 공감되는 인생 상황 제시
+- 본문: 불교적 관점에서 풀어가는 이야기
 - 전환: 깨달음의 순간
 - 마무리: 따뜻한 위로와 실천 가능한 마음가짐"""
 }
 
-# 공통 JSON 출력 형식
-JSON_OUTPUT_FORMAT = """
+# JSON 출력 형식 + 이미지 프롬프트 통합
+INTEGRATED_OUTPUT_FORMAT = """
 
-## 이미지 배분 규칙
-각 씬마다 image_count(1~5)와 importance(1~5)를 지정:
-- 핵심 장면: image_count 3~5, importance 4~5
-- 일반 장면: image_count 1~2, importance 2~3
+## 출력 형식 (JSON) - 대본 + 이미지 프롬프트 통합
+각 씬마다 나레이션과 이미지 프롬프트를 함께 작성하세요.
 
-## 출력 형식 (JSON)
 ```json
 {{
   "title": "영상 제목",
@@ -123,140 +118,80 @@ JSON_OUTPUT_FORMAT = """
     {{
       "scene_id": 1,
       "title": "씬 제목",
-      "text": "나레이션 텍스트",
-      "image_count": 2,
+      "text": "나레이션 텍스트 (이 씬에서 읽을 내용)",
+      "image_prompts": [
+        "English image prompt 1 for this scene, detailed visual description, mood, lighting, composition",
+        "English image prompt 2 for this scene (if needed)"
+      ],
       "importance": 3
     }}
   ]
 }}
-```"""
+```
 
-DEFAULT_IMAGE_PROMPT_TEMPLATE = """당신은 이미지 프롬프트 전문가입니다.
-각 씬에 지정된 이미지 개수만큼 프롬프트를 영어로 작성해주세요.
-
-## 규칙
+## 이미지 프롬프트 규칙
+- 영어로 작성
 - 400자 이내
-- 장면 연출에 초점
-- 일관된 스타일 유지
-- 구체적인 시각적 묘사
+- 구체적인 시각적 묘사 (조명, 색감, 구도)
+- 씬당 1~4개 (중요도에 따라)
+- 전체 이미지 총합: {duration}분 영상 기준 약 {total_images}장"""
 
-## 이미지 배분 원칙
-- 중요 씬(importance 4-5): 감정 변화별로 다른 장면
-- 일반 씬(importance 2-3): 핵심 순간 위주"""
-
-# 스타일별 이미지 프롬프트 템플릿
-STYLE_IMAGE_PROMPTS = {
-    "뉴스": DEFAULT_IMAGE_PROMPT_TEMPLATE,
-    "정보": DEFAULT_IMAGE_PROMPT_TEMPLATE,
-    "믿거나말거나": DEFAULT_IMAGE_PROMPT_TEMPLATE + """
-
-## 스타일 특징
-- 어두운 분위기, 서스펜스
-- 미스터리한 조명과 그림자
-- 긴장감 있는 구도""",
-    "불교종교": """당신은 불교/명상 스타일 이미지 프롬프트 전문가입니다.
-각 씬에 지정된 이미지 개수만큼 프롬프트를 영어로 작성해주세요.
-
-## 규칙
-- 400자 이내
-- 명상적이고 신비로운 분위기
-- 따뜻하고 위로가 되는 이미지
-- 자연, 고요함, 빛 활용
-
-## 스타일 특징
-- 부드러운 황금빛/새벽빛 조명
-- 연꽃, 물결, 산, 사찰 등 불교적 요소
-- 평화로운 자연 배경 (대나무, 안개 낀 산)
-- 명상하는 실루엣
-- 촛불, 향 연기, 기도하는 손
-- 밤하늘 별, 보름달
-
-## 감정 코드별 비주얼
-- 불안/고립: 안개 속 외로운 실루엣 → 빛이 비추는 장면으로 전환
-- 후회/죄책감: 어두운 곳에서 빛을 향해 걸어가는 모습
-- 희망/구원: 연꽃이 피어나는 장면, 해돋이
-- 평안/깨달음: 고요한 호수에 비친 달, 명상 자세
-
-## 이미지 배분 원칙
-- 도입 씬: 공감되는 힘든 상황 비주얼
-- 본문 씬: 점점 밝아지는 톤
-- 마무리 씬: 평화롭고 따뜻한 장면"""
+# 스타일별 이미지 스타일 가이드
+STYLE_IMAGE_GUIDES = {
+    "뉴스": "Professional news broadcast style, clean composition, neutral lighting",
+    "정보": "Bright, friendly infographic style, clear visuals, warm colors",
+    "믿거나말거나": "Dark mysterious atmosphere, dramatic lighting, suspenseful mood, shadows",
+    "불교종교": "Serene meditation style, golden dawn light, lotus flowers, misty mountains, peaceful temple, soft glow, silhouette meditation pose"
 }
-
 
 # 스타일별 입력 가이드
 STYLE_GUIDES = {
-    "뉴스": """**💡 입력 팁**: 뉴스 기사나 사실 기반 내용을 붙여넣으세요.""",
-    "정보": """**💡 입력 팁**: 설명할 주제나 정보를 입력하세요. (예: 항산화 물질 5가지)""",
-    "믿거나말거나": """**💡 입력 팁**: 미스터리한 주제나 흥미로운 이야기를 입력하세요.""",
-    "불교종교": """**💡 불교종교 스타일**: '사람의 상태'로 입력하세요!
+    "뉴스": "**💡 뉴스**: 사실 기반 내용을 입력하세요.",
+    "정보": "**💡 정보**: 설명할 주제를 입력하세요. (예: 항산화 물질 5가지)",
+    "믿거나말거나": "**💡 믿거나말거나**: 미스터리한 주제나 흥미로운 이야기를 입력하세요.",
+    "불교종교": """**💡 불교종교**: '사람의 상태'로 입력하세요!
 
-❌ 잘못된 입력: 불교 업보, 기도하면 돈 벌까, 전생 인연
-✅ 올바른 입력: 삶이 힘들 때, 돈이 안 풀릴 때, 관계가 자꾸 깨질 때, 불안해서 잠이 안 올 때
+❌ 불교 업보, 기도하면 돈 벌까
+✅ 삶이 힘들 때, 돈이 안 풀릴 때, 관계가 자꾸 깨질 때
 
-→ **감정 코드**: 불안 / 죄책감 / 후회 / 구원욕구 / 희망 / 분노 / 고립 / 관계집착
-→ 이 감정을 자극하는 인생 상황으로 입력하면 공감 높은 서사가 생성됩니다."""
+**감정 코드**: 불안 / 죄책감 / 후회 / 구원욕구 / 희망 / 분노 / 고립"""
 }
 
 def update_style_guide(style: str):
-    """스타일 변경시 가이드 업데이트"""
     return STYLE_GUIDES.get(style, STYLE_GUIDES["정보"])
 
 
-def get_style_image_prompt(style: str):
-    """스타일에 맞는 이미지 프롬프트 템플릿 반환"""
-    return STYLE_IMAGE_PROMPTS.get(style, DEFAULT_IMAGE_PROMPT_TEMPLATE)
-
-
 # ═══════════════════════════════════════════════════════════════
-# Step 1: 프로젝트 생성
+# 통합 스크립트 + 이미지 프롬프트 생성
 # ═══════════════════════════════════════════════════════════════
 
-def create_project(topic: str, duration: int, style: str):
-    """프로젝트 생성"""
+def generate_script_and_images(topic: str, duration: int, style: str):
+    """주제 입력 → 스크립트 + 이미지 프롬프트 한번에 생성"""
     if not topic.strip():
-        return "❌ 주제를 입력해주세요", ""
-
-    project = pipeline.create_project(topic, duration)
-
-    # 스타일별 프롬프트 준비
-    style_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["정보"])
-
-    info = f"✅ 프로젝트 생성: {project.project_id}\n📝 스타일: {style}"
-    return info, style
-
-
-def prepare_script_prompt(source_text: str, duration: int, style: str):
-    """스타일에 맞는 스크립트 프롬프트 생성"""
-    if not source_text.strip():
-        source_text = "[주제를 직접 입력하거나 원본 텍스트를 붙여넣으세요]"
-
-    base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["정보"])
-    prompt = base_prompt.format(
-        source_text=source_text[:5000],
-        duration=duration
-    )
-    prompt += JSON_OUTPUT_FORMAT
-
-    return prompt
-
-
-# ═══════════════════════════════════════════════════════════════
-# Step 2: 스크립트 생성
-# ═══════════════════════════════════════════════════════════════
-
-def generate_script_with_prompt(prompt: str):
-    """편집된 프롬프트로 스크립트 생성"""
-    if not pipeline.project:
-        return "❌ 프로젝트 생성 필요", "", ""
+        return "❌ 주제를 입력해주세요", "", ""
 
     try:
+        # 프로젝트 생성
+        project = pipeline.create_project(topic, duration)
+
+        # 분량에 따른 이미지 수 계산
+        total_images = duration * 2  # 분당 약 2장
+
+        # 스타일별 프롬프트 구성
+        base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["정보"])
+        image_style = STYLE_IMAGE_GUIDES.get(style, "")
+
+        prompt = base_prompt.format(topic=topic, duration=duration)
+        prompt += INTEGRATED_OUTPUT_FORMAT.format(duration=duration, total_images=total_images)
+        prompt += f"\n\n## 이미지 스타일\n{image_style}"
+
+        # Claude API 호출
         from anthropic import Anthropic
         client = Anthropic()
 
         response = client.messages.create(
             model="claude-sonnet-4-20250514",
-            max_tokens=4096,
+            max_tokens=8192,
             messages=[{"role": "user", "content": prompt}]
         )
 
@@ -273,56 +208,61 @@ def generate_script_with_prompt(prompt: str):
 
             data = json.loads(json_str)
 
+            # Script 객체 생성
             from models.types import Script, Scene
-            scenes = [
-                Scene(
+            scenes = []
+            all_image_prompts = []
+
+            for s in data["scenes"]:
+                image_prompts = s.get("image_prompts", [])
+                all_image_prompts.extend(image_prompts)
+
+                scenes.append(Scene(
                     scene_id=s["scene_id"],
                     title=s["title"],
                     text=s["text"],
-                    image_count=s.get("image_count", 2),
+                    image_count=len(image_prompts),
                     importance=s.get("importance", 3)
-                )
-                for s in data["scenes"]
-            ]
-
-            total_images = sum(s.image_count for s in scenes)
+                ))
 
             script = Script(
                 title=data["title"],
                 scenes=scenes,
-                duration_min=pipeline.project.duration_min,
-                total_panels=total_images
+                duration_min=duration,
+                total_panels=len(all_image_prompts)
             )
             pipeline.project.script = script
 
-            # 미리보기
+            # 스크립트 미리보기
             preview = f"# {script.title}\n\n"
-            preview += f"**총 {len(scenes)}개 씬 | 이미지 {total_images}장**\n\n"
+            preview += f"**{len(scenes)}개 씬 | 이미지 {len(all_image_prompts)}장**\n\n"
 
-            for scene in script.scenes:
-                stars = "⭐" * scene.importance
-                preview += f"## 씬 {scene.scene_id}: {scene.title}\n"
-                preview += f"🖼️ {scene.image_count}장 | {stars}\n\n"
+            for i, scene in enumerate(script.scenes):
+                preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
+                preview += f"🖼️ {scene.image_count}장\n\n"
                 preview += f"{scene.text}\n\n---\n\n"
 
-            return "✅ 스크립트 생성 완료", preview, result_text
+            # 이미지 프롬프트 포맷팅
+            prompts_text = ""
+            for i, prompt in enumerate(all_image_prompts, 1):
+                prompts_text += f"이미지 {i}: {prompt}\n\n"
+
+            return f"✅ 생성 완료! {len(scenes)}개 씬, {len(all_image_prompts)}장 이미지", preview, prompts_text
 
         except json.JSONDecodeError:
-            return "⚠️ JSON 파싱 실패", result_text, result_text
+            return "⚠️ JSON 파싱 실패 - 원본 확인", result_text, ""
 
     except Exception as e:
         return f"❌ 오류: {e}", "", ""
 
 
 # ═══════════════════════════════════════════════════════════════
-# Step 3: TTS 생성
+# TTS 생성
 # ═══════════════════════════════════════════════════════════════
 
 def generate_tts(engine: str):
-    """TTS 생성"""
     if not pipeline.project or not pipeline.project.script:
         return "❌ 스크립트 생성 필요", None
-
     try:
         audio_path = pipeline.step3_generate_tts(engine)
         total = sum(s.duration for s in pipeline.project.audio_segments)
@@ -332,75 +272,12 @@ def generate_tts(engine: str):
 
 
 # ═══════════════════════════════════════════════════════════════
-# Step 4: 이미지 프롬프트
+# 이미지 생성
 # ═══════════════════════════════════════════════════════════════
 
-def get_image_allocation_summary():
-    """이미지 배분 요약"""
-    if not pipeline.project or not pipeline.project.script:
-        return "스크립트 생성 후 확인 가능"
-
-    summary = "## 📊 이미지 배분\n\n"
-    total = 0
-
-    for scene in pipeline.project.script.scenes:
-        stars = "⭐" * scene.importance
-        bar = "█" * scene.image_count + "░" * (5 - scene.image_count)
-        summary += f"**씬 {scene.scene_id}**: {scene.title[:20]}\n"
-        summary += f"  {bar} {scene.image_count}장 | {stars}\n\n"
-        total += scene.image_count
-
-    summary += f"---\n**총 이미지: {total}장**"
-    return summary
-
-
-def generate_image_prompts_with_claude(master_prompt: str):
-    """Claude로 이미지 프롬프트 생성"""
-    if not pipeline.project or not pipeline.project.script:
-        return "❌ 스크립트 생성 필요", "", "스크립트 생성 후 확인 가능"
-
-    try:
-        from anthropic import Anthropic
-        client = Anthropic()
-
-        script_text = ""
-        total_images = 0
-        for scene in pipeline.project.script.scenes:
-            stars = "⭐" * scene.importance
-            script_text += f"[씬 {scene.scene_id}: {scene.title}]\n"
-            script_text += f"이미지: {scene.image_count}장 | {stars}\n"
-            script_text += f"{scene.text}\n\n"
-            total_images += scene.image_count
-
-        prompt = f"""{master_prompt}
-
-## 스크립트 (총 {total_images}장)
-{script_text}
-
-## 출력 형식
-이미지 1: [프롬프트]
-이미지 2: [프롬프트]
-..."""
-
-        response = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=8192,
-            messages=[{"role": "user", "content": prompt}]
-        )
-
-        result = response.content[0].text
-        allocation = get_image_allocation_summary()
-        return f"✅ 프롬프트 생성 완료 ({total_images}장)", result, allocation
-
-    except Exception as e:
-        return f"❌ 오류: {e}", "", get_image_allocation_summary()
-
-
 def parse_image_prompts(prompts_text: str):
-    """이미지 프롬프트 파싱"""
     lines = prompts_text.strip().split("\n")
     parsed = []
-
     for line in lines:
         line = line.strip()
         if line.startswith("이미지") or line.startswith("Image"):
@@ -408,41 +285,28 @@ def parse_image_prompts(prompts_text: str):
                 parts = line.split(":", 1)
                 if len(parts) == 2 and parts[1].strip():
                     parsed.append(parts[1].strip())
-
     if not parsed:
         parsed = [l.strip() for l in lines if l.strip() and not l.startswith("#") and len(l.strip()) > 20]
-
     return parsed
 
 
-# ═══════════════════════════════════════════════════════════════
-# Step 5: 이미지 생성
-# ═══════════════════════════════════════════════════════════════
-
 def generate_images_from_text(prompts_text: str, engine: str):
-    """이미지 생성"""
     if not pipeline.project:
-        return "❌ 프로젝트 생성 필요", []
-
+        return "❌ 스크립트 먼저 생성하세요", []
     try:
         prompts = parse_image_prompts(prompts_text)
         if not prompts:
             return "❌ 프롬프트 파싱 실패", []
 
-        image_paths = pipeline.step4_generate_images_from_prompts(
-            prompts=prompts,
-            engine=engine
-        )
-
+        image_paths = pipeline.step4_generate_images_from_prompts(prompts=prompts, engine=engine)
         images = [Image.open(p) for p in image_paths]
         return f"✅ 이미지 생성 완료 ({len(images)}장)", images
-
     except Exception as e:
         return f"❌ 오류: {e}", []
 
 
 # ═══════════════════════════════════════════════════════════════
-# Step 6: 자막 & 영상
+# 영상 렌더링
 # ═══════════════════════════════════════════════════════════════
 
 def generate_subtitles(use_whisper: bool):
@@ -478,43 +342,28 @@ def finalize_video():
 
 
 # ═══════════════════════════════════════════════════════════════
-# 트렌드 분석 (선택적)
+# 트렌드 분석 (참고용)
 # ═══════════════════════════════════════════════════════════════
 
-# 검색된 영상 목록 저장
-_trend_videos = []
-
-
 def analyze_trend(keyword: str):
-    """트렌드 분석"""
-    global _trend_videos
     if not keyword.strip():
         return "❌ 키워드 입력 필요", "", []
-
     try:
         videos = pipeline.step1_analyze_trend(keyword)
-        _trend_videos = videos
-
         result = "## 🔥 인기 영상\n\n"
         choices = []
-
         for i, v in enumerate(videos[:10], 1):
             result += f"**{i}. {v.title}**\n"
-            result += f"- 조회수: {v.view_count:,} | 좋아요: {v.like_count:,} | 댓글: {v.comment_count:,}\n"
-            result += f"- ID: `{v.video_id}`\n\n"
-            choices.append(f"{i}. {v.title[:50]}... ({v.video_id})")
-
+            result += f"- 조회수: {v.view_count:,} | 댓글: {v.comment_count:,}\n\n"
+            choices.append(f"{i}. {v.title[:40]}... ({v.video_id})")
         return "✅ 분석 완료", result, gr.update(choices=choices, value=None)
     except Exception as e:
         return f"❌ 오류: {e}", "", []
 
 
 def extract_transcript_and_comments(selection: str):
-    """선택한 영상의 자막과 댓글 추출"""
     if not selection:
         return "❌ 영상을 선택해주세요", "", ""
-
-    # video_id 추출
     try:
         video_id = selection.split("(")[-1].replace(")", "").strip()
     except:
@@ -524,125 +373,88 @@ def extract_transcript_and_comments(selection: str):
     comments_text = ""
     status_msg = []
 
-    # 1. 자막 추출 시도
     try:
         data = pipeline.step1b_extract_transcript(video_id)
         transcript_text = data["transcript"].original_text
         status_msg.append(f"✅ 자막: {len(transcript_text)}자")
     except Exception as e:
-        error_str = str(e).lower()
-        if "disabled" in error_str or "unavailable" in error_str:
-            transcript_text = "[⚠️ 이 영상은 자막이 비활성화되어 있습니다]\n\n수동으로 영상 내용을 입력하거나, 다른 영상을 선택하세요."
-            status_msg.append("⚠️ 자막 비활성화")
+        if "disabled" in str(e).lower():
+            transcript_text = "[자막 비활성화됨]"
+            status_msg.append("⚠️ 자막 없음")
         else:
-            transcript_text = f"[❌ 자막 추출 실패: {e}]"
             status_msg.append("❌ 자막 실패")
 
-    # 2. 댓글 추출
     try:
         from engines.trend_engine import TrendEngine
         trend_engine = TrendEngine()
-        comments = trend_engine.get_top_comments(video_id, max_results=20)
-
+        comments = trend_engine.get_top_comments(video_id, max_results=15)
         if comments:
-            comments_text = "## 💬 인기 댓글 (시청자 반응)\n\n"
-            for i, c in enumerate(comments[:15], 1):
-                likes = c.get("like_count", 0)
-                text = c.get("text", "").replace("\n", " ")[:200]
-                comments_text += f"**{i}.** 👍 {likes}\n{text}\n\n"
+            comments_text = "## 💬 인기 댓글\n\n"
+            for i, c in enumerate(comments[:10], 1):
+                text = c.get("text", "").replace("\n", " ")[:150]
+                comments_text += f"**{i}.** 👍{c.get('like_count', 0)} {text}\n\n"
             status_msg.append(f"✅ 댓글: {len(comments)}개")
-        else:
-            comments_text = "[댓글이 없거나 비활성화됨]"
-            status_msg.append("⚠️ 댓글 없음")
-    except Exception as e:
-        comments_text = f"[❌ 댓글 추출 실패: {e}]"
+    except:
         status_msg.append("❌ 댓글 실패")
 
     return " | ".join(status_msg), transcript_text, comments_text
 
 
-def extract_transcript(video_id: str):
-    """자막 추출 (수동 입력용)"""
-    if not video_id.strip():
-        return "❌ 영상 ID 입력 필요", ""
-
-    try:
-        data = pipeline.step1b_extract_transcript(video_id)
-        text = data["transcript"].original_text
-        return f"✅ 자막 추출 완료 ({len(text)}자)", text
-    except Exception as e:
-        error_str = str(e).lower()
-        if "disabled" in error_str or "unavailable" in error_str:
-            return "⚠️ 이 영상은 자막이 비활성화되어 있습니다", ""
-        return f"❌ 오류: {e}", ""
-
-
 # ═══════════════════════════════════════════════════════════════
-# Gradio UI
+# Gradio UI - 간소화된 버전
 # ═══════════════════════════════════════════════════════════════
 
 with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     gr.Markdown("# 🎬 AI 콘텐츠 생성기")
-    gr.Markdown("주제/원본 입력 → 스타일 선택 → 대본/이미지/영상 자동 생성")
+    gr.Markdown("주제 입력 → 스타일 선택 → 스크립트/이미지/영상 자동 생성")
 
-    status = gr.Textbox(label="📊 상태", lines=2, interactive=False)
-    selected_style = gr.State("정보")
+    status = gr.Textbox(label="📊 상태", lines=1, interactive=False)
 
     with gr.Tabs():
         # ─────────────────────────────────────────────
-        # Tab 1: 프로젝트 생성
+        # Tab 1: 스크립트 생성 (통합)
         # ─────────────────────────────────────────────
-        with gr.Tab("1️⃣ 프로젝트"):
+        with gr.Tab("1️⃣ 스크립트 생성"):
             with gr.Row():
-                with gr.Column():
+                with gr.Column(scale=1):
                     topic_input = gr.Textbox(
-                        label="주제",
-                        placeholder="예: 항산화 물질 5가지, 조선시대 미스터리",
-                        lines=2
+                        label="📝 주제 / 내용",
+                        placeholder="짧게: 삶이 힘들 때\n\n또는 길게: 요즘 직장에서 스트레스 받고 집에서도 힘들고 남편은 게임만 하고...\n\n또는 스토리: 어떤 여자가 있었는데 10년간 모은 돈을 사기당해서...",
+                        lines=10
                     )
-                    duration_input = gr.Radio([5, 10, 15, 20], value=10, label="영상 길이 (분)")
+
+                    with gr.Row():
+                        duration_input = gr.Radio(
+                            [5, 10, 15, 20],
+                            value=10,
+                            label="영상 길이 (분)"
+                        )
 
                     style_input = gr.Radio(
                         ["뉴스", "정보", "믿거나말거나", "불교종교"],
                         value="정보",
-                        label="콘텐츠 스타일",
-                        info="뉴스: 객관적 보도 | 정보: 친근한 설명 | 믿거나말거나: 미스터리 | 불교종교: 명상/위로/깨달음"
+                        label="스타일"
                     )
 
-                    create_btn = gr.Button("🚀 프로젝트 생성", variant="primary")
+                    style_guide = gr.Markdown(STYLE_GUIDES["정보"])
 
-                with gr.Column():
-                    gr.Markdown("### 📝 원본 텍스트 (선택)")
-                    style_guide = gr.Markdown("""**💡 입력 팁**: 기사/대본을 붙여넣거나 주제만 입력하세요.""")
-                    source_input = gr.Textbox(
-                        label="기사/대본 붙여넣기",
-                        placeholder="뉴스 기사, 블로그 글, 또는 직접 작성한 내용을 여기에 붙여넣으세요.\n비워두면 주제만으로 생성합니다.",
-                        lines=15
+                    generate_btn = gr.Button("🚀 스크립트 생성", variant="primary", size="lg")
+
+                with gr.Column(scale=2):
+                    script_preview = gr.Markdown(label="📖 스크립트", value="*주제를 입력하고 생성 버튼을 누르세요*")
+
+                    gr.Markdown("---")
+                    gr.Markdown("### 🎨 이미지 프롬프트")
+                    image_prompts = gr.Textbox(
+                        label="생성된 이미지 프롬프트 (수정 가능)",
+                        lines=10,
+                        placeholder="스크립트 생성 후 자동으로 채워집니다"
                     )
 
         # ─────────────────────────────────────────────
-        # Tab 2: 스크립트 생성
+        # Tab 2: TTS
         # ─────────────────────────────────────────────
-        with gr.Tab("2️⃣ 스크립트"):
-            gr.Markdown("### 📝 스크립트 생성")
-
-            with gr.Row():
-                with gr.Column():
-                    script_prompt_input = gr.Textbox(
-                        label="🔧 프롬프트 (수정 가능)",
-                        lines=20
-                    )
-                    prepare_btn = gr.Button("📋 프롬프트 준비")
-                    generate_script_btn = gr.Button("🚀 스크립트 생성", variant="primary")
-
-                with gr.Column():
-                    script_preview = gr.Markdown(label="생성된 스크립트")
-                    script_raw = gr.Textbox(label="원본 JSON", lines=10, visible=False)
-
-        # ─────────────────────────────────────────────
-        # Tab 3: TTS
-        # ─────────────────────────────────────────────
-        with gr.Tab("3️⃣ TTS"):
+        with gr.Tab("2️⃣ TTS"):
             with gr.Row():
                 with gr.Column():
                     tts_engine = gr.Radio(
@@ -655,32 +467,9 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     audio_preview = gr.Audio(label="생성된 오디오")
 
         # ─────────────────────────────────────────────
-        # Tab 4: 이미지 프롬프트
+        # Tab 3: 이미지 생성
         # ─────────────────────────────────────────────
-        with gr.Tab("4️⃣ 이미지 프롬프트"):
-            with gr.Row():
-                with gr.Column(scale=2):
-                    allocation_display = gr.Markdown(value="스크립트 생성 후 확인 가능")
-                    refresh_btn = gr.Button("🔄 새로고침", size="sm")
-
-                    image_master_prompt = gr.Textbox(
-                        label="🔧 마스터 프롬프트",
-                        lines=10,
-                        value=DEFAULT_IMAGE_PROMPT_TEMPLATE
-                    )
-                    gen_prompts_btn = gr.Button("🤖 프롬프트 생성", variant="primary")
-
-                with gr.Column(scale=3):
-                    image_prompts_output = gr.Textbox(
-                        label="📝 이미지 프롬프트 (편집 가능)",
-                        lines=20,
-                        placeholder="이미지 1: [프롬프트]\n이미지 2: [프롬프트]..."
-                    )
-
-        # ─────────────────────────────────────────────
-        # Tab 5: 이미지 생성
-        # ─────────────────────────────────────────────
-        with gr.Tab("5️⃣ 이미지 생성"):
+        with gr.Tab("3️⃣ 이미지 생성"):
             with gr.Row():
                 with gr.Column():
                     image_engine = gr.Radio(
@@ -688,16 +477,19 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         value="fal",
                         label="이미지 엔진"
                     )
-                    final_prompts = gr.Textbox(label="최종 프롬프트", lines=10)
+                    final_prompts = gr.Textbox(
+                        label="이미지 프롬프트",
+                        lines=8,
+                        info="Tab 1에서 생성된 프롬프트가 자동으로 복사됩니다"
+                    )
                     gen_images_btn = gr.Button("🎨 이미지 생성", variant="primary")
-
                 with gr.Column():
                     images_gallery = gr.Gallery(label="생성된 이미지", columns=3)
 
         # ─────────────────────────────────────────────
-        # Tab 6: 영상 렌더링
+        # Tab 4: 영상 렌더링
         # ─────────────────────────────────────────────
-        with gr.Tab("6️⃣ 영상"):
+        with gr.Tab("4️⃣ 영상"):
             with gr.Row():
                 with gr.Column():
                     use_whisper = gr.Checkbox(label="Whisper 자막", value=False)
@@ -710,138 +502,66 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     final_btn = gr.Button("✅ 최종 영상", variant="primary")
 
                 with gr.Column():
-                    subtitle_preview = gr.Textbox(label="자막 (SRT)", lines=8)
+                    subtitle_preview = gr.Textbox(label="자막 (SRT)", lines=6)
                     video_preview = gr.Video(label="영상")
                     final_video = gr.Video(label="최종 영상")
 
         # ─────────────────────────────────────────────
-        # Tab 7: 트렌드 분석 (선택)
+        # Tab 5: 트렌드 분석 (참고용)
         # ─────────────────────────────────────────────
-        with gr.Tab("📊 트렌드 분석"):
+        with gr.Tab("📊 트렌드 (참고)"):
             gr.Markdown("### 🔍 YouTube 트렌드 분석")
-            gr.Markdown("*인기 영상을 검색하고 자막/댓글을 분석하여 원본 텍스트로 활용*")
+            gr.Markdown("*아이디어 참고용 - 인기 영상 검색*")
 
             with gr.Row():
-                # 왼쪽: 검색 및 선택
                 with gr.Column(scale=1):
-                    trend_keyword = gr.Textbox(
-                        label="검색 키워드",
-                        placeholder="예: 삶이 힘들 때, 건강 정보, 미스터리"
-                    )
-                    trend_btn = gr.Button("🔍 트렌드 검색", variant="primary")
+                    trend_keyword = gr.Textbox(label="검색 키워드", placeholder="예: 삶이 힘들 때")
+                    trend_btn = gr.Button("🔍 검색", variant="primary")
 
-                    gr.Markdown("---")
-                    video_selector = gr.Dropdown(
-                        label="📺 영상 선택",
-                        choices=[],
-                        interactive=True,
-                        info="검색 후 영상을 선택하면 자막/댓글 자동 추출"
-                    )
-                    extract_selected_btn = gr.Button("📥 자막/댓글 추출", variant="secondary")
+                    video_selector = gr.Dropdown(label="📺 영상 선택", choices=[], interactive=True)
+                    extract_btn = gr.Button("📥 자막/댓글 추출")
 
-                    gr.Markdown("---")
-                    gr.Markdown("**수동 입력**")
-                    video_id_input = gr.Textbox(label="영상 ID", placeholder="예: dQw4w9WgXcQ")
-                    extract_btn = gr.Button("📜 자막만 추출")
-
-                # 오른쪽: 결과
                 with gr.Column(scale=2):
-                    trend_result = gr.Markdown(label="검색 결과")
-
+                    trend_result = gr.Markdown()
                     with gr.Row():
-                        with gr.Column():
-                            transcript_result = gr.Textbox(
-                                label="📝 추출된 자막",
-                                lines=12,
-                                placeholder="영상을 선택하면 자막이 여기 표시됩니다"
-                            )
-                        with gr.Column():
-                            comments_result = gr.Markdown(
-                                label="💬 인기 댓글",
-                                value="*영상을 선택하면 댓글이 표시됩니다*"
-                            )
-
-                    copy_to_source_btn = gr.Button("📋 원본 텍스트로 복사 →", variant="primary")
+                        transcript_result = gr.Textbox(label="자막", lines=8)
+                        comments_result = gr.Markdown(label="댓글")
 
     # ═══════════════════════════════════════════════════════════════
     # 이벤트 연결
     # ═══════════════════════════════════════════════════════════════
 
-    # Tab 1: 프로젝트 생성
+    # 스타일 변경시 가이드 업데이트
     style_input.change(update_style_guide, [style_input], [style_guide])
-    style_input.change(get_style_image_prompt, [style_input], [image_master_prompt])
 
-    create_btn.click(
-        create_project,
+    # Tab 1: 스크립트 생성
+    generate_btn.click(
+        generate_script_and_images,
         [topic_input, duration_input, style_input],
-        [status, selected_style]
+        [status, script_preview, image_prompts]
     )
 
-    # Tab 2: 스크립트
-    prepare_btn.click(
-        prepare_script_prompt,
-        [source_input, duration_input, style_input],
-        [script_prompt_input]
-    )
+    # 이미지 프롬프트 자동 복사
+    image_prompts.change(lambda x: x, [image_prompts], [final_prompts])
 
-    generate_script_btn.click(
-        generate_script_with_prompt,
-        [script_prompt_input],
-        [status, script_preview, script_raw]
-    )
-
-    # Tab 3: TTS
+    # Tab 2: TTS
     tts_btn.click(generate_tts, [tts_engine], [status, audio_preview])
 
-    # Tab 4: 이미지 프롬프트
-    refresh_btn.click(get_image_allocation_summary, [], [allocation_display])
-    gen_prompts_btn.click(
-        generate_image_prompts_with_claude,
-        [image_master_prompt],
-        [status, image_prompts_output, allocation_display]
-    )
-    image_prompts_output.change(lambda x: x, [image_prompts_output], [final_prompts])
-
-    # Tab 5: 이미지 생성
+    # Tab 3: 이미지 생성
     gen_images_btn.click(
         generate_images_from_text,
         [final_prompts, image_engine],
         [status, images_gallery]
     )
 
-    # Tab 6: 영상
+    # Tab 4: 영상
     subtitle_btn.click(generate_subtitles, [use_whisper], [status, subtitle_preview])
     render_btn.click(render_video, [use_ken_burns, use_bgm], [status, video_preview])
     final_btn.click(finalize_video, [], [status, final_video])
 
-    # Tab 7: 트렌드 분석
-    trend_btn.click(
-        analyze_trend,
-        [trend_keyword],
-        [status, trend_result, video_selector]
-    )
-
-    # 영상 선택 시 자막/댓글 추출
-    extract_selected_btn.click(
-        extract_transcript_and_comments,
-        [video_selector],
-        [status, transcript_result, comments_result]
-    )
-
-    # 수동 ID 입력
-    extract_btn.click(extract_transcript, [video_id_input], [status, transcript_result])
-
-    # 자막을 원본 텍스트로 복사
-    def copy_transcript_to_source(transcript):
-        if transcript and not transcript.startswith("["):
-            return transcript
-        return ""
-
-    copy_to_source_btn.click(
-        copy_transcript_to_source,
-        [transcript_result],
-        [source_input]
-    )
+    # Tab 5: 트렌드
+    trend_btn.click(analyze_trend, [trend_keyword], [status, trend_result, video_selector])
+    extract_btn.click(extract_transcript_and_comments, [video_selector], [status, transcript_result, comments_result])
 
 
 if __name__ == "__main__":
