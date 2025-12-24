@@ -12,10 +12,12 @@ import json
 
 from pipeline import Pipeline
 from engines import ScriptEngine, ImageEngine
+from engines.thumbnail_engine import ThumbnailEngine
 from config import DURATION_SPECS, BGM_CONFIG
 
 # 전역 파이프라인 인스턴스
 pipeline = Pipeline()
+thumbnail_engine = ThumbnailEngine()
 
 # ═══════════════════════════════════════════════════════════════
 # 스타일별 프롬프트 템플릿
@@ -452,6 +454,128 @@ def extract_transcript_and_comments(selection: str):
 
 
 # ═══════════════════════════════════════════════════════════════
+# 썸네일 생성
+# ═══════════════════════════════════════════════════════════════
+
+def get_background_images():
+    """프로젝트 이미지 목록 가져오기"""
+    if not pipeline.project or not pipeline.project.cut_paths:
+        return []
+    return pipeline.project.cut_paths
+
+
+def generate_thumbnail(
+    bg_image,
+    main_text: str,
+    sub_text: str,
+    bottom_text: str,
+    darken: float
+):
+    """썸네일 생성"""
+    if not main_text.strip():
+        return "❌ 메인 텍스트를 입력하세요", None
+
+    # 배경 이미지 결정
+    if bg_image is not None:
+        # 업로드된 이미지 사용
+        bg_path = bg_image
+    elif pipeline.project and pipeline.project.cut_paths:
+        # 프로젝트 첫 번째 이미지
+        bg_path = pipeline.project.cut_paths[0]
+    else:
+        return "❌ 배경 이미지를 업로드하거나 이미지를 먼저 생성하세요", None
+
+    try:
+        style = getattr(pipeline.project, 'style', '정보') if pipeline.project else '정보'
+
+        # 출력 경로
+        if pipeline.project:
+            output_path = pipeline._get_path("thumbnail.jpg")
+        else:
+            output_path = "thumbnail_output.jpg"
+
+        thumbnail_path = thumbnail_engine.create_thumbnail(
+            background_image=bg_path,
+            main_text=main_text,
+            sub_text=sub_text,
+            bottom_text=bottom_text,
+            style=style,
+            darken=darken,
+            output_path=output_path
+        )
+
+        return f"✅ 썸네일 생성 완료!", thumbnail_path
+    except Exception as e:
+        return f"❌ 오류: {e}", None
+
+
+def use_project_image(img_index: int):
+    """프로젝트 이미지 선택"""
+    if not pipeline.project or not pipeline.project.cut_paths:
+        return None
+    if 0 <= img_index < len(pipeline.project.cut_paths):
+        return pipeline.project.cut_paths[img_index]
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════
+# YouTube 업로드 준비
+# ═══════════════════════════════════════════════════════════════
+
+def prepare_youtube_upload():
+    """YouTube 업로드용 정보 생성"""
+    if not pipeline.project:
+        return "❌ 프로젝트 없음", "", "", "", "", None, None
+
+    project = pipeline.project
+    script = project.script
+
+    # 제목
+    title = script.title if script else project.title
+
+    # 설명 생성
+    description = f"""🙏 {title}
+
+"""
+    if script:
+        # 씬 요약
+        for scene in script.scenes[:3]:
+            description += f"• {scene.title}\n"
+        description += "\n"
+
+    description += """═══════════════════════════════════════
+📢 구독과 좋아요 부탁드립니다!
+🔔 알림 설정으로 새 영상을 받아보세요
+
+#명상 #불교 #마음치유 #힐링 #위로
+═══════════════════════════════════════"""
+
+    # 태그
+    style = getattr(project, 'style', '정보')
+    base_tags = {
+        "불교종교": "명상, 불교, 마음치유, 힐링, 위로, 잠잘때듣는, 부처님말씀, 인생명언",
+        "뉴스": "뉴스, 이슈, 시사, 정보, 핫이슈, 트렌드",
+        "정보": "정보, 꿀팁, 생활정보, 유용한정보, 알아두면좋은",
+        "믿거나말거나": "미스터리, 충격, 믿거나말거나, 신기한이야기, 소름",
+    }
+    tags = base_tags.get(style, "")
+
+    # 파일 경로
+    video_path = getattr(project, 'final_video_path', None) or getattr(project, 'video_path', None)
+    thumbnail_path = pipeline._get_path("thumbnail.jpg") if os.path.exists(pipeline._get_path("thumbnail.jpg")) else None
+
+    return (
+        "✅ 업로드 정보 준비 완료",
+        title,
+        description,
+        tags,
+        f"📁 {project.project_id}" if project else "",
+        video_path,
+        thumbnail_path
+    )
+
+
+# ═══════════════════════════════════════════════════════════════
 # Gradio UI - 간소화된 버전
 # ═══════════════════════════════════════════════════════════════
 
@@ -579,7 +703,107 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     final_video = gr.Video(label="최종 영상")
 
         # ─────────────────────────────────────────────
-        # Tab 5: 트렌드 분석 (참고용)
+        # Tab 5: 썸네일 생성
+        # ─────────────────────────────────────────────
+        with gr.Tab("5️⃣ 썸네일"):
+            gr.Markdown("### 🖼️ 썸네일 생성")
+            gr.Markdown("*배경 이미지 + 텍스트 오버레이*")
+
+            with gr.Row():
+                with gr.Column(scale=1):
+                    thumb_bg = gr.Image(
+                        label="배경 이미지",
+                        type="filepath",
+                        sources=["upload"],
+                        info="업로드하거나 비워두면 프로젝트 이미지 사용"
+                    )
+
+                    thumb_sub = gr.Textbox(
+                        label="상단 텍스트 (작은 글씨)",
+                        placeholder="예: 잠자면서 듣는",
+                        lines=1
+                    )
+
+                    thumb_main = gr.Textbox(
+                        label="메인 텍스트 (큰 글씨) ⭐",
+                        placeholder="예: 부처님말씀 2시간",
+                        lines=2
+                    )
+
+                    thumb_bottom = gr.Textbox(
+                        label="하단 텍스트",
+                        placeholder="예: 노후에는 다 부질없다 이렇게만 살아라",
+                        lines=1
+                    )
+
+                    thumb_darken = gr.Slider(
+                        minimum=0.0,
+                        maximum=0.8,
+                        value=0.4,
+                        step=0.1,
+                        label="배경 어둡게"
+                    )
+
+                    thumb_btn = gr.Button("🎨 썸네일 생성", variant="primary")
+
+                with gr.Column(scale=1):
+                    thumb_preview = gr.Image(label="썸네일 미리보기")
+                    thumb_download = gr.File(label="📥 다운로드")
+
+        # ─────────────────────────────────────────────
+        # Tab 6: YouTube 업로드
+        # ─────────────────────────────────────────────
+        with gr.Tab("6️⃣ YouTube 업로드"):
+            gr.Markdown("### 📤 YouTube 업로드 준비")
+            gr.Markdown("*복사하여 YouTube Studio에 붙여넣기*")
+
+            prepare_btn = gr.Button("📋 업로드 정보 준비", variant="primary")
+
+            with gr.Row():
+                with gr.Column():
+                    yt_title = gr.Textbox(
+                        label="📌 제목",
+                        lines=2,
+                        interactive=True,
+                        info="클릭 후 Ctrl+A, Ctrl+C로 복사"
+                    )
+
+                    yt_description = gr.Textbox(
+                        label="📝 설명",
+                        lines=10,
+                        interactive=True
+                    )
+
+                    yt_tags = gr.Textbox(
+                        label="🏷️ 태그",
+                        lines=2,
+                        interactive=True,
+                        info="쉼표로 구분"
+                    )
+
+                    yt_project = gr.Textbox(
+                        label="📁 프로젝트",
+                        interactive=False
+                    )
+
+                with gr.Column():
+                    yt_video = gr.Video(label="🎬 영상 파일")
+                    yt_thumb = gr.Image(label="🖼️ 썸네일")
+
+            gr.Markdown("""
+            ---
+            ### 📋 YouTube Studio 업로드 순서
+            1. **제목** 복사 → YouTube Studio에 붙여넣기
+            2. **설명** 복사 → 붙여넣기
+            3. **태그** 복사 → '더보기' 클릭 후 태그 입력
+            4. **썸네일** 우클릭 저장 후 업로드
+            5. 영상 파일 선택하여 업로드
+
+            *🔜 향후 자동 업로드 기능 추가 예정!*
+            """)
+
+        # ─────────────────────────────────────────────
+        # Tab 7: 트렌드 분석 (참고용)
         # ─────────────────────────────────────────────
         with gr.Tab("📊 트렌드 (참고)"):
             gr.Markdown("### 🔍 YouTube 트렌드 분석")
@@ -636,7 +860,27 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     render_btn.click(render_video, [use_ken_burns, bgm_selector, bgm_volume], [status, video_preview])
     final_btn.click(finalize_video, [], [status, final_video])
 
-    # Tab 5: 트렌드
+    # Tab 5: 썸네일
+    def thumb_generate_wrapper(bg, main, sub, bottom, darken):
+        status_msg, thumb_path = generate_thumbnail(bg, main, sub, bottom, darken)
+        if thumb_path:
+            return status_msg, thumb_path, thumb_path
+        return status_msg, None, None
+
+    thumb_btn.click(
+        thumb_generate_wrapper,
+        [thumb_bg, thumb_main, thumb_sub, thumb_bottom, thumb_darken],
+        [status, thumb_preview, thumb_download]
+    )
+
+    # Tab 6: YouTube 업로드
+    prepare_btn.click(
+        prepare_youtube_upload,
+        [],
+        [status, yt_title, yt_description, yt_tags, yt_project, yt_video, yt_thumb]
+    )
+
+    # Tab 7: 트렌드
     trend_btn.click(analyze_trend, [trend_keyword], [status, trend_result, video_selector])
     extract_btn.click(extract_transcript_and_comments, [video_selector], [status, transcript_result, comments_result])
 
