@@ -263,17 +263,63 @@ def generate_script_and_images(topic: str, duration: int, style: str):
 # TTS 생성
 # ═══════════════════════════════════════════════════════════════
 
+def preview_tts_script(engine: str):
+    """TTS에 입력될 대사 미리보기"""
+    if not pipeline.project or not pipeline.project.script:
+        return "❌ 스크립트를 먼저 생성하세요"
+
+    script = pipeline.project.script
+    style = getattr(pipeline.project, 'style', None)
+    total_scenes = len(script.scenes)
+
+    # EMOTION_TAGS 가져오기
+    from config import EMOTION_TAGS
+
+    preview = f"## 🎙️ TTS 입력 대사 미리보기\n"
+    preview += f"**엔진**: {engine} | **스타일**: {style or '없음'} | **씬**: {total_scenes}개\n\n"
+    preview += "---\n\n"
+
+    for i, scene in enumerate(script.scenes):
+        position = i / total_scenes
+
+        # 감정 태그 결정 (ElevenLabs + 스타일일 때만)
+        tag = ""
+        if engine == "elevenlabs" and style and style in EMOTION_TAGS:
+            tags = EMOTION_TAGS[style]
+            if position < 0.15:
+                tag = tags.get("intro", "")
+            elif position < 0.5:
+                tag = tags.get("body_sad", tags.get("body", ""))
+            elif position < 0.75:
+                tag = tags.get("body_hope", tags.get("climax", ""))
+            elif position < 0.9:
+                tag = tags.get("climax", "")
+            else:
+                tag = tags.get("ending", "")
+
+        preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
+        if tag:
+            preview += f"🎭 **감정태그**: `{tag}`\n\n"
+        preview += f"```\n{tag} {scene.text}\n```\n\n"
+
+    return preview
+
+
 def generate_tts(engine: str):
     if not pipeline.project or not pipeline.project.script:
-        return "❌ 스크립트 생성 필요", None
+        return "❌ 스크립트 생성 필요", None, ""
     try:
         # 프로젝트에 저장된 스타일 가져오기
         style = getattr(pipeline.project, 'style', None)
         audio_path = pipeline.step3_generate_tts(engine, style=style)
         total = sum(s.duration for s in pipeline.project.audio_segments)
-        return f"✅ TTS 완료 ({total:.1f}초)", audio_path
+
+        # TTS 입력 대사 로그
+        tts_log = preview_tts_script(engine)
+
+        return f"✅ TTS 완료 ({total:.1f}초)", audio_path, tts_log
     except Exception as e:
-        return f"❌ 오류: {e}", None
+        return f"❌ 오류: {e}", None, ""
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -631,15 +677,29 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         # ─────────────────────────────────────────────
         with gr.Tab("2️⃣ TTS"):
             with gr.Row():
-                with gr.Column():
+                with gr.Column(scale=1):
                     tts_engine = gr.Radio(
                         ["wavenet", "elevenlabs", "openai"],
                         value="wavenet",
                         label="TTS 엔진"
                     )
+                    gr.Markdown("""
+                    **엔진 설명**:
+                    - `wavenet`: Google Cloud TTS (자연스러움)
+                    - `elevenlabs`: 감정 태그 지원 ⭐
+                    - `openai`: OpenAI TTS
+                    """)
+                    tts_preview_btn = gr.Button("👁️ 대사 미리보기")
                     tts_btn = gr.Button("🔊 TTS 생성", variant="primary")
-                with gr.Column():
+
+                with gr.Column(scale=1):
                     audio_preview = gr.Audio(label="생성된 오디오")
+
+            gr.Markdown("---")
+            tts_script_preview = gr.Markdown(
+                label="TTS 입력 대사",
+                value="*TTS 엔진 선택 후 '대사 미리보기' 클릭*"
+            )
 
         # ─────────────────────────────────────────────
         # Tab 3: 이미지 생성
@@ -841,7 +901,8 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     image_prompts.change(lambda x: x, [image_prompts], [final_prompts])
 
     # Tab 2: TTS
-    tts_btn.click(generate_tts, [tts_engine], [status, audio_preview])
+    tts_preview_btn.click(preview_tts_script, [tts_engine], [tts_script_preview])
+    tts_btn.click(generate_tts, [tts_engine], [status, audio_preview, tts_script_preview])
 
     # Tab 3: 이미지 생성
     gen_images_btn.click(
