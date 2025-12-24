@@ -817,10 +817,9 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
             with gr.Row():
                 with gr.Column(scale=1):
                     thumb_bg = gr.Image(
-                        label="배경 이미지",
+                        label="배경 이미지 (비워두면 프로젝트 이미지 사용)",
                         type="filepath",
-                        sources=["upload"],
-                        info="업로드하거나 비워두면 프로젝트 이미지 사용"
+                        sources=["upload"]
                     )
 
                     thumb_sub = gr.Textbox(
