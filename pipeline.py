@@ -42,7 +42,22 @@ class Pipeline:
     def create_project(self, topic: str, duration_min: int) -> Project:
         """새 프로젝트 생성"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        project_id = f"{topic[:20]}_{timestamp}".replace(" ", "_")
+
+        # 폴더명에 사용할 수 없는 문자 제거
+        safe_topic = topic[:20]
+        # 줄바꿈, 탭 제거
+        safe_topic = safe_topic.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+        # Windows 금지 문자 제거
+        for char in ['/', '\\', ':', '*', '?', '"', '<', '>', '|']:
+            safe_topic = safe_topic.replace(char, "")
+        # 공백을 언더스코어로
+        safe_topic = safe_topic.replace(" ", "_")
+        # 연속 언더스코어 정리
+        while "__" in safe_topic:
+            safe_topic = safe_topic.replace("__", "_")
+        safe_topic = safe_topic.strip("_")
+
+        project_id = f"{safe_topic}_{timestamp}"
 
         project_path = os.path.join(self.project_dir, project_id)
         os.makedirs(project_path, exist_ok=True)
