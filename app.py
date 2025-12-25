@@ -317,7 +317,22 @@ def generate_tts(engine: str):
         # TTS 입력 대사 로그
         tts_log = preview_tts_script(engine)
 
-        return f"✅ TTS 완료 ({total:.1f}초)", audio_path, tts_log
+        # ElevenLabs 사용량 표시
+        usage_info = ""
+        if engine == "elevenlabs":
+            from engines.tts_engine import TTSEngine
+            tts = TTSEngine(engine="elevenlabs", style=style)
+            usage = tts.get_elevenlabs_usage()
+            if usage:
+                usage_info = (
+                    f"\n\n📊 ElevenLabs 사용량: "
+                    f"{usage['used']:,} / {usage['limit']:,} 문자 "
+                    f"({usage['percent']}%) | "
+                    f"리셋: {usage['reset_date']} | "
+                    f"플랜: {usage['tier']}"
+                )
+
+        return f"✅ TTS 완료 ({total:.1f}초){usage_info}", audio_path, tts_log
     except Exception as e:
         return f"❌ 오류: {e}", None, ""
 
