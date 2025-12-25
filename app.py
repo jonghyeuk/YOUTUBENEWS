@@ -871,7 +871,13 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         # ─────────────────────────────────────────────
         # Tab 2: TTS
         # ─────────────────────────────────────────────
-        with gr.Tab("2️⃣ TTS"):
+        with gr.Tab("2️⃣ TTS") as tts_tab:
+            # ElevenLabs 사용량 표시
+            elevenlabs_usage_display = gr.Markdown(
+                value="📊 *ElevenLabs 사용량 로딩 중...*",
+                visible=True
+            )
+
             with gr.Row():
                 with gr.Column(scale=1):
                     tts_engine = gr.Radio(
@@ -1126,6 +1132,8 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     image_prompts.change(lambda x: x, [image_prompts], [final_prompts])
 
     # Tab 2: TTS
+    # 탭 선택 시 ElevenLabs 사용량 로드
+    tts_tab.select(get_elevenlabs_usage_info, [], [elevenlabs_usage_display])
     tts_preview_btn.click(preview_tts_script, [tts_engine], [tts_script_preview])
     tts_btn.click(generate_tts, [tts_engine], [status, audio_preview, tts_script_preview])
 
