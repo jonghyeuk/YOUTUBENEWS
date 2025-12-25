@@ -347,15 +347,21 @@ class VideoEngine:
             f"Alignment={style.get('alignment', 2)}"
         )
 
+        # Windows 경로 호환: forward slash + 콜론 이스케이프
+        subtitle_path_escaped = subtitle_path.replace("\\", "/").replace(":", "\\:")
+
         cmd = [
             "ffmpeg", "-y",
-            "-i", video_path,
-            "-vf", f"subtitles={subtitle_path}:force_style='{force_style}'",
+            "-i", video_path.replace("\\", "/"),
+            "-vf", f"subtitles={subtitle_path_escaped}:force_style='{force_style}'",
             "-c:a", "copy",
-            output_path
+            output_path.replace("\\", "/")
         ]
 
-        subprocess.run(cmd, check=True, capture_output=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        if result.returncode != 0:
+            print(f"[VideoEngine] Subtitle burn error: {result.stderr}")
+            raise RuntimeError(f"Subtitle burn failed: {result.stderr}")
 
         print(f"[VideoEngine] Final video with subtitles: {output_path}")
         return output_path
