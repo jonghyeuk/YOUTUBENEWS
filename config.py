@@ -17,6 +17,12 @@ DURATION_SPECS = {
 TTS_CONFIG = {
     "default_engine": "elevenlabs",  # ElevenLabs 기본 (고품질)
 
+    # 음성 속도 설정 (1.0 = 기본, 0.5 = 느리게, 2.0 = 빠르게)
+    # - WaveNet: 0.25 ~ 4.0
+    # - ElevenLabs: 0.5 ~ 2.0 (v3 모델 기준)
+    # - OpenAI: 0.25 ~ 4.0
+    "speed": 0.9,  # 시니어 타겟: 약간 느리게 (0.9)
+
     # Google WaveNet
     "wavenet_voice": "ko-KR-Wavenet-D",  # 남성, 따뜻한 목소리
 
@@ -30,26 +36,31 @@ TTS_CONFIG = {
 
 # 스타일별 ElevenLabs 음성 설정
 # stability 허용값: 0.0 (Creative), 0.5 (Natural), 1.0 (Robust)
+# speed: 0.5 ~ 2.0 (미지정 시 TTS_CONFIG["speed"] 사용)
 ELEVENLABS_STYLE_VOICES = {
     "뉴스": {
         "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 신뢰감 있는 뉴스 앵커 스타일
         "stability": 1.0,  # Robust - 안정적이고 일관된 톤
         "similarity_boost": 0.8,
+        "speed": 1.0,  # 뉴스: 보통 속도
     },
     "정보": {
         "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 친근한 설명 스타일
         "stability": 0.5,  # Natural - 자연스러운 톤
         "similarity_boost": 0.75,
+        "speed": 0.95,  # 정보: 약간 느리게
     },
     "믿거나말거나": {
         "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 미스터리 내레이션
         "stability": 0.0,  # Creative - 다양하고 극적인 톤
         "similarity_boost": 0.7,
+        "speed": 0.9,  # 미스터리: 느리게 (긴장감)
     },
     "불교종교": {
         "voice_id": "4p0HBzAAGyju0nYfNntV",  # 사용자 지정 - 명상/위로 스타일
         "stability": 0.0,  # Creative - 감정적이고 따뜻한 톤
         "similarity_boost": 0.8,
+        "speed": 0.85,  # 불교: 천천히 (명상적)
     },
 }
 
