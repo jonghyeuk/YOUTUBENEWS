@@ -46,12 +46,14 @@ class TTSEngine:
             language_code="ko-KR",
             name=TTS_CONFIG.get("wavenet_voice", "ko-KR-Wavenet-D")
         )
+        # 속도 설정 (0.25 ~ 4.0)
+        self.speed = TTS_CONFIG.get("speed", 1.0)
         self.audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
-            speaking_rate=1.0,
+            speaking_rate=self.speed,
             pitch=0.0
         )
-        print("[TTSEngine] Google WaveNet 초기화 완료")
+        print(f"[TTSEngine] Google WaveNet 초기화 완료 (속도: {self.speed})")
 
     def _init_elevenlabs(self):
         """ElevenLabs 초기화 (스타일별 음성 설정)"""
@@ -64,19 +66,23 @@ class TTSEngine:
             self.voice_id = voice_config["voice_id"]
             self.stability = voice_config.get("stability", 0.5)
             self.similarity_boost = voice_config.get("similarity_boost", 0.75)
-            print(f"[TTSEngine] ElevenLabs 초기화 완료 (스타일: {self.style}, 음성: {self.voice_id})")
+            # 스타일별 속도 (없으면 전역 설정 사용)
+            self.speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
+            print(f"[TTSEngine] ElevenLabs 초기화 완료 (스타일: {self.style}, 속도: {self.speed})")
         else:
             self.voice_id = TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.stability = 0.5
             self.similarity_boost = 0.75
-            print("[TTSEngine] ElevenLabs 초기화 완료 (기본 음성)")
+            self.speed = TTS_CONFIG.get("speed", 1.0)
+            print(f"[TTSEngine] ElevenLabs 초기화 완료 (기본 음성, 속도: {self.speed})")
 
     def _init_openai(self):
         """OpenAI TTS 초기화"""
         from openai import OpenAI
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.voice = TTS_CONFIG.get("openai_voice", "alloy")  # alloy, echo, fable, onyx, nova, shimmer
-        print("[TTSEngine] OpenAI TTS 초기화 완료")
+        self.speed = TTS_CONFIG.get("speed", 1.0)  # 0.25 ~ 4.0
+        print(f"[TTSEngine] OpenAI TTS 초기화 완료 (속도: {self.speed})")
 
     def generate_full_audio(
         self,
@@ -199,7 +205,8 @@ class TTSEngine:
                 "stability": getattr(self, 'stability', 0.5),
                 "similarity_boost": getattr(self, 'similarity_boost', 0.75),
                 "style": 0.5,
-                "use_speaker_boost": True
+                "use_speaker_boost": True,
+                "speed": getattr(self, 'speed', 1.0)  # 속도 설정 (0.5 ~ 2.0)
             }
         )
 
@@ -212,7 +219,8 @@ class TTSEngine:
         response = self.client.audio.speech.create(
             model="tts-1",  # 또는 "tts-1-hd" (고품질)
             voice=self.voice,
-            input=text
+            input=text,
+            speed=getattr(self, 'speed', 1.0)  # 속도 설정 (0.25 ~ 4.0)
         )
 
         return response.content

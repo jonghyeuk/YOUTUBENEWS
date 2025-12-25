@@ -17,6 +17,12 @@ DURATION_SPECS = {
 TTS_CONFIG = {
     "default_engine": "elevenlabs",  # ElevenLabs 기본 (고품질)
 
+    # 음성 속도 설정 (1.0 = 기본, 0.5 = 느리게, 2.0 = 빠르게)
+    # - WaveNet: 0.25 ~ 4.0
+    # - ElevenLabs: 0.5 ~ 2.0 (v3 모델 기준)
+    # - OpenAI: 0.25 ~ 4.0
+    "speed": 0.9,  # 시니어 타겟: 약간 느리게 (0.9)
+
     # Google WaveNet
     "wavenet_voice": "ko-KR-Wavenet-D",  # 남성, 따뜻한 목소리
 
@@ -30,26 +36,31 @@ TTS_CONFIG = {
 
 # 스타일별 ElevenLabs 음성 설정
 # stability 허용값: 0.0 (Creative), 0.5 (Natural), 1.0 (Robust)
+# speed: 0.5 ~ 2.0 (미지정 시 TTS_CONFIG["speed"] 사용)
 ELEVENLABS_STYLE_VOICES = {
     "뉴스": {
         "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 신뢰감 있는 뉴스 앵커 스타일
         "stability": 1.0,  # Robust - 안정적이고 일관된 톤
         "similarity_boost": 0.8,
+        "speed": 1.0,  # 뉴스: 보통 속도
     },
     "정보": {
         "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 친근한 설명 스타일
         "stability": 0.5,  # Natural - 자연스러운 톤
         "similarity_boost": 0.75,
+        "speed": 0.95,  # 정보: 약간 느리게
     },
     "믿거나말거나": {
         "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 미스터리 내레이션
         "stability": 0.0,  # Creative - 다양하고 극적인 톤
         "similarity_boost": 0.7,
+        "speed": 0.9,  # 미스터리: 느리게 (긴장감)
     },
     "불교종교": {
         "voice_id": "4p0HBzAAGyju0nYfNntV",  # 사용자 지정 - 명상/위로 스타일
         "stability": 0.0,  # Creative - 감정적이고 따뜻한 톤
         "similarity_boost": 0.8,
+        "speed": 0.85,  # 불교: 천천히 (명상적)
     },
 }
 
@@ -266,5 +277,75 @@ YOUTUBE_DESCRIPTION_TEMPLATE = {
 🔔 알림 설정으로 새 영상을 받아보세요
 ═══════════════════════════════════════
 """,
+}
+
+# ═══════════════════════════════════════════════════════════════
+# 썸네일 텍스트 설정 - 제목과 별도 (초단문 8~16자)
+# ═══════════════════════════════════════════════════════════════
+
+# 썸네일 텍스트 템플릿 (제목과 분리 - 짧게!)
+YOUTUBE_THUMBNAIL_TEXT_TEMPLATES = {
+    "불교종교": [
+        "불안 내려놓기",
+        "생각 과다 멈춤",
+        "화가 사라지는 법",
+        "인연 정리",
+        "기대 끊기",
+        "마음이 편해짐",
+        "오늘 밤 {duration}분",
+        "부처의 한마디",
+        "놓아야 산다",
+        "걱정 멈추는 습관",
+        "나를 지키는 법",
+        "조용히 강해지기",
+        "마음 비우기",
+        "예민함 다스리기",
+        "잠들기 전 위로",
+    ],
+    "뉴스": [
+        "오늘 핵심만",
+        "{duration}분 브리핑",
+        "지금 무슨 일?",
+        "핵심 요약",
+        "이것만 알면 됨",
+    ],
+    "정보": [
+        "이건 꼭 알기",
+        "알면 유리함",
+        "{duration}분 꿀정보",
+        "모르면 손해",
+        "꿀팁 정리",
+    ],
+    "믿거나말거나": [
+        "실화입니다",
+        "소름 주의",
+        "끝까지 보세요",
+        "충격 실화",
+        "믿기 어려운 일",
+    ],
+}
+
+# 후킹 타입별 썸네일 전용 문구 (짧은 스니펫)
+YOUTUBE_THUMBNAIL_HOOK_SNIPPETS = {
+    "경고형": ["하지 마세요", "조심하세요", "금지"],
+    "상황저격형": ["생각 많은 밤", "예민한 사람", "불안한 밤"],
+    "반전형": ["놓아야 됩니다", "비우면 풀림", "그게 답"],
+    "관계절연형": ["인연 정리", "거리 두기", "끊어야 편함"],
+    "숫자형": ["딱 3가지", "5가지", "1가지"],
+    "질문형": ["왜 불안한가", "왜 힘든가", "답은 간단"],
+    "즉시성": ["오늘 밤 {duration}분", "지금 바로", "딱 {duration}분"],
+    "자존감형": ["눈치 끊기", "나를 지키기", "내가 우선"],
+}
+
+# 썸네일 금지어 (제목과 동일 룰 재사용)
+YOUTUBE_THUMBNAIL_FORBIDDEN_WORDS = YOUTUBE_FORBIDDEN_WORDS
+
+# 썸네일 생성 규칙
+YOUTUBE_THUMBNAIL_RULES = {
+    "max_chars": 16,           # 한국어 기준 총 글자수 제한
+    "max_lines": 2,            # 최대 줄 수
+    "prefer_korean_short": True,
+    "avoid_punctuation": True,  # ".", "!" 남발 금지
+    "avoid_too_many_keywords": True,
 }
 

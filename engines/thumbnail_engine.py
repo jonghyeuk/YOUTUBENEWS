@@ -3,8 +3,16 @@
 한글 텍스트 오버레이 + 그림자/외곽선 효과
 """
 import os
+import random
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from typing import List, Tuple, Optional
+
+from config import (
+    YOUTUBE_THUMBNAIL_TEXT_TEMPLATES,
+    YOUTUBE_THUMBNAIL_HOOK_SNIPPETS,
+    YOUTUBE_THUMBNAIL_FORBIDDEN_WORDS,
+    YOUTUBE_THUMBNAIL_RULES,
+)
 
 
 class ThumbnailEngine:
@@ -224,27 +232,103 @@ class ThumbnailEngine:
         # 메인 텍스트
         draw.text((x, y), text, font=font, fill=fill)
 
+    def generate_thumbnail_text(
+        self,
+        style: str = "정보",
+        duration: int = 10,
+        hook_type: str = None
+    ) -> str:
+        """
+        썸네일 텍스트 자동 생성 (초단문)
+
+        Args:
+            style: 콘텐츠 스타일 (불교종교/뉴스/정보/믿거나말거나)
+            duration: 영상 길이 (분)
+            hook_type: 후킹 타입 (None이면 랜덤)
+
+        Returns:
+            생성된 썸네일 텍스트 (8~16자)
+        """
+        # 1. 템플릿 풀에서 1개 선택
+        templates = YOUTUBE_THUMBNAIL_TEXT_TEMPLATES.get(
+            style,
+            YOUTUBE_THUMBNAIL_TEXT_TEMPLATES.get("정보", ["정보"])
+        )
+        text = random.choice(templates)
+
+        # 2. {duration} 치환
+        text = text.format(duration=duration)
+
+        # 3. 금지어 필터링 (걸리면 다시 뽑기, 최대 5회)
+        attempts = 0
+        while attempts < 5:
+            has_forbidden = False
+            for forbidden in YOUTUBE_THUMBNAIL_FORBIDDEN_WORDS:
+                if forbidden in text:
+                    has_forbidden = True
+                    break
+
+            if not has_forbidden:
+                break
+
+            text = random.choice(templates).format(duration=duration)
+            attempts += 1
+
+        # 4. 길이 제한 (max_chars)
+        max_chars = YOUTUBE_THUMBNAIL_RULES.get("max_chars", 16)
+        if len(text) > max_chars:
+            text = text[:max_chars]
+
+        # 5. 구두점 제거 (avoid_punctuation)
+        if YOUTUBE_THUMBNAIL_RULES.get("avoid_punctuation", True):
+            text = text.rstrip(".!?。！？")
+
+        print(f"[ThumbnailEngine] 썸네일 텍스트 생성: '{text}' ({len(text)}자)")
+        return text
+
     def create_from_project(
         self,
         project,
         main_text: str = None,
         sub_text: str = "",
         bottom_text: str = "",
-        output_path: str = None
+        output_path: str = None,
+        auto_generate: bool = True
     ) -> str:
-        """프로젝트에서 썸네일 생성"""
+        """
+        프로젝트에서 썸네일 생성
+
+        Args:
+            project: Project 객체
+            main_text: 메인 텍스트 (None이면 자동 생성)
+            sub_text: 서브 텍스트
+            bottom_text: 하단 텍스트
+            output_path: 출력 경로
+            auto_generate: main_text 없을 때 자동 생성 여부
+
+        Returns:
+            썸네일 이미지 경로
+        """
         # 첫 번째 이미지를 배경으로 사용
         if project.cut_paths:
             background = project.cut_paths[0]
         else:
             raise ValueError("프로젝트에 이미지가 없습니다")
 
-        # 메인 텍스트 기본값
-        if not main_text and project.script:
-            main_text = project.script.title
-
         # 스타일
         style = getattr(project, 'style', '정보')
+        duration = getattr(project, 'duration_min', 10)
+
+        # 메인 텍스트 자동 생성 (초단문 템플릿 사용)
+        if not main_text:
+            if auto_generate:
+                main_text = self.generate_thumbnail_text(
+                    style=style,
+                    duration=duration
+                )
+            elif project.script:
+                # 폴백: 스크립트 제목 사용 (권장하지 않음)
+                main_text = project.script.title
 
         # 출력 경로
         if not output_path:
