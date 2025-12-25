@@ -189,11 +189,12 @@ class TTSEngine:
 
     def _synthesize_elevenlabs(self, text: str) -> bytes:
         """ElevenLabs TTS (스타일별 음성 설정 적용)"""
-        # 최신 SDK (v1.0+) API 사용
+        # Eleven v3 모델 사용 (Audio Tags 지원)
+        # 참고: https://elevenlabs.io/blog/eleven-v3-alpha-now-available-in-the-api
         audio_generator = self.client.text_to_speech.convert(
             text=text,
             voice_id=self.voice_id,
-            model_id="eleven_multilingual_v2",
+            model_id="eleven_v3",  # v3: Audio Tags 지원 ([calm], [excited] 등)
             voice_settings={
                 "stability": getattr(self, 'stability', 0.5),
                 "similarity_boost": getattr(self, 'similarity_boost', 0.75),
