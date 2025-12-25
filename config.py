@@ -52,20 +52,33 @@ ELEVENLABS_STYLE_VOICES = {
     },
 }
 
-# 스타일별 감정 태그 매핑 (씬 위치 기반)
+# 스타일별 감정 태그 매핑 (ElevenLabs v3 Audio Tags - 영어만 인식)
+# 참고: https://elevenlabs.io/blog/v3-audiotags
 EMOTION_TAGS = {
     "불교종교": {
-        "intro": "[차분하고 공감하는 목소리로]",
-        "body_sad": "[슬프고 위로하는 목소리로]",
-        "body_hope": "[따뜻하고 희망찬 목소리로]",
-        "climax": "[깊이 있고 감동적인 목소리로]",
-        "ending": "[평화롭고 위로하는 목소리로]",
+        "intro": "[calm, gentle]",
+        "body_sad": "[sad, comforting]",
+        "body_hope": "[warm, hopeful]",
+        "climax": "[deep, emotional]",
+        "ending": "[peaceful, soothing]",
     },
     "믿거나말거나": {
-        "intro": "[호기심을 자극하는 목소리로]",
-        "body": "[긴장감 있는 목소리로]",
-        "climax": "[충격적인 목소리로]",
-        "ending": "[의미심장한 목소리로]",
+        "intro": "[curious, intrigued]",
+        "body": "[tense, suspenseful]",
+        "climax": "[shocked, dramatic]",
+        "ending": "[mysterious, thoughtful]",
+    },
+    "뉴스": {
+        "intro": "[professional, clear]",
+        "body": "[informative, steady]",
+        "climax": "[urgent, serious]",
+        "ending": "[conclusive, calm]",
+    },
+    "정보": {
+        "intro": "[friendly, engaging]",
+        "body": "[clear, explanatory]",
+        "climax": "[enthusiastic]",
+        "ending": "[warm, encouraging]",
     },
 }
 
