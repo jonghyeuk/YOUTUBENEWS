@@ -609,6 +609,126 @@ def use_project_image(img_index: int):
     return None
 
 
+def get_thumbnail_gallery_images():
+    """썸네일용 이미지 갤러리 가져오기"""
+    if not pipeline.project or not pipeline.project.cut_paths:
+        return []
+    return pipeline.project.cut_paths
+
+
+def generate_thumbnail_texts():
+    """AI가 썸네일 텍스트 자동 생성"""
+    if not pipeline.project or not pipeline.project.script:
+        return "❌ 프로젝트/스크립트 없음", "", "", ""
+
+    script = pipeline.project.script
+    title = script.title or ""
+    style = getattr(pipeline.project, 'style', '정보')
+
+    # 스타일별 텍스트 생성
+    if style == "불교종교":
+        sub_text = "잠자면서 듣는"
+        # 제목에서 핵심 키워드 추출
+        if len(title) > 20:
+            main_text = title[:20] + "..."
+        else:
+            main_text = title
+        bottom_text = "마음이 편안해지는 말씀"
+    elif style == "뉴스":
+        sub_text = "긴급 속보"
+        main_text = title[:25] if len(title) > 25 else title
+        bottom_text = "지금 바로 확인하세요"
+    elif style == "믿거나말거나":
+        sub_text = "충격 실화"
+        main_text = title[:25] if len(title) > 25 else title
+        bottom_text = "이게 진짜라고?"
+    else:  # 정보
+        sub_text = "꼭 알아야 할"
+        main_text = title[:25] if len(title) > 25 else title
+        bottom_text = "지금 확인하세요"
+
+    return "✅ 텍스트 생성 완료!", sub_text, main_text, bottom_text
+
+
+def on_gallery_select(evt: gr.SelectData):
+    """갤러리에서 이미지 선택 시"""
+    if not pipeline.project or not pipeline.project.cut_paths:
+        return None, "❌ 이미지 없음"
+
+    idx = evt.index
+    if 0 <= idx < len(pipeline.project.cut_paths):
+        selected_path = pipeline.project.cut_paths[idx]
+        return selected_path, f"✅ 이미지 {idx + 1} 선택됨"
+    return None, "❌ 선택 오류"
+
+
+def preview_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
+    """썸네일 미리보기 생성"""
+    if not bg_path:
+        return "❌ 배경 이미지를 선택하세요", None
+    if not main_text.strip():
+        return "❌ 메인 텍스트를 입력하세요", None
+
+    try:
+        style = getattr(pipeline.project, 'style', '정보') if pipeline.project else '정보'
+
+        # 미리보기 경로 (임시)
+        if pipeline.project:
+            preview_path = pipeline._get_path("thumbnail_preview.jpg")
+        else:
+            preview_path = "thumbnail_preview.jpg"
+
+        thumbnail_path = thumbnail_engine.create_thumbnail(
+            background_image=bg_path,
+            main_text=main_text,
+            sub_text=sub_text,
+            bottom_text=bottom_text,
+            style=style,
+            darken=darken,
+            output_path=preview_path
+        )
+
+        return "👁️ 미리보기 생성됨 (확정하려면 '✅ 확정' 버튼 클릭)", thumbnail_path
+    except Exception as e:
+        return f"❌ 오류: {e}", None
+
+
+def confirm_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
+    """썸네일 확정 저장"""
+    if not bg_path:
+        return "❌ 배경 이미지를 선택하세요", None, None
+    if not main_text.strip():
+        return "❌ 메인 텍스트를 입력하세요", None, None
+
+    try:
+        style = getattr(pipeline.project, 'style', '정보') if pipeline.project else '정보'
+
+        # 최종 경로
+        if pipeline.project:
+            output_path = pipeline._get_path("thumbnail.jpg")
+        else:
+            output_path = "thumbnail_output.jpg"
+
+        thumbnail_path = thumbnail_engine.create_thumbnail(
+            background_image=bg_path,
+            main_text=main_text,
+            sub_text=sub_text,
+            bottom_text=bottom_text,
+            style=style,
+            darken=darken,
+            output_path=output_path
+        )
+
+        return f"✅ 썸네일 확정 저장: {output_path}", thumbnail_path, thumbnail_path
+    except Exception as e:
+        return f"❌ 오류: {e}", None, None
+
+
+def reset_thumbnail():
+    """썸네일 설정 리셋"""
+    return None, "", "", "", 0.4, None, "🔄 리셋 완료 - 이미지를 다시 선택하세요"
+
+
 # ═══════════════════════════════════════════════════════════════
 # YouTube 업로드 준비
 # ═══════════════════════════════════════════════════════════════
@@ -827,15 +947,27 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         # ─────────────────────────────────────────────
         with gr.Tab("5️⃣ 썸네일"):
             gr.Markdown("### 🖼️ 썸네일 생성")
-            gr.Markdown("*배경 이미지 + 텍스트 오버레이*")
+            gr.Markdown("*이미지 선택 → 텍스트 생성 → 미리보기 → 확정*")
 
             with gr.Row():
                 with gr.Column(scale=1):
-                    thumb_bg = gr.Image(
-                        label="배경 이미지 (비워두면 프로젝트 이미지 사용)",
-                        type="filepath",
-                        sources=["upload"]
+                    # 이미지 갤러리
+                    gr.Markdown("#### 📸 배경 이미지 선택")
+                    thumb_gallery = gr.Gallery(
+                        label="클릭해서 배경 선택",
+                        columns=4,
+                        rows=2,
+                        height=200,
+                        object_fit="cover",
+                        allow_preview=False
                     )
+                    thumb_refresh_btn = gr.Button("🔄 이미지 새로고침", size="sm")
+
+                    # 선택된 이미지 경로 (숨김)
+                    thumb_selected_path = gr.Textbox(visible=False)
+
+                    gr.Markdown("#### ✏️ 텍스트 설정")
+                    thumb_auto_btn = gr.Button("🎯 텍스트 자동 생성", variant="secondary")
 
                     thumb_sub = gr.Textbox(
                         label="상단 텍스트 (작은 글씨)",
@@ -851,7 +983,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
 
                     thumb_bottom = gr.Textbox(
                         label="하단 텍스트",
-                        placeholder="예: 노후에는 다 부질없다 이렇게만 살아라",
+                        placeholder="예: 노후에는 다 부질없다",
                         lines=1
                     )
 
@@ -863,10 +995,13 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         label="배경 어둡게"
                     )
 
-                    thumb_btn = gr.Button("🎨 썸네일 생성", variant="primary")
+                    with gr.Row():
+                        thumb_preview_btn = gr.Button("👁️ 미리보기", variant="secondary")
+                        thumb_reset_btn = gr.Button("🔄 리셋", variant="secondary")
+                        thumb_confirm_btn = gr.Button("✅ 확정", variant="primary")
 
                 with gr.Column(scale=1):
-                    thumb_preview = gr.Image(label="썸네일 미리보기")
+                    thumb_preview = gr.Image(label="썸네일 미리보기", height=400)
                     thumb_download = gr.File(label="📥 다운로드")
 
         # ─────────────────────────────────────────────
@@ -982,15 +1117,45 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     final_btn.click(finalize_video, [], [status, final_video])
 
     # Tab 5: 썸네일
-    def thumb_generate_wrapper(bg, main, sub, bottom, darken):
-        status_msg, thumb_path = generate_thumbnail(bg, main, sub, bottom, darken)
-        if thumb_path:
-            return status_msg, thumb_path, thumb_path
-        return status_msg, None, None
+    # 갤러리 새로고침
+    thumb_refresh_btn.click(
+        get_thumbnail_gallery_images,
+        [],
+        [thumb_gallery]
+    )
 
-    thumb_btn.click(
-        thumb_generate_wrapper,
-        [thumb_bg, thumb_main, thumb_sub, thumb_bottom, thumb_darken],
+    # 갤러리에서 이미지 선택
+    thumb_gallery.select(
+        on_gallery_select,
+        [],
+        [thumb_selected_path, status]
+    )
+
+    # 텍스트 자동 생성
+    thumb_auto_btn.click(
+        generate_thumbnail_texts,
+        [],
+        [status, thumb_sub, thumb_main, thumb_bottom]
+    )
+
+    # 미리보기
+    thumb_preview_btn.click(
+        preview_thumbnail,
+        [thumb_selected_path, thumb_main, thumb_sub, thumb_bottom, thumb_darken],
+        [status, thumb_preview]
+    )
+
+    # 리셋
+    thumb_reset_btn.click(
+        reset_thumbnail,
+        [],
+        [thumb_selected_path, thumb_sub, thumb_main, thumb_bottom, thumb_darken, thumb_preview, status]
+    )
+
+    # 확정
+    thumb_confirm_btn.click(
+        confirm_thumbnail,
+        [thumb_selected_path, thumb_main, thumb_sub, thumb_bottom, thumb_darken],
         [status, thumb_preview, thumb_download]
     )
 
