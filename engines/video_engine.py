@@ -148,7 +148,7 @@ class VideoEngine:
             "-c:v", self.codec,
             "-pix_fmt", "yuv420p",
             "-r", str(self.fps),
-            output_path
+            output_path.replace("\\", "/")
         ]
 
         subprocess.run(cmd, check=True, capture_output=True)
@@ -173,7 +173,7 @@ class VideoEngine:
             "-safe", "0",
             "-i", list_path.replace("\\", "/"),
             "-c", "copy",
-            output_path
+            output_path.replace("\\", "/")
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
@@ -213,7 +213,7 @@ class VideoEngine:
                 abs_path = os.path.abspath(clip_path).replace("\\", "/")
                 f.write(f"file '{abs_path}'\n")
 
-        temp_video = output_path.replace(".mp4", "_temp.mp4")
+        temp_video = output_path.replace(".mp4", "_temp.mp4").replace("\\", "/")
 
         cmd_concat = [
             "ffmpeg", "-y",
@@ -243,12 +243,12 @@ class VideoEngine:
         """TTS 오디오만 추가"""
         cmd = [
             "ffmpeg", "-y",
-            "-i", video_path,
-            "-i", audio_path,
+            "-i", video_path.replace("\\", "/"),
+            "-i", audio_path.replace("\\", "/"),
             "-c:v", "copy",
             "-c:a", "aac",
             "-shortest",
-            output_path
+            output_path.replace("\\", "/")
         ]
         subprocess.run(cmd, check=True, capture_output=True)
 
@@ -277,16 +277,16 @@ class VideoEngine:
 
         cmd = [
             "ffmpeg", "-y",
-            "-i", video_path,
-            "-i", tts_path,
-            "-i", bgm_path,
+            "-i", video_path.replace("\\", "/"),
+            "-i", tts_path.replace("\\", "/"),
+            "-i", bgm_path.replace("\\", "/"),
             "-filter_complex", filter_complex,
             "-map", "0:v",
             "-map", "[aout]",
             "-c:v", "copy",
             "-c:a", "aac",
             "-shortest",
-            output_path
+            output_path.replace("\\", "/")
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
