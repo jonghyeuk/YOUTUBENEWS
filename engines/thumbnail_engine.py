@@ -307,19 +307,15 @@ class ThumbnailEngine:
         self,
         project,
         main_text: str = None,
-        sub_text: str = "",
-        bottom_text: str = "",
         output_path: str = None,
         auto_generate: bool = True
     ) -> str:
         """
-        프로젝트에서 썸네일 생성
+        프로젝트에서 썸네일 생성 (메인 텍스트만 자동 생성)
 
         Args:
             project: Project 객체
             main_text: 메인 텍스트 (None이면 자동 생성)
-            sub_text: 서브 텍스트
-            bottom_text: 하단 텍스트
             output_path: 출력 경로
             auto_generate: main_text 없을 때 자동 생성 여부
 
@@ -354,8 +350,6 @@ class ThumbnailEngine:
         return self.create_thumbnail(
             background_image=background,
             main_text=main_text,
-            sub_text=sub_text,
-            bottom_text=bottom_text,
             style=style,
             output_path=output_path
         )
