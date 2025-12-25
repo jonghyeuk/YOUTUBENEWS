@@ -13,7 +13,11 @@ import json
 from pipeline import Pipeline
 from engines import ScriptEngine, ImageEngine
 from engines.thumbnail_engine import ThumbnailEngine
-from config import DURATION_SPECS, BGM_CONFIG
+from config import (
+    DURATION_SPECS, BGM_CONFIG,
+    YOUTUBE_TITLE_TEMPLATES, YOUTUBE_DEFAULT_TAGS,
+    YOUTUBE_DESCRIPTION_TEMPLATE, YOUTUBE_FORBIDDEN_WORDS
+)
 
 # 전역 파이프라인 인스턴스
 pipeline = Pipeline()
@@ -765,49 +769,61 @@ def reset_thumbnail():
 # ═══════════════════════════════════════════════════════════════
 
 def prepare_youtube_upload():
-    """YouTube 업로드용 정보 생성"""
+    """YouTube 업로드용 정보 생성 - config.py 규칙 적용"""
+    import random
+
     if not pipeline.project:
         return "❌ 프로젝트 없음", "", "", "", "", None, None
 
     project = pipeline.project
     script = project.script
-
-    # 제목
-    title = script.title if script else project.title
-
-    # 설명 생성
-    description = f"""🙏 {title}
-
-"""
-    if script:
-        # 씬 요약
-        for scene in script.scenes[:3]:
-            description += f"• {scene.title}\n"
-        description += "\n"
-
-    description += """═══════════════════════════════════════
-📢 구독과 좋아요 부탁드립니다!
-🔔 알림 설정으로 새 영상을 받아보세요
-
-#명상 #불교 #마음치유 #힐링 #위로
-═══════════════════════════════════════"""
-
-    # 태그
     style = getattr(project, 'style', '정보')
-    base_tags = {
-        "불교종교": "명상, 불교, 마음치유, 힐링, 위로, 잠잘때듣는, 부처님말씀, 인생명언",
-        "뉴스": "뉴스, 이슈, 시사, 정보, 핫이슈, 트렌드",
-        "정보": "정보, 꿀팁, 생활정보, 유용한정보, 알아두면좋은",
-        "믿거나말거나": "미스터리, 충격, 믿거나말거나, 신기한이야기, 소름",
-    }
-    tags = base_tags.get(style, "")
+
+    # 영상 길이 계산 (분)
+    duration = getattr(project, 'duration', 10)
+
+    # 제목 생성 - 템플릿에서 랜덤 선택
+    title_templates = YOUTUBE_TITLE_TEMPLATES.get(style, YOUTUBE_TITLE_TEMPLATES.get("정보", []))
+    if title_templates:
+        title_template = random.choice(title_templates)
+        title = title_template.format(duration=duration)
+    else:
+        title = script.title if script else project.title
+
+    # 금지어 체크 및 제거
+    for forbidden in YOUTUBE_FORBIDDEN_WORDS:
+        if forbidden in title:
+            title = title.replace(forbidden, "")
+
+    # 씬 요약 생성
+    scene_summaries = ""
+    if script:
+        for i, scene in enumerate(script.scenes[:5], 1):
+            scene_summaries += f"📌 {scene.title}\n"
+
+    # 설명 생성 - 템플릿 사용
+    desc_template = YOUTUBE_DESCRIPTION_TEMPLATE.get(style, YOUTUBE_DESCRIPTION_TEMPLATE.get("default", ""))
+    description = desc_template.format(
+        title=title,
+        scene_summaries=scene_summaries
+    )
+
+    # 태그 - config에서 가져오기
+    tags = YOUTUBE_DEFAULT_TAGS.get(style, "")
+
+    # 추가 태그 (제목 키워드 추출)
+    if script and script.title:
+        extra_keywords = script.title.replace(",", " ").split()[:3]
+        for kw in extra_keywords:
+            if len(kw) > 1 and kw not in tags:
+                tags += f", {kw}"
 
     # 파일 경로
     video_path = getattr(project, 'final_video_path', None) or getattr(project, 'video_path', None)
     thumbnail_path = pipeline._get_path("thumbnail.jpg") if os.path.exists(pipeline._get_path("thumbnail.jpg")) else None
 
     return (
-        "✅ 업로드 정보 준비 완료",
+        f"✅ 업로드 정보 준비 완료 (스타일: {style})",
         title,
         description,
         tags,
