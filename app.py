@@ -652,37 +652,52 @@ def get_thumbnail_gallery_images():
 
 
 def generate_thumbnail_texts():
-    """AI가 썸네일 텍스트 자동 생성"""
+    """AI가 썸네일 텍스트 자동 생성 - config.py 규칙 적용"""
+    import random
+
     if not pipeline.project or not pipeline.project.script:
         return "❌ 프로젝트/스크립트 없음", "", "", ""
 
     script = pipeline.project.script
     title = script.title or ""
     style = getattr(pipeline.project, 'style', '정보')
+    duration = getattr(pipeline.project, 'duration', 10)
 
-    # 스타일별 텍스트 생성
+    # YouTube 제목 템플릿에서 랜덤 선택
+    title_templates = YOUTUBE_TITLE_TEMPLATES.get(style, YOUTUBE_TITLE_TEMPLATES.get("정보", []))
+    if title_templates:
+        template = random.choice(title_templates)
+        generated_title = template.format(duration=duration)
+    else:
+        generated_title = title
+
+    # 금지어 제거
+    for forbidden in YOUTUBE_FORBIDDEN_WORDS:
+        generated_title = generated_title.replace(forbidden, "")
+
+    # 썸네일용으로 분할 (메인: 핵심 문구, 서브/하단: 보조 문구)
     if style == "불교종교":
-        sub_text = "잠자면서 듣는"
-        # 제목에서 핵심 키워드 추출
-        if len(title) > 20:
-            main_text = title[:20] + "..."
+        sub_text = "잠들기 전 듣는"
+        # 메인 텍스트: 템플릿에서 핵심 부분 추출 (15자 이내)
+        if "," in generated_title:
+            main_text = generated_title.split(",")[1].strip()[:15]
         else:
-            main_text = title
-        bottom_text = "마음이 편안해지는 말씀"
+            main_text = generated_title[:15]
+        bottom_text = f"부처님 말씀 {duration}분"
     elif style == "뉴스":
         sub_text = "긴급 속보"
-        main_text = title[:25] if len(title) > 25 else title
-        bottom_text = "지금 바로 확인하세요"
+        main_text = generated_title[:15] if len(generated_title) > 15 else generated_title
+        bottom_text = f"{duration}분 정리"
     elif style == "믿거나말거나":
         sub_text = "충격 실화"
-        main_text = title[:25] if len(title) > 25 else title
-        bottom_text = "이게 진짜라고?"
+        main_text = generated_title[:15] if len(generated_title) > 15 else generated_title
+        bottom_text = f"소름 {duration}분"
     else:  # 정보
         sub_text = "꼭 알아야 할"
-        main_text = title[:25] if len(title) > 25 else title
-        bottom_text = "지금 확인하세요"
+        main_text = generated_title[:15] if len(generated_title) > 15 else generated_title
+        bottom_text = f"꿀팁 {duration}분"
 
-    return "✅ 텍스트 생성 완료!", sub_text, main_text, bottom_text
+    return f"✅ 텍스트 생성 완료! (스타일: {style})", sub_text, main_text, bottom_text
 
 
 def on_gallery_select(evt: gr.SelectData):
