@@ -153,14 +153,31 @@ class ThumbnailEngine:
                 outline_width=3
             )
 
-        # 메인 텍스트 (중앙)
-        self._draw_text_with_outline(
-            draw, main_text, main_font,
-            position=(width // 2, height // 2),
-            fill=colors["primary"],
-            outline=colors["outline"],
-            outline_width=4
-        )
+        # 메인 텍스트 (중앙) - 멀티라인 지원
+        if "\n" in main_text:
+            # 2줄 텍스트: 같은 크기로 각 줄 렌더링
+            lines = main_text.split("\n")
+            line_height = 100  # 줄 간격
+            total_height = len(lines) * line_height
+            start_y = height // 2 - total_height // 2 + line_height // 2
+
+            for i, line in enumerate(lines):
+                self._draw_text_with_outline(
+                    draw, line, main_font,
+                    position=(width // 2, start_y + i * line_height),
+                    fill=colors["primary"],
+                    outline=colors["outline"],
+                    outline_width=4
+                )
+        else:
+            # 1줄 텍스트
+            self._draw_text_with_outline(
+                draw, main_text, main_font,
+                position=(width // 2, height // 2),
+                fill=colors["primary"],
+                outline=colors["outline"],
+                outline_width=4
+            )
 
         # 하단 텍스트
         if bottom_text:
