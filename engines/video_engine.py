@@ -144,7 +144,7 @@ class VideoEngine:
             "-f", "concat",
             "-safe", "0",
             "-i", list_path.replace("\\", "/"),
-            "-vf", f"scale={self.resolution}:force_original_aspect_ratio=decrease,pad={self.resolution}:(ow-iw)/2:(oh-ih)/2",
+            "-vf", f"scale={self.resolution.replace('x', ':')}:force_original_aspect_ratio=decrease,pad={self.resolution.replace('x', ':')}:(ow-iw)/2:(oh-ih)/2",
             "-c:v", self.codec,
             "-pix_fmt", "yuv420p",
             "-r", str(self.fps),
