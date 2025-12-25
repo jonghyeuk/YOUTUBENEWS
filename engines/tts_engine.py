@@ -223,8 +223,8 @@ class TTSEngine:
             return None
 
         try:
-            # 최신 SDK API: subscription() (get_subscription이 아님)
-            subscription = self.client.user.subscription()
+            # 최신 SDK API: user.subscription.get()
+            subscription = self.client.user.subscription.get()
 
             # 사용량 정보 추출
             character_count = subscription.character_count

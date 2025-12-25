@@ -144,14 +144,17 @@ class VideoEngine:
             "-f", "concat",
             "-safe", "0",
             "-i", list_path.replace("\\", "/"),
-            "-vf", f"scale={self.resolution}:force_original_aspect_ratio=decrease,pad={self.resolution}:(ow-iw)/2:(oh-ih)/2",
+            "-vf", f"scale={self.resolution.replace('x', ':')}:force_original_aspect_ratio=decrease,pad={self.resolution.replace('x', ':')}:(ow-iw)/2:(oh-ih)/2",
             "-c:v", self.codec,
             "-pix_fmt", "yuv420p",
             "-r", str(self.fps),
-            output_path
+            output_path.replace("\\", "/")
         ]
 
-        subprocess.run(cmd, check=True, capture_output=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        if result.returncode != 0:
+            print(f"[VideoEngine] FFmpeg stderr: {result.stderr}")
+            raise RuntimeError(f"FFmpeg failed: {result.stderr}")
         os.remove(list_path)
 
     def _concat_clips_simple(self, clip_paths: List[str], output_path: str):
@@ -173,7 +176,7 @@ class VideoEngine:
             "-safe", "0",
             "-i", list_path.replace("\\", "/"),
             "-c", "copy",
-            output_path
+            output_path.replace("\\", "/")
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
@@ -213,7 +216,7 @@ class VideoEngine:
                 abs_path = os.path.abspath(clip_path).replace("\\", "/")
                 f.write(f"file '{abs_path}'\n")
 
-        temp_video = output_path.replace(".mp4", "_temp.mp4")
+        temp_video = output_path.replace(".mp4", "_temp.mp4").replace("\\", "/")
 
         cmd_concat = [
             "ffmpeg", "-y",
@@ -243,12 +246,12 @@ class VideoEngine:
         """TTS 오디오만 추가"""
         cmd = [
             "ffmpeg", "-y",
-            "-i", video_path,
-            "-i", audio_path,
+            "-i", video_path.replace("\\", "/"),
+            "-i", audio_path.replace("\\", "/"),
             "-c:v", "copy",
             "-c:a", "aac",
             "-shortest",
-            output_path
+            output_path.replace("\\", "/")
         ]
         subprocess.run(cmd, check=True, capture_output=True)
 
@@ -277,16 +280,16 @@ class VideoEngine:
 
         cmd = [
             "ffmpeg", "-y",
-            "-i", video_path,
-            "-i", tts_path,
-            "-i", bgm_path,
+            "-i", video_path.replace("\\", "/"),
+            "-i", tts_path.replace("\\", "/"),
+            "-i", bgm_path.replace("\\", "/"),
             "-filter_complex", filter_complex,
             "-map", "0:v",
             "-map", "[aout]",
             "-c:v", "copy",
             "-c:a", "aac",
             "-shortest",
-            output_path
+            output_path.replace("\\", "/")
         ]
 
         result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
@@ -344,15 +347,21 @@ class VideoEngine:
             f"Alignment={style.get('alignment', 2)}"
         )
 
+        # Windows 경로 호환: forward slash + 콜론 이스케이프
+        subtitle_path_escaped = subtitle_path.replace("\\", "/").replace(":", "\\:")
+
         cmd = [
             "ffmpeg", "-y",
-            "-i", video_path,
-            "-vf", f"subtitles={subtitle_path}:force_style='{force_style}'",
+            "-i", video_path.replace("\\", "/"),
+            "-vf", f"subtitles={subtitle_path_escaped}:force_style='{force_style}'",
             "-c:a", "copy",
-            output_path
+            output_path.replace("\\", "/")
         ]
 
-        subprocess.run(cmd, check=True, capture_output=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        if result.returncode != 0:
+            print(f"[VideoEngine] Subtitle burn error: {result.stderr}")
+            raise RuntimeError(f"Subtitle burn failed: {result.stderr}")
 
         print(f"[VideoEngine] Final video with subtitles: {output_path}")
         return output_path
