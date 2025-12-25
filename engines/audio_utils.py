@@ -24,7 +24,11 @@ def get_audio_duration(audio_path: str) -> float:
         audio_path
     ]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+
+    if not result.stdout:
+        raise RuntimeError(f"ffprobe 오류: {result.stderr or '출력 없음'}")
+
     data = json.loads(result.stdout)
 
     return float(data["format"]["duration"])
