@@ -176,7 +176,7 @@ class VideoEngine:
             output_path
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
         if result.returncode != 0:
             print(f"[VideoEngine] FFmpeg error: {result.stderr}")
             raise RuntimeError(f"FFmpeg concat failed: {result.stderr}")
@@ -289,7 +289,7 @@ class VideoEngine:
             output_path
         ]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
         if result.returncode != 0:
             print(f"[VideoEngine] BGM 믹싱 오류: {result.stderr}")
             # 실패 시 BGM 없이 재시도

@@ -189,22 +189,21 @@ class TTSEngine:
 
     def _synthesize_elevenlabs(self, text: str) -> bytes:
         """ElevenLabs TTS (스타일별 음성 설정 적용)"""
-        from elevenlabs import VoiceSettings
-
-        audio = self.client.generate(
+        # 최신 SDK (v1.0+) API 사용
+        audio_generator = self.client.text_to_speech.convert(
             text=text,
-            voice=self.voice_id,
-            model="eleven_multilingual_v2",
-            voice_settings=VoiceSettings(
-                stability=getattr(self, 'stability', 0.5),
-                similarity_boost=getattr(self, 'similarity_boost', 0.75),
-                style=0.5,  # 스타일 강도
-                use_speaker_boost=True
-            )
+            voice_id=self.voice_id,
+            model_id="eleven_multilingual_v2",
+            voice_settings={
+                "stability": getattr(self, 'stability', 0.5),
+                "similarity_boost": getattr(self, 'similarity_boost', 0.75),
+                "style": 0.5,
+                "use_speaker_boost": True
+            }
         )
 
         # generator를 bytes로 변환
-        audio_bytes = b"".join(audio)
+        audio_bytes = b"".join(audio_generator)
         return audio_bytes
 
     def _synthesize_openai(self, text: str) -> bytes:
