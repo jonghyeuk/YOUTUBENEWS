@@ -151,7 +151,10 @@ class VideoEngine:
             output_path.replace("\\", "/")
         ]
 
-        subprocess.run(cmd, check=True, capture_output=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        if result.returncode != 0:
+            print(f"[VideoEngine] FFmpeg stderr: {result.stderr}")
+            raise RuntimeError(f"FFmpeg failed: {result.stderr}")
         os.remove(list_path)
 
     def _concat_clips_simple(self, clip_paths: List[str], output_path: str):
