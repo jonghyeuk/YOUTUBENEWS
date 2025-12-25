@@ -143,7 +143,7 @@ class VideoEngine:
             "ffmpeg", "-y",
             "-f", "concat",
             "-safe", "0",
-            "-i", list_path,
+            "-i", list_path.replace("\\", "/"),
             "-vf", f"scale={self.resolution}:force_original_aspect_ratio=decrease,pad={self.resolution}:(ow-iw)/2:(oh-ih)/2",
             "-c:v", self.codec,
             "-pix_fmt", "yuv420p",
@@ -171,7 +171,7 @@ class VideoEngine:
             "ffmpeg", "-y",
             "-f", "concat",
             "-safe", "0",
-            "-i", list_path,
+            "-i", list_path.replace("\\", "/"),
             "-c", "copy",
             output_path
         ]
@@ -219,7 +219,7 @@ class VideoEngine:
             "ffmpeg", "-y",
             "-f", "concat",
             "-safe", "0",
-            "-i", list_path,
+            "-i", list_path.replace("\\", "/"),
             "-c", "copy",
             temp_video
         ]
