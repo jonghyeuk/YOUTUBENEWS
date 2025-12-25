@@ -119,13 +119,14 @@ FFMPEG_FILTERS = {
     },
     # 자막 스타일
     "subtitle_style": {
-        "fontname": "NanumGothic",
-        "fontsize": 24,
-        "primary_color": "&HFFFFFF",
-        "outline_color": "&H000000",
-        "outline": 2,
+        "fontname": "NanumMyeongjo",  # 정자체 (나눔명조)
+        "fontsize": 38,  # 크게
+        "primary_color": "&HFFFFFF",  # 흰색
+        "outline_color": "&H000000",  # 검정 외곽선
+        "outline": 3,  # 외곽선 두께
         "shadow": 1,
-        "margin_v": 50,
+        "margin_v": 120,  # 화면 중간 아래 (값이 클수록 위로)
+        "alignment": 2,  # 하단 중앙 정렬
     },
 }
 

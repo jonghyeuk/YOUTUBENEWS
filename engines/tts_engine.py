@@ -215,3 +215,36 @@ class TTSEngine:
         )
 
         return response.content
+
+    def get_elevenlabs_usage(self) -> dict:
+        """ElevenLabs 사용량 조회"""
+        if self.engine != "elevenlabs":
+            return None
+
+        try:
+            subscription = self.client.user.get_subscription()
+
+            # 사용량 정보 추출
+            character_count = subscription.character_count
+            character_limit = subscription.character_limit
+            usage_percent = (character_count / character_limit * 100) if character_limit > 0 else 0
+
+            # 리셋 날짜
+            next_reset = subscription.next_character_count_reset_unix
+            if next_reset:
+                from datetime import datetime
+                reset_date = datetime.fromtimestamp(next_reset)
+                reset_str = reset_date.strftime("%Y-%m-%d")
+            else:
+                reset_str = "알 수 없음"
+
+            return {
+                "used": character_count,
+                "limit": character_limit,
+                "percent": round(usage_percent, 1),
+                "reset_date": reset_str,
+                "tier": subscription.tier
+            }
+        except Exception as e:
+            print(f"[TTSEngine] ElevenLabs 사용량 조회 실패: {e}")
+            return None
