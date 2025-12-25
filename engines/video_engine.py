@@ -18,7 +18,8 @@ class VideoEngine:
         self.resolution = VIDEO_CONFIG["resolution"]
         self.fps = VIDEO_CONFIG["fps"]
         self.codec = VIDEO_CONFIG["codec"]
-        self.ken_burns_effects = ["zoom_in", "zoom_out", "pan_left", "pan_right"]
+        # Ken Burns 효과 (줌인/줌아웃만 - 패닝은 흔들림 유발)
+        self.ken_burns_effects = ["zoom_in", "zoom_out"]
 
     def render_scene_clips(
         self,
