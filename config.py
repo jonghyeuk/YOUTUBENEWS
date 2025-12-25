@@ -29,25 +29,26 @@ TTS_CONFIG = {
 }
 
 # 스타일별 ElevenLabs 음성 설정
+# stability 허용값: 0.0 (Creative), 0.5 (Natural), 1.0 (Robust)
 ELEVENLABS_STYLE_VOICES = {
     "뉴스": {
         "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 신뢰감 있는 뉴스 앵커 스타일
-        "stability": 0.7,
+        "stability": 1.0,  # Robust - 안정적이고 일관된 톤
         "similarity_boost": 0.8,
     },
     "정보": {
         "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 친근한 설명 스타일
-        "stability": 0.5,
+        "stability": 0.5,  # Natural - 자연스러운 톤
         "similarity_boost": 0.75,
     },
     "믿거나말거나": {
         "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 미스터리 내레이션
-        "stability": 0.4,
+        "stability": 0.0,  # Creative - 다양하고 극적인 톤
         "similarity_boost": 0.7,
     },
     "불교종교": {
         "voice_id": "4p0HBzAAGyju0nYfNntV",  # 사용자 지정 - 명상/위로 스타일
-        "stability": 0.35,  # 낮으면 더 감정적
+        "stability": 0.0,  # Creative - 감정적이고 따뜻한 톤
         "similarity_boost": 0.8,
     },
 }
