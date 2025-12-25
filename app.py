@@ -277,9 +277,12 @@ def get_elevenlabs_usage_info():
                 f"리셋: {usage['reset_date']} | "
                 f"플랜: {usage['tier']}"
             )
-    except Exception:
-        pass
-    return ""
+        else:
+            print("[ElevenLabs] usage 반환값 없음")
+            return ""
+    except Exception as e:
+        print(f"[ElevenLabs] 사용량 조회 오류: {e}")
+        return f"⚠️ ElevenLabs 사용량 조회 실패: {e}"
 
 
 def preview_tts_script(engine: str):
