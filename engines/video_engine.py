@@ -340,7 +340,8 @@ class VideoEngine:
             f"OutlineColour={style['outline_color']},"
             f"Outline={style['outline']},"
             f"Shadow={style['shadow']},"
-            f"MarginV={style['margin_v']}"
+            f"MarginV={style['margin_v']},"
+            f"Alignment={style.get('alignment', 2)}"
         )
 
         cmd = [
