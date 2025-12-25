@@ -263,6 +263,25 @@ def generate_script_and_images(topic: str, duration: int, style: str):
 # TTS 생성
 # ═══════════════════════════════════════════════════════════════
 
+def get_elevenlabs_usage_info():
+    """ElevenLabs 사용량 정보 가져오기"""
+    try:
+        from engines.tts_engine import TTSEngine
+        tts = TTSEngine(engine="elevenlabs", style=None)
+        usage = tts.get_elevenlabs_usage()
+        if usage:
+            return (
+                f"📊 **ElevenLabs 사용량**: "
+                f"{usage['used']:,} / {usage['limit']:,} 문자 "
+                f"({usage['percent']}%) | "
+                f"리셋: {usage['reset_date']} | "
+                f"플랜: {usage['tier']}"
+            )
+    except Exception:
+        pass
+    return ""
+
+
 def preview_tts_script(engine: str):
     """TTS에 입력될 대사 미리보기"""
     if not pipeline.project or not pipeline.project.script:
@@ -272,12 +291,21 @@ def preview_tts_script(engine: str):
     style = getattr(pipeline.project, 'style', None)
     total_scenes = len(script.scenes)
 
+    # ElevenLabs 사용량 표시
+    usage_info = ""
+    if engine == "elevenlabs":
+        usage_info = get_elevenlabs_usage_info()
+        if usage_info:
+            usage_info = f"\n\n{usage_info}\n\n---\n"
+
     # EMOTION_TAGS 가져오기
     from config import EMOTION_TAGS
 
     preview = f"## 🎙️ TTS 입력 대사 미리보기\n"
-    preview += f"**엔진**: {engine} | **스타일**: {style or '없음'} | **씬**: {total_scenes}개\n\n"
-    preview += "---\n\n"
+    preview += f"**엔진**: {engine} | **스타일**: {style or '없음'} | **씬**: {total_scenes}개\n"
+    if usage_info:
+        preview += usage_info
+    preview += "\n---\n\n"
 
     for i, scene in enumerate(script.scenes):
         position = i / total_scenes
@@ -945,7 +973,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         # ─────────────────────────────────────────────
         # Tab 5: 썸네일 생성
         # ─────────────────────────────────────────────
-        with gr.Tab("5️⃣ 썸네일"):
+        with gr.Tab("5️⃣ 썸네일") as thumb_tab:
             gr.Markdown("### 🖼️ 썸네일 생성")
             gr.Markdown("*이미지 선택 → 텍스트 생성 → 미리보기 → 확정*")
 
@@ -1117,6 +1145,13 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     final_btn.click(finalize_video, [], [status, final_video])
 
     # Tab 5: 썸네일
+    # 탭 선택시 갤러리 자동 로드
+    thumb_tab.select(
+        get_thumbnail_gallery_images,
+        [],
+        [thumb_gallery]
+    )
+
     # 갤러리 새로고침
     thumb_refresh_btn.click(
         get_thumbnail_gallery_images,
