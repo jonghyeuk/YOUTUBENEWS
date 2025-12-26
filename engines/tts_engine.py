@@ -130,11 +130,11 @@ class TTSEngine:
             )
             segments.append(segment)
 
-            # 씬 사이 짧은 무음 추가
-            silence = PydubSegment.silent(duration=500)  # 0.5초
+            # 씬 사이 무음 추가 (호흡 시간)
+            silence = PydubSegment.silent(duration=2000)  # 2초
             combined += scene_audio + silence
 
-            current_time += duration + 0.5
+            current_time += duration + 2.0
 
         # 파일 저장
         combined.export(output_path, format="mp3")
