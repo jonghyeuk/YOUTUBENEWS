@@ -151,11 +151,11 @@ FFMPEG_FILTERS = {
     # 자막 스타일
     "subtitle_style": {
         "fontname": "NanumMyeongjo",  # 정자체 (나눔명조)
-        "fontsize": 38,  # 크게
+        "fontsize": 72,  # 시니어용: 아주 크게
         "primary_color": "&HFFFFFF",  # 흰색
         "outline_color": "&H000000",  # 검정 외곽선
-        "outline": 3,  # 외곽선 두께
-        "shadow": 1,
+        "outline": 4,  # 외곽선 두께 (더 두껍게)
+        "shadow": 2,  # 그림자 (더 진하게)
         "margin_v": 60,  # 하단 마진 (값이 작을수록 아래)
         "alignment": 2,  # 하단 중앙 정렬
     },
