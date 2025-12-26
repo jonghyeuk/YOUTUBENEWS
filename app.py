@@ -340,13 +340,13 @@ def preview_tts_script(engine: str):
     return preview
 
 
-def generate_tts(engine: str):
+def generate_tts(engine: str, speed: float = 0.9):
     if not pipeline.project or not pipeline.project.script:
         return "❌ 스크립트 생성 필요", None, ""
     try:
         # 프로젝트에 저장된 스타일 가져오기
         style = getattr(pipeline.project, 'style', None)
-        audio_path = pipeline.step3_generate_tts(engine, style=style)
+        audio_path = pipeline.step3_generate_tts(engine, style=style, speed=speed)
         total = sum(s.duration for s in pipeline.project.audio_segments)
 
         # TTS 입력 대사 로그
@@ -367,7 +367,7 @@ def generate_tts(engine: str):
                     f"플랜: {usage['tier']}"
                 )
 
-        return f"✅ TTS 완료 ({total:.1f}초){usage_info}", audio_path, tts_log
+        return f"✅ TTS 완료 ({total:.1f}초, 속도 {speed}x){usage_info}", audio_path, tts_log
     except Exception as e:
         return f"❌ 오류: {e}", None, ""
 
@@ -895,6 +895,13 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         value="wavenet",
                         label="TTS 엔진"
                     )
+                    tts_speed = gr.Slider(
+                        minimum=0.5,
+                        maximum=1.5,
+                        value=0.9,
+                        step=0.05,
+                        label="🎚️ 음성 속도 (0.5=느리게, 1.0=보통, 1.5=빠르게)"
+                    )
                     gr.Markdown("""
                     **엔진 설명**:
                     - `wavenet`: Google Cloud TTS (자연스러움)
@@ -1150,7 +1157,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     # 탭 선택 시 ElevenLabs 사용량 로드
     tts_tab.select(get_elevenlabs_usage_info, [], [elevenlabs_usage_display])
     tts_preview_btn.click(preview_tts_script, [tts_engine], [tts_script_preview])
-    tts_btn.click(generate_tts, [tts_engine], [status, audio_preview, tts_script_preview])
+    tts_btn.click(generate_tts, [tts_engine, tts_speed], [status, audio_preview, tts_script_preview])
 
     # Tab 3: 이미지 생성
     image_engine.change(update_model_choices, [image_engine], [image_model])

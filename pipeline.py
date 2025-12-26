@@ -140,11 +140,12 @@ class Pipeline:
     # Step 3: TTS 생성
     # ─────────────────────────────────────────────
 
-    def step3_generate_tts(self, engine: str = "wavenet", style: str = None) -> str:
+    def step3_generate_tts(self, engine: str = "wavenet", style: str = None, speed: float = None) -> str:
         """3단계: TTS 음성 생성 (스타일별 음성/감정 지원)"""
-        self._log(f"3단계: TTS 생성 중... (엔진: {engine}, 스타일: {style})")
+        speed_info = f", 속도: {speed}" if speed else ""
+        self._log(f"3단계: TTS 생성 중... (엔진: {engine}, 스타일: {style}{speed_info})")
 
-        tts_engine = TTSEngine(engine=engine, style=style)
+        tts_engine = TTSEngine(engine=engine, style=style, speed=speed)
         audio_path = self._get_path("audio_full.mp3")
 
         audio_path, segments = tts_engine.generate_full_audio(
