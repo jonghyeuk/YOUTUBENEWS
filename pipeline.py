@@ -283,7 +283,7 @@ class Pipeline:
         """6단계: 영상 렌더링"""
         effects = []
         if use_ken_burns:
-            effects.append("Ken Burns")
+            effects.append("줌 효과")
         if bgm_path:
             effects.append(f"BGM({int(bgm_volume*100)}%)")
         effect_str = " + ".join(effects) if effects else "기본"
@@ -296,7 +296,7 @@ class Pipeline:
         for scene in self.project.script.scenes:
             scene_images[scene.scene_id] = scene.image_paths
 
-        # 씬별 클립 생성 (Ken Burns 옵션)
+        # 씬별 클립 생성 (줌 효과 옵션)
         clip_paths = self.video_engine.render_scene_clips(
             scene_images=scene_images,
             audio_segments=self.project.audio_segments,
@@ -372,7 +372,7 @@ class Pipeline:
             tts_engine: TTS 엔진 (wavenet, elevenlabs, openai)
             image_engine: 이미지 엔진 (fal, dalle, imagen)
             style_prefix: 이미지 스타일 접두사
-            use_ken_burns: Ken Burns 효과 사용 여부
+            use_ken_burns: 이미지 줌 효과 사용 여부
             bgm_path: 배경음악 파일 경로
 
         Returns:
