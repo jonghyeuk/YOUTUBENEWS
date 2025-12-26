@@ -66,8 +66,11 @@ class SubtitleEngine:
         """ASS 파일 헤더 생성 (스타일 포함)"""
         style = FFMPEG_FILTERS.get("subtitle_style", {})
         fontname = style.get("fontname", "NanumMyeongjo")
-        fontsize = style.get("fontsize", 38)
+        # ASS 폰트 크기: 1080p 기준 48-60이 적절 (config의 38은 SRT용)
+        fontsize = 52  # 시니어 타겟: 크게
         margin_v = style.get("margin_v", 60)
+        outline = style.get("outline", 3)
+        shadow = style.get("shadow", 1)
 
         return f"""[Script Info]
 Title: Auto-generated subtitles
@@ -78,7 +81,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{fontname},{fontsize},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,3,1,2,10,10,{margin_v},1
+Style: Default,{fontname},{fontsize},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,{outline},{shadow},2,10,10,{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
