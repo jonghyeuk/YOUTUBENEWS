@@ -254,20 +254,21 @@ class Pipeline:
         self._log(f"5단계: 자막 생성 중... ({method})")
 
         subtitle_engine = SubtitleEngine(use_whisper=use_whisper)
-        subtitle_path = self._get_path("subtitles.srt")
+        subtitle_path = self._get_path("subtitles.ass")
 
-        subtitle_engine.generate_srt(
+        # generate_srt returns the actual path (.ass format)
+        actual_path = subtitle_engine.generate_srt(
             script=self.project.script,
             audio_segments=self.project.audio_segments,
             output_path=subtitle_path,
             audio_path=self.project.audio_path if use_whisper else None
         )
 
-        self.project.subtitle_path = subtitle_path
+        self.project.subtitle_path = actual_path
         self.project.current_step = 5
 
         self._log("자막 생성 완료")
-        return subtitle_path
+        return actual_path
 
     # ─────────────────────────────────────────────
     # Step 6: 영상 렌더링
