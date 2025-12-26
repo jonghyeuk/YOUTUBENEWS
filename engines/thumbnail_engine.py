@@ -153,14 +153,31 @@ class ThumbnailEngine:
                 outline_width=3
             )
 
-        # 메인 텍스트 (중앙)
-        self._draw_text_with_outline(
-            draw, main_text, main_font,
-            position=(width // 2, height // 2),
-            fill=colors["primary"],
-            outline=colors["outline"],
-            outline_width=4
-        )
+        # 메인 텍스트 (중앙) - 멀티라인 지원
+        if "\n" in main_text:
+            # 2줄 텍스트: 같은 크기로 각 줄 렌더링
+            lines = main_text.split("\n")
+            line_height = 100  # 줄 간격
+            total_height = len(lines) * line_height
+            start_y = height // 2 - total_height // 2 + line_height // 2
+
+            for i, line in enumerate(lines):
+                self._draw_text_with_outline(
+                    draw, line, main_font,
+                    position=(width // 2, start_y + i * line_height),
+                    fill=colors["primary"],
+                    outline=colors["outline"],
+                    outline_width=4
+                )
+        else:
+            # 1줄 텍스트
+            self._draw_text_with_outline(
+                draw, main_text, main_font,
+                position=(width // 2, height // 2),
+                fill=colors["primary"],
+                outline=colors["outline"],
+                outline_width=4
+            )
 
         # 하단 텍스트
         if bottom_text:
@@ -290,19 +307,15 @@ class ThumbnailEngine:
         self,
         project,
         main_text: str = None,
-        sub_text: str = "",
-        bottom_text: str = "",
         output_path: str = None,
         auto_generate: bool = True
     ) -> str:
         """
-        프로젝트에서 썸네일 생성
+        프로젝트에서 썸네일 생성 (메인 텍스트만 자동 생성)
 
         Args:
             project: Project 객체
             main_text: 메인 텍스트 (None이면 자동 생성)
-            sub_text: 서브 텍스트
-            bottom_text: 하단 텍스트
             output_path: 출력 경로
             auto_generate: main_text 없을 때 자동 생성 여부
 
@@ -337,8 +350,6 @@ class ThumbnailEngine:
         return self.create_thumbnail(
             background_image=background,
             main_text=main_text,
-            sub_text=sub_text,
-            bottom_text=bottom_text,
             style=style,
             output_path=output_path
         )

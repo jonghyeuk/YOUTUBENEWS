@@ -16,17 +16,19 @@ class TTSEngine:
 
     ENGINES = ["wavenet", "elevenlabs", "openai"]
 
-    def __init__(self, engine: str = "wavenet", style: str = None):
+    def __init__(self, engine: str = "wavenet", style: str = None, speed: float = None):
         """
         Args:
             engine: "wavenet" (기본), "elevenlabs", 또는 "openai"
             style: 콘텐츠 스타일 (뉴스/정보/믿거나말거나/불교종교)
+            speed: 음성 속도 (None이면 config/스타일 설정 사용)
         """
         if engine not in self.ENGINES:
             raise ValueError(f"지원하지 않는 엔진: {engine}. 사용 가능: {self.ENGINES}")
 
         self.engine = engine
         self.style = style
+        self._speed_override = speed  # UI에서 지정한 속도 (우선순위 높음)
         self._init_engine()
 
     def _init_engine(self):
@@ -46,8 +48,8 @@ class TTSEngine:
             language_code="ko-KR",
             name=TTS_CONFIG.get("wavenet_voice", "ko-KR-Wavenet-D")
         )
-        # 속도 설정 (0.25 ~ 4.0)
-        self.speed = TTS_CONFIG.get("speed", 1.0)
+        # 속도 설정: UI 지정값 > config 값 (0.25 ~ 4.0)
+        self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
         self.audio_config = texttospeech.AudioConfig(
             audio_encoding=texttospeech.AudioEncoding.MP3,
             speaking_rate=self.speed,
@@ -66,14 +68,15 @@ class TTSEngine:
             self.voice_id = voice_config["voice_id"]
             self.stability = voice_config.get("stability", 0.5)
             self.similarity_boost = voice_config.get("similarity_boost", 0.75)
-            # 스타일별 속도 (없으면 전역 설정 사용)
-            self.speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
+            # 속도: UI 지정값 > 스타일 값 > 전역 설정
+            style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
+            self.speed = self._speed_override if self._speed_override else style_speed
             print(f"[TTSEngine] ElevenLabs 초기화 완료 (스타일: {self.style}, 속도: {self.speed})")
         else:
             self.voice_id = TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.stability = 0.5
             self.similarity_boost = 0.75
-            self.speed = TTS_CONFIG.get("speed", 1.0)
+            self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
             print(f"[TTSEngine] ElevenLabs 초기화 완료 (기본 음성, 속도: {self.speed})")
 
     def _init_openai(self):
@@ -81,7 +84,8 @@ class TTSEngine:
         from openai import OpenAI
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.voice = TTS_CONFIG.get("openai_voice", "alloy")  # alloy, echo, fable, onyx, nova, shimmer
-        self.speed = TTS_CONFIG.get("speed", 1.0)  # 0.25 ~ 4.0
+        # 속도: UI 지정값 > config 값 (0.25 ~ 4.0)
+        self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
         print(f"[TTSEngine] OpenAI TTS 초기화 완료 (속도: {self.speed})")
 
     def generate_full_audio(
@@ -126,11 +130,11 @@ class TTSEngine:
             )
             segments.append(segment)
 
-            # 씬 사이 짧은 무음 추가
-            silence = PydubSegment.silent(duration=500)  # 0.5초
+            # 씬 사이 무음 추가 (호흡 시간)
+            silence = PydubSegment.silent(duration=2000)  # 2초
             combined += scene_audio + silence
 
-            current_time += duration + 0.5
+            current_time += duration + 2.0
 
         # 파일 저장
         combined.export(output_path, format="mp3")
