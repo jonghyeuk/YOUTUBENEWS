@@ -130,12 +130,12 @@ VIDEO_CONFIG = {
 
 # FFmpeg 필터 설정
 FFMPEG_FILTERS = {
-    # Ken Burns Effect (줌인/줌아웃)
+    # Ken Burns Effect (줌인/줌아웃만 - 부드럽게)
     "ken_burns": {
-        "zoom_in": "zoompan=z='min(zoom+0.0015,1.5)':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
-        "zoom_out": "zoompan=z='if(lte(zoom,1.0),1.5,max(1.001,zoom-0.0015))':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
-        "pan_left": "zoompan=z='1.3':d={duration}:x='if(lte(on,1),(iw-iw/zoom)/2,x-1)':y='(ih-ih/zoom)/2':s={resolution}:fps={fps}",
-        "pan_right": "zoompan=z='1.3':d={duration}:x='if(lte(on,1),0,min(x+1,(iw-iw/zoom)))':y='(ih-ih/zoom)/2':s={resolution}:fps={fps}",
+        # 줌인: 1.0 → 1.2 (20% 확대, 부드러운 속도)
+        "zoom_in": "zoompan=z='min(zoom+0.001,1.2)':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
+        # 줌아웃: 1.2 → 1.0 (축소, 부드러운 속도)
+        "zoom_out": "zoompan=z='if(lte(zoom,1.0),1.2,max(1.001,zoom-0.001))':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
     },
     # 오디오 믹싱 (TTS + BGM)
     "audio_mix": {
@@ -150,7 +150,7 @@ FFMPEG_FILTERS = {
         "outline_color": "&H000000",  # 검정 외곽선
         "outline": 3,  # 외곽선 두께
         "shadow": 1,
-        "margin_v": 120,  # 화면 중간 아래 (값이 클수록 위로)
+        "margin_v": 60,  # 하단 마진 (값이 작을수록 아래)
         "alignment": 2,  # 하단 중앙 정렬
     },
 }

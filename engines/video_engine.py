@@ -244,14 +244,23 @@ class VideoEngine:
         return output_path
 
     def _add_audio_simple(self, video_path: str, audio_path: str, output_path: str):
-        """TTS 오디오만 추가"""
+        """TTS 오디오만 추가 (오디오 길이 기준 + 페이드아웃)"""
+        # 오디오 길이 확인
+        audio_duration = get_audio_duration(audio_path)
+        fade_out_duration = 3  # 마지막 3초 페이드아웃
+
+        # TTS에 페이드아웃 적용
+        filter_audio = f"afade=t=out:st={max(0, audio_duration - fade_out_duration)}:d={fade_out_duration}"
+
         cmd = [
             "ffmpeg", "-y",
+            "-stream_loop", "-1",  # 비디오 반복 (오디오보다 짧을 경우)
             "-i", video_path.replace("\\", "/"),
             "-i", audio_path.replace("\\", "/"),
+            "-af", filter_audio,
             "-c:v", "copy",
             "-c:a", "aac",
-            "-shortest",
+            "-t", str(audio_duration),  # 오디오 길이로 제한
             output_path.replace("\\", "/")
         ]
         subprocess.run(cmd, check=True, capture_output=True)
@@ -264,16 +273,16 @@ class VideoEngine:
         output_path: str,
         bgm_volume: float = 0.15
     ):
-        """TTS + BGM 믹싱하여 추가 (BGM 자동 반복)"""
+        """TTS + BGM 믹싱하여 추가 (오디오 길이 기준 + 페이드아웃)"""
         # 오디오 길이 확인
         tts_duration = get_audio_duration(tts_path)
 
-        # BGM에 페이드 아웃 적용하고 TTS와 믹싱
+        # 페이드 아웃 설정
         fade_out = BGM_CONFIG.get("fade_out", 3)
 
-        # BGM 반복 + 볼륨 + 페이드아웃 적용
+        # TTS + BGM 모두 페이드아웃 적용
         filter_complex = (
-            f"[1:a]volume=1.0[tts];"
+            f"[1:a]afade=t=out:st={max(0, tts_duration - fade_out)}:d={fade_out}[tts];"
             f"[2:a]aloop=loop=-1:size=2e+09,volume={bgm_volume},"
             f"afade=t=out:st={max(0, tts_duration - fade_out)}:d={fade_out}[bgm];"
             f"[tts][bgm]amix=inputs=2:duration=first:dropout_transition=2[aout]"
@@ -281,6 +290,7 @@ class VideoEngine:
 
         cmd = [
             "ffmpeg", "-y",
+            "-stream_loop", "-1",  # 비디오 반복 (오디오보다 짧을 경우)
             "-i", video_path.replace("\\", "/"),
             "-i", tts_path.replace("\\", "/"),
             "-i", bgm_path.replace("\\", "/"),
@@ -289,7 +299,7 @@ class VideoEngine:
             "-map", "[aout]",
             "-c:v", "copy",
             "-c:a", "aac",
-            "-shortest",
+            "-t", str(tts_duration),  # 오디오 길이로 제한
             output_path.replace("\\", "/")
         ]
 
