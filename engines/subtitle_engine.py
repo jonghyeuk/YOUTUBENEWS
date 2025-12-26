@@ -66,10 +66,10 @@ class SubtitleEngine:
         """ASS 파일 헤더 생성 (스타일 포함)"""
         style = FFMPEG_FILTERS.get("subtitle_style", {})
         fontname = style.get("fontname", "NanumMyeongjo")
-        # ASS 폰트 크기: 1080p 기준 시니어 타겟은 크게
-        fontsize = 72  # 시니어용: 아주 크게
-        margin_v = style.get("margin_v", 60)
-        outline = style.get("outline", 4)  # 외곽선 더 두껍게
+        # ASS 폰트 크기: config에서 가져옴
+        fontsize = style.get("fontsize", 108)  # 시니어용: 1.5배 크게
+        margin_v = style.get("margin_v", 100)  # 조금 위로
+        outline = style.get("outline", 5)  # 외곽선 더 두껍게
         shadow = style.get("shadow", 2)  # 그림자 더 진하게
 
         return f"""[Script Info]
