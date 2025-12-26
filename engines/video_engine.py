@@ -18,10 +18,13 @@ class VideoEngine:
         self.resolution = VIDEO_CONFIG["resolution"]
         self.fps = VIDEO_CONFIG["fps"]
         self.codec = VIDEO_CONFIG["codec"]
-        # Ken Burns 효과 옵션:
-        # - "static": 움직임 없음 (가장 안정적)
-        # - "zoom_in", "zoom_out": 매우 느린 줌 (3% 범위)
-        self.ken_burns_effects = ["static"]  # 흔들림 완전 제거
+        # Ken Burns 효과 옵션 (부드럽고 자연스러운 움직임):
+        # - "slow_zoom_in": 천천히 확대 (8%)
+        # - "slow_zoom_out": 천천히 축소
+        # - "slow_pan_left": 천천히 왼쪽 이동
+        # - "slow_pan_right": 천천히 오른쪽 이동
+        # - "static": 움직임 없음
+        self.ken_burns_effects = ["slow_zoom_in", "slow_zoom_out", "slow_pan_left", "slow_pan_right"]
 
     def render_scene_clips(
         self,

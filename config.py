@@ -130,13 +130,17 @@ VIDEO_CONFIG = {
 
 # FFmpeg 필터 설정
 FFMPEG_FILTERS = {
-    # Ken Burns Effect (매우 부드러운 줌만)
+    # Ken Burns Effect (부드럽고 자연스러운 움직임)
     "ken_burns": {
-        # 줌인: 1.0 → 1.03 (3% 확대, 매우 느리게)
-        "zoom_in": "zoompan=z='min(zoom+0.0002,1.03)':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
-        # 줌아웃: 1.03 → 1.0 (축소, 매우 느리게)
-        "zoom_out": "zoompan=z='if(lte(zoom,1.0),1.03,max(1.0,zoom-0.0002))':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
-        # 정적: 움직임 없음 (가장 안정적)
+        # 천천히 줌인: 중앙에서 1.0 → 1.08 (8% 확대)
+        "slow_zoom_in": "zoompan=z='min(zoom+0.0001,1.08)':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
+        # 천천히 줌아웃: 1.08 → 1.0
+        "slow_zoom_out": "zoompan=z='if(lte(zoom,1.0),1.08,max(1.0,zoom-0.0001))':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
+        # 왼쪽으로 천천히 이동 (1.1배 확대 상태에서 패닝)
+        "slow_pan_left": "zoompan=z='1.1':d={duration}:x='if(lte(x,0),(iw-iw/zoom),x-0.5)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
+        # 오른쪽으로 천천히 이동
+        "slow_pan_right": "zoompan=z='1.1':d={duration}:x='if(gte(x,iw-iw/zoom),0,x+0.5)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
+        # 정적: 움직임 없음
         "static": "zoompan=z='1':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
     },
     # 오디오 믹싱 (TTS + BGM)
