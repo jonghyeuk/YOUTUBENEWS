@@ -125,38 +125,33 @@ class VideoEngine:
 
     def _apply_smooth_zoom(self, clip, start_zoom, end_zoom, duration):
         """부드러운 줌 효과 적용 (부동소수점 계산으로 떨림 없음)"""
+        from PIL import Image
+        import numpy as np
+
         w, h = clip.size
 
-        # 줌 비율 계산 함수 (시간에 따라 선형 보간)
-        def zoom_func(t):
-            progress = t / duration
-            current_zoom = start_zoom + (end_zoom - start_zoom) * progress
-            return current_zoom
+        def make_frame(gf, t):
+            """각 프레임에 줌 효과 적용"""
+            frame = gf(t)
 
-        # 새 크기로 리사이즈하고 중앙 크롭
-        def make_frame(get_frame):
-            def new_frame(t):
-                frame = get_frame(t)
-                zoom = zoom_func(t)
+            # 줌 비율 계산 (시간에 따라 선형 보간)
+            progress = t / duration if duration > 0 else 0
+            zoom = start_zoom + (end_zoom - start_zoom) * progress
 
-                # 새 크기 계산 (부동소수점 유지)
-                new_w = int(w * zoom)
-                new_h = int(h * zoom)
+            # 새 크기 계산
+            new_w = int(w * zoom)
+            new_h = int(h * zoom)
 
-                # PIL로 고품질 리사이즈 (Lanczos)
-                from PIL import Image
-                import numpy as np
+            # PIL로 고품질 리사이즈 (Lanczos)
+            img = Image.fromarray(frame)
+            img_resized = img.resize((new_w, new_h), Image.LANCZOS)
 
-                img = Image.fromarray(frame)
-                img_resized = img.resize((new_w, new_h), Image.LANCZOS)
+            # 중앙 크롭 (원본 크기로)
+            left = (new_w - w) // 2
+            top = (new_h - h) // 2
+            img_cropped = img_resized.crop((left, top, left + w, top + h))
 
-                # 중앙 크롭 (원본 크기로)
-                left = (new_w - w) // 2
-                top = (new_h - h) // 2
-                img_cropped = img_resized.crop((left, top, left + w, top + h))
-
-                return np.array(img_cropped)
-            return new_frame
+            return np.array(img_cropped)
 
         # 새 클립 생성
         new_clip = clip.fl(make_frame)
