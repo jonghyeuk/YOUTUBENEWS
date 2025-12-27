@@ -6,6 +6,11 @@ import random
 import subprocess
 from typing import List, Dict, Optional
 
+# Pillow 10+ 호환성 패치 (ANTIALIAS → LANCZOS)
+import PIL.Image
+if not hasattr(PIL.Image, 'ANTIALIAS'):
+    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
+
 from moviepy.editor import ImageClip, concatenate_videoclips, CompositeVideoClip
 from moviepy.video.fx.resize import resize
 
