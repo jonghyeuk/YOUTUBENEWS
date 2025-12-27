@@ -128,21 +128,8 @@ VIDEO_CONFIG = {
     "codec": "libx264",
 }
 
-# FFmpeg 필터 설정
+# FFmpeg 필터 설정 (오디오 믹싱, 자막 스타일)
 FFMPEG_FILTERS = {
-    # Ken Burns Effect (확실히 눈에 보이는 움직임)
-    "ken_burns": {
-        # 줌인: 1.0 → 1.25 (25% 확대, 확실히 보임)
-        "slow_zoom_in": "zoompan=z='min(zoom+0.001,1.25)':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
-        # 줌아웃: 1.25 → 1.0 (축소)
-        "slow_zoom_out": "zoompan=z='if(lte(zoom,1.0),1.25,max(1.0,zoom-0.001))':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
-        # 왼쪽으로 이동 (1.2배 확대 상태)
-        "slow_pan_left": "zoompan=z='1.2':d={duration}:x='if(lte(x,0),(iw-iw/zoom),x-3)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
-        # 오른쪽으로 이동
-        "slow_pan_right": "zoompan=z='1.2':d={duration}:x='if(gte(x,iw-iw/zoom),0,x+3)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
-        # 정적: 움직임 없음
-        "static": "zoompan=z='1':d={duration}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={resolution}:fps={fps}",
-    },
     # 오디오 믹싱 (TTS + BGM)
     "audio_mix": {
         # TTS 볼륨 1.0, BGM 볼륨 0.15
@@ -151,12 +138,12 @@ FFMPEG_FILTERS = {
     # 자막 스타일
     "subtitle_style": {
         "fontname": "NanumMyeongjo",  # 정자체 (나눔명조)
-        "fontsize": 72,  # 시니어용: 아주 크게
+        "fontsize": 108,  # 시니어용: 1.5배 더 크게 (72→108)
         "primary_color": "&HFFFFFF",  # 흰색
         "outline_color": "&H000000",  # 검정 외곽선
-        "outline": 4,  # 외곽선 두께 (더 두껍게)
+        "outline": 5,  # 외곽선 두께 (더 두껍게)
         "shadow": 2,  # 그림자 (더 진하게)
-        "margin_v": 60,  # 하단 마진 (값이 작을수록 아래)
+        "margin_v": 100,  # 하단 마진 (조금 위로)
         "alignment": 2,  # 하단 중앙 정렬
     },
 }

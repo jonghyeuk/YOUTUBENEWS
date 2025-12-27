@@ -970,7 +970,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     subtitle_btn = gr.Button("📄 자막 생성")
 
                     gr.Markdown("---")
-                    use_ken_burns = gr.Checkbox(label="Ken Burns 효과", value=True)
+                    use_ken_burns = gr.Checkbox(label="🎬 이미지 줌 효과 (부드러운 확대/축소)", value=True)
 
                     gr.Markdown("### 🎵 BGM 선택")
                     with gr.Row():

@@ -1,10 +1,13 @@
 """
-영상 렌더링 엔진 - FFmpeg 기반 (Ken Burns + BGM 믹싱)
+영상 렌더링 엔진 - MoviePy 기반 (부드러운 줌 효과 + BGM 믹싱)
 """
 import os
 import random
 import subprocess
 from typing import List, Dict, Optional
+
+from moviepy.editor import ImageClip, concatenate_videoclips, CompositeVideoClip
+from moviepy.video.fx.resize import resize
 
 from models.types import Script, AudioSegment
 from config import DURATION_SPECS, VIDEO_CONFIG, FFMPEG_FILTERS, BGM_CONFIG
@@ -12,35 +15,31 @@ from engines.audio_utils import get_audio_duration
 
 
 class VideoEngine:
-    """FFmpeg를 사용한 영상 생성 (Ken Burns Effect + BGM)"""
+    """MoviePy를 사용한 영상 생성 (부드러운 줌 효과 + BGM)"""
 
     def __init__(self):
         self.resolution = VIDEO_CONFIG["resolution"]
+        self.width, self.height = map(int, self.resolution.split("x"))
         self.fps = VIDEO_CONFIG["fps"]
         self.codec = VIDEO_CONFIG["codec"]
-        # Ken Burns 효과 옵션 (부드럽고 자연스러운 움직임):
-        # - "slow_zoom_in": 천천히 확대 (8%)
-        # - "slow_zoom_out": 천천히 축소
-        # - "slow_pan_left": 천천히 왼쪽 이동
-        # - "slow_pan_right": 천천히 오른쪽 이동
-        # - "static": 움직임 없음
-        self.ken_burns_effects = ["slow_zoom_in", "slow_zoom_out", "slow_pan_left", "slow_pan_right"]
+        # 부드러운 이미지 효과 옵션
+        self.image_effects = ["zoom_in", "zoom_out"]
 
     def render_scene_clips(
         self,
         scene_images: Dict[int, List[str]],
         audio_segments: List[AudioSegment],
         output_dir: str,
-        use_ken_burns: bool = True
+        use_ken_burns: bool = True  # 하위 호환용 파라미터명 유지
     ) -> List[str]:
         """
-        씬별 영상 클립 생성 (Ken Burns Effect 적용)
+        씬별 영상 클립 생성 (부드러운 줌 효과 적용)
 
         Args:
             scene_images: 씬별 이미지 경로 {scene_id: [img_paths]}
             audio_segments: 씬별 오디오 세그먼트
             output_dir: 출력 디렉토리
-            use_ken_burns: Ken Burns 효과 사용 여부
+            use_ken_burns: 이미지 효과 사용 여부
 
         Returns:
             씬 클립 경로 리스트
@@ -62,7 +61,7 @@ class VideoEngine:
             duration_per_image = segment.duration / len(images)
 
             if use_ken_burns:
-                self._create_scene_clip_ken_burns(
+                self._create_scene_clip_smooth_zoom(
                     images=images,
                     duration_per_image=duration_per_image,
                     output_path=clip_path
@@ -79,52 +78,88 @@ class VideoEngine:
 
         return clip_paths
 
-    def _create_scene_clip_ken_burns(
+    def _create_scene_clip_smooth_zoom(
         self,
         images: List[str],
         duration_per_image: float,
         output_path: str
     ):
-        """Ken Burns Effect가 적용된 씬 클립 생성"""
-        temp_clips = []
+        """MoviePy를 사용한 부드러운 줌 효과 씬 클립 생성 (떨림 없음)"""
+        clips = []
 
         for i, img_path in enumerate(images):
-            # 랜덤 효과 선택 (연속 이미지에 다른 효과)
-            effect_name = self.ken_burns_effects[i % len(self.ken_burns_effects)]
-            effect_template = FFMPEG_FILTERS["ken_burns"][effect_name]
+            # 효과 선택 (줌인/줌아웃 교대)
+            effect = self.image_effects[i % len(self.image_effects)]
 
-            # 프레임 수 계산
-            duration_frames = int(duration_per_image * self.fps)
+            # 이미지 클립 생성
+            clip = ImageClip(img_path).set_duration(duration_per_image)
 
-            # 필터 문자열 생성
-            filter_str = effect_template.format(
-                duration=duration_frames,
-                resolution=self.resolution,
-                fps=self.fps
-            )
+            # 부드러운 줌 효과 적용 (부동소수점 계산으로 떨림 방지)
+            if effect == "zoom_in":
+                # 1.0 → 1.15 (15% 확대)
+                zoom_clip = self._apply_smooth_zoom(clip, 1.0, 1.15, duration_per_image)
+            else:  # zoom_out
+                # 1.15 → 1.0 (축소)
+                zoom_clip = self._apply_smooth_zoom(clip, 1.15, 1.0, duration_per_image)
 
-            temp_clip = output_path.replace(".mp4", f"_temp_{i}.mp4")
-
-            cmd = [
-                "ffmpeg", "-y",
-                "-loop", "1",
-                "-i", img_path,
-                "-vf", filter_str,
-                "-t", str(duration_per_image),
-                "-c:v", self.codec,
-                "-pix_fmt", "yuv420p",
-                temp_clip
-            ]
-
-            subprocess.run(cmd, check=True, capture_output=True)
-            temp_clips.append(temp_clip)
+            clips.append(zoom_clip)
 
         # 클립들 합치기
-        self._concat_clips_simple(temp_clips, output_path)
+        final_clip = concatenate_videoclips(clips, method="compose")
 
-        # 임시 파일 삭제
-        for clip in temp_clips:
-            os.remove(clip)
+        # 파일로 저장 (고품질 설정)
+        final_clip.write_videofile(
+            output_path,
+            fps=self.fps,
+            codec=self.codec,
+            audio=False,
+            preset='medium',
+            threads=4,
+            logger=None  # 로그 출력 숨김
+        )
+
+        # 메모리 해제
+        final_clip.close()
+        for clip in clips:
+            clip.close()
+
+    def _apply_smooth_zoom(self, clip, start_zoom, end_zoom, duration):
+        """부드러운 줌 효과 적용 (부동소수점 계산으로 떨림 없음)"""
+        from PIL import Image
+        import numpy as np
+
+        w, h = clip.size
+
+        def make_frame(gf, t):
+            """각 프레임에 줌 효과 적용"""
+            frame = gf(t)
+
+            # 줌 비율 계산 (시간에 따라 선형 보간)
+            progress = t / duration if duration > 0 else 0
+            zoom = start_zoom + (end_zoom - start_zoom) * progress
+
+            # 새 크기 계산
+            new_w = int(w * zoom)
+            new_h = int(h * zoom)
+
+            # PIL로 고품질 리사이즈 (Lanczos)
+            img = Image.fromarray(frame)
+            img_resized = img.resize((new_w, new_h), Image.LANCZOS)
+
+            # 중앙 크롭 (원본 크기로)
+            left = (new_w - w) // 2
+            top = (new_h - h) // 2
+            img_cropped = img_resized.crop((left, top, left + w, top + h))
+
+            return np.array(img_cropped)
+
+        # 새 클립 생성
+        new_clip = clip.fl(make_frame)
+
+        # 출력 해상도에 맞게 최종 리사이즈
+        final_clip = new_clip.resize((self.width, self.height))
+
+        return final_clip
 
     def _create_scene_clip_simple(
         self,
