@@ -107,10 +107,14 @@ class VideoEngine:
                 # 1.15 → 1.0 (축소)
                 zoom_clip = self._apply_smooth_zoom(clip, 1.15, 1.0, duration_per_image)
 
+            # 페이드 인/아웃 효과 추가 (부드러운 전환)
+            fade_duration = 0.5  # 0.5초 페이드
+            zoom_clip = zoom_clip.fadein(fade_duration).fadeout(fade_duration)
+
             clips.append(zoom_clip)
 
-        # 클립들 합치기
-        final_clip = concatenate_videoclips(clips, method="compose")
+        # 클립들 합치기 (크로스페이드 효과)
+        final_clip = concatenate_videoclips(clips, method="compose", padding=-0.3)
 
         # 파일로 저장 (고품질 설정)
         final_clip.write_videofile(

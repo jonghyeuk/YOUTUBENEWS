@@ -1,20 +1,264 @@
 """
-TTS 엔진 - Google WaveNet (기본) + ElevenLabs + OpenAI TTS
+TTS 엔진 - Google WaveNet (기본) + ElevenLabs v3 + ElevenLabs Turbo v2.5 + OpenAI TTS
 스타일별 음성 + 감정 태그 지원
 """
 import os
 import io
-from typing import List, Tuple, Optional
+import re
+from typing import List, Tuple, Optional, Dict
+from dataclasses import dataclass
 from pydub import AudioSegment as PydubSegment
 
 from models.types import Script, Scene, AudioSegment
 from config import TTS_CONFIG, ELEVENLABS_STYLE_VOICES, EMOTION_TAGS
 
 
-class TTSEngine:
-    """TTS 음성 생성 엔진 (WaveNet / ElevenLabs / OpenAI)"""
+# ========== ElevenLabs Turbo v2.5 감정 흉내 시스템 ==========
 
-    ENGINES = ["wavenet", "elevenlabs", "openai"]
+# Turbo v2.5에서 해석할 "사용자 태그" (ElevenLabs로 그대로 보내지 않음)
+EMO_TAGS_V25 = {
+    "neutral", "calm", "sad", "angry", "happy", "fear",
+    "suspense", "tender", "shout", "whisper", "thoughtful"
+}
+PAUSE_TAGS_V25 = {"short pause", "pause", "long pause"}
+
+TAG_RE_V25 = re.compile(
+    r"\[((?:short pause|long pause|pause)|"
+    r"(?:neutral|calm|sad|angry|happy|fear|suspense|tender|shout|whisper|thoughtful))\]",
+    re.IGNORECASE
+)
+
+
+@dataclass
+class TurboSegment:
+    """Turbo v2.5 감정 세그먼트"""
+    emotion: str
+    text: str
+
+
+@dataclass
+class SubtitleSegment:
+    """자막 싱크용 세그먼트 (TTS 텍스트와 분리)"""
+    clean_text: str      # 자막용 클린 텍스트 (SSML 제거)
+    start_time: float    # 시작 시간 (초)
+    end_time: float      # 종료 시간 (초)
+    duration: float      # 길이 (초)
+
+
+def clean_text_for_subtitle(text: str) -> str:
+    """
+    TTS용 텍스트에서 자막용 클린 텍스트 생성
+    - SSML 태그 제거 (<break>, <prosody> 등)
+    - 감정 태그 제거 ([angry], [calm] 등)
+    - 과도한 의성어/말줄임 정리
+    """
+    clean = text
+
+    # 1. SSML 태그 제거
+    clean = re.sub(r'<[^>]+>', '', clean)
+
+    # 2. 감정/pause 태그 제거
+    clean = re.sub(r'\[(short pause|long pause|pause|neutral|calm|sad|angry|happy|fear|suspense|tender|shout|whisper|thoughtful)\]', '', clean, flags=re.IGNORECASE)
+
+    # 3. 기타 대괄호 태그 제거
+    clean = re.sub(r'\[[^\]]+\]', '', clean)
+
+    # 4. 과도한 느낌표/물음표 정리 (3개 이상 → 1개)
+    clean = re.sub(r'!{2,}', '!', clean)
+    clean = re.sub(r'\?{2,}', '?', clean)
+
+    # 5. 연속된 말줄임표 정리
+    clean = re.sub(r'…{2,}', '…', clean)
+    clean = re.sub(r'\.{4,}', '...', clean)
+
+    # 6. 공백 정리
+    clean = re.sub(r'\s+', ' ', clean).strip()
+
+    return clean
+
+
+def extract_break_duration(text: str) -> float:
+    """텍스트에서 <break> 태그들의 총 시간 추출 (초)"""
+    total = 0.0
+    for match in re.finditer(r'<break\s+time="([0-9.]+)s"\s*/>', text):
+        total += float(match.group(1))
+    return total
+
+
+def parse_emotion_tags_for_turbo(text: str, default_emotion: str = "neutral") -> List[TurboSegment]:
+    """
+    입력 텍스트에서 [angry], [sad], [pause] 같은 태그를 파싱하되,
+    Turbo로 보낼 최종 텍스트에는 태그를 남기지 않는다.
+    """
+    emotion = default_emotion
+    buf: List[str] = []
+    out: List[TurboSegment] = []
+
+    def flush():
+        nonlocal buf, emotion
+        t = "".join(buf).strip()
+        if t:
+            out.append(TurboSegment(emotion=emotion, text=t))
+        buf = []
+
+    last = 0
+    for m in TAG_RE_V25.finditer(text):
+        # 태그 이전 텍스트 추가
+        buf.append(text[last:m.start()])
+        tag = m.group(1).lower().strip()
+
+        # 태그 처리
+        if tag in PAUSE_TAGS_V25:
+            # Turbo는 SSML <break>를 지원하므로 pause 태그를 break로 치환
+            if tag == "short pause":
+                buf.append('<break time="0.25s" />')
+            elif tag == "pause":
+                buf.append('<break time="0.6s" />')
+            else:  # long pause
+                buf.append('<break time="1.2s" />')
+        elif tag in EMO_TAGS_V25:
+            # 감정 태그는 구간 분리를 위해 flush 후 감정 상태 변경
+            flush()
+            emotion = tag
+        # 다음 위치
+        last = m.end()
+
+    buf.append(text[last:])
+    flush()
+    return out
+
+
+def shape_text_for_turbo(text: str, emotion: str) -> str:
+    """
+    감정 흉내를 강화하는 텍스트 변형 (구두점/호흡/SSML break)
+    Turbo v2.5는 태그 대신 문장 형태에 반응
+    """
+    t = text.strip()
+
+    # (필수) 남아있는 모든 [ ... ] 제거 — Turbo가 읽어버리는 사고 방지
+    t = re.sub(r"\[[^\]]+\]", "", t)
+
+    # 과도한 느낌표/물음표는 2개까지만 허용
+    def cap_marks(s: str) -> str:
+        s = re.sub(r"!{3,}", "!!", s)
+        s = re.sub(r"\?{3,}", "??", s)
+        s = re.sub(r"\?!{2,}|\!\?{2,}", "?!", s)
+        return s
+
+    t = cap_marks(t)
+
+    # 감정별 미세 튜닝
+    if emotion in ("angry", "shout"):
+        # 짧게 끊고, 강한 끝맺음
+        t = t.replace("...", "…")
+        if not t.endswith(("!", "!!", "?", "??", "…")):
+            t += "!"
+        # 질문형이면 ?!로 살짝 올리기
+        if t.endswith("?"):
+            t = t[:-1] + "?!"
+
+    elif emotion in ("sad", "tender"):
+        # 호흡 늘리고, 말줄임/쉼표로 속도 떨어뜨림
+        t = t.replace("!", ".")
+        t = t.replace("??", "?")
+        # 문장 중간에 너무 길면 약한 break 삽입
+        if len(t) > 80 and "<break" not in t:
+            t = t.replace(",", ', <break time="0.25s" />', 1)
+
+    elif emotion in ("fear", "suspense"):
+        # 짧은 호흡과 멈칫
+        if "<break" not in t:
+            # 핵심 단어 앞에 짧은 멈춤
+            t = re.sub(r"(그때|순간|문득|갑자기)", r'<break time="0.25s" /> \1', t, count=1)
+        t = t.replace("!", "!!")  # 공포는 가끔 강세가 필요
+
+    elif emotion in ("happy",):
+        # 밝게, 다만 과한 느낌표 금지
+        t = re.sub(r"!{2,}", "!", t)
+        if not t.endswith(("!", "?", "…")):
+            t += "!"
+
+    elif emotion in ("whisper", "thoughtful", "calm"):
+        # 차분하게
+        t = re.sub(r"!+", ".", t)
+        t = t.replace("!!", ".")
+        if len(t) > 90 and "<break" not in t:
+            t = t + ' <break time="0.35s" />'
+
+    return t.strip()
+
+
+def voice_settings_for_emotion(emotion: str) -> Dict:
+    """감정별 voice_settings 프리셋 (Turbo v2.5용)"""
+    # 기본값(중립)
+    base = dict(
+        stability=0.60,
+        similarity_boost=0.82,
+        style=0.20,
+        use_speaker_boost=True,
+    )
+
+    presets = {
+        "neutral":    dict(stability=0.60, similarity_boost=0.82, style=0.20),
+        "calm":       dict(stability=0.75, similarity_boost=0.84, style=0.10),
+        "thoughtful": dict(stability=0.70, similarity_boost=0.84, style=0.15),
+
+        "sad":        dict(stability=0.78, similarity_boost=0.80, style=0.15),
+        "tender":     dict(stability=0.72, similarity_boost=0.83, style=0.20),
+
+        "happy":      dict(stability=0.45, similarity_boost=0.83, style=0.35),
+        "angry":      dict(stability=0.30, similarity_boost=0.86, style=0.55),
+        "shout":      dict(stability=0.25, similarity_boost=0.86, style=0.60),
+
+        "fear":       dict(stability=0.38, similarity_boost=0.84, style=0.45),
+        "suspense":   dict(stability=0.50, similarity_boost=0.84, style=0.40),
+
+        "whisper":    dict(stability=0.65, similarity_boost=0.82, style=0.12),
+    }
+
+    cfg = presets.get(emotion, base)
+    result = base.copy()
+    result.update(cfg)
+    return result
+
+
+# 스타일별 기본 감정 매핑 (Turbo v2.5용)
+STYLE_DEFAULT_EMOTIONS_V25 = {
+    "불교종교": {
+        "intro": "calm",
+        "body_early": "sad",
+        "body_late": "tender",
+        "climax": "thoughtful",
+        "ending": "calm",
+    },
+    "믿거나말거나": {
+        "intro": "neutral",
+        "body_early": "suspense",
+        "body_late": "fear",
+        "climax": "angry",
+        "ending": "thoughtful",
+    },
+    "뉴스": {
+        "intro": "neutral",
+        "body_early": "neutral",
+        "body_late": "neutral",
+        "climax": "neutral",
+        "ending": "calm",
+    },
+    "정보": {
+        "intro": "happy",
+        "body_early": "neutral",
+        "body_late": "neutral",
+        "climax": "happy",
+        "ending": "calm",
+    },
+}
+
+
+class TTSEngine:
+    """TTS 음성 생성 엔진 (WaveNet / ElevenLabs v3 / ElevenLabs Turbo v2.5 / OpenAI)"""
+
+    ENGINES = ["wavenet", "elevenlabs", "elevenlabs2.5", "openai"]
 
     def __init__(self, engine: str = "wavenet", style: str = None, speed: float = None):
         """
@@ -37,6 +281,8 @@ class TTSEngine:
             self._init_wavenet()
         elif self.engine == "elevenlabs":
             self._init_elevenlabs()
+        elif self.engine == "elevenlabs2.5":
+            self._init_elevenlabs_v25()
         elif self.engine == "openai":
             self._init_openai()
 
@@ -79,6 +325,24 @@ class TTSEngine:
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
             print(f"[TTSEngine] ElevenLabs 초기화 완료 (기본 음성, 속도: {self.speed})")
 
+    def _init_elevenlabs_v25(self):
+        """ElevenLabs Turbo v2.5 초기화 (SSML + voice_settings 기반 감정 흉내)"""
+        from elevenlabs.client import ElevenLabs
+        self.client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
+
+        # 스타일별 음성 설정 가져오기
+        if self.style and self.style in ELEVENLABS_STYLE_VOICES:
+            voice_config = ELEVENLABS_STYLE_VOICES[self.style]
+            self.voice_id = voice_config["voice_id"]
+            # 속도: UI 지정값 > 스타일 값 > 전역 설정
+            style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
+            self.speed = self._speed_override if self._speed_override else style_speed
+            print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 (스타일: {self.style}, 속도: {self.speed})")
+        else:
+            self.voice_id = TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
+            self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
+            print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 (기본 음성, 속도: {self.speed})")
+
     def _init_openai(self):
         """OpenAI TTS 초기화"""
         from openai import OpenAI
@@ -92,7 +356,7 @@ class TTSEngine:
         self,
         script: Script,
         output_path: str
-    ) -> Tuple[str, List[AudioSegment]]:
+    ) -> Tuple[str, List[AudioSegment], List[SubtitleSegment]]:
         """
         전체 대본으로 단일 오디오 파일 생성
 
@@ -101,9 +365,10 @@ class TTSEngine:
             output_path: 출력 파일 경로
 
         Returns:
-            (오디오 파일 경로, 씬별 AudioSegment 리스트)
+            (오디오 파일 경로, 씬별 AudioSegment 리스트, 자막용 SubtitleSegment 리스트)
         """
         segments = []
+        subtitle_segments = []  # 자막 싱크용 세그먼트
         combined = PydubSegment.empty()
         current_time = 0.0
         total_scenes = len(script.scenes)
@@ -113,11 +378,14 @@ class TTSEngine:
         for i, scene in enumerate(script.scenes):
             print(f"[TTSEngine] 씬 {scene.scene_id}/{total_scenes} 처리 중...")
 
-            # 감정 태그 추가 (ElevenLabs + 스타일 설정 시)
+            # 원본 텍스트 저장 (자막용)
+            original_text = scene.text
+
+            # 감정 태그 추가 (ElevenLabs v3 + 스타일 설정 시)
             text_with_emotion = self._add_emotion_tag(scene.text, i, total_scenes)
 
-            # 씬별 TTS 생성
-            audio_data = self._synthesize(text_with_emotion)
+            # 씬별 TTS 생성 (elevenlabs2.5는 scene 정보 필요)
+            audio_data = self._synthesize(text_with_emotion, scene_idx=i, total_scenes=total_scenes)
             scene_audio = PydubSegment.from_mp3(io.BytesIO(audio_data))
 
             duration = len(scene_audio) / 1000.0  # ms → sec
@@ -130,6 +398,16 @@ class TTSEngine:
             )
             segments.append(segment)
 
+            # 자막용 클린 텍스트 생성 (SSML, 감정 태그 제거)
+            clean_text = clean_text_for_subtitle(original_text)
+            subtitle_seg = SubtitleSegment(
+                clean_text=clean_text,
+                start_time=current_time,
+                end_time=current_time + duration,
+                duration=duration
+            )
+            subtitle_segments.append(subtitle_seg)
+
             # 씬 사이 무음 추가 (호흡 시간)
             silence = PydubSegment.silent(duration=2000)  # 2초
             combined += scene_audio + silence
@@ -141,8 +419,9 @@ class TTSEngine:
 
         total_duration = sum(s.duration for s in segments)
         print(f"[TTSEngine] TTS 생성 완료: {total_duration:.1f}초")
+        print(f"[TTSEngine] 자막 세그먼트: {len(subtitle_segments)}개 생성")
 
-        return output_path, segments
+        return output_path, segments, subtitle_segments
 
     def _add_emotion_tag(self, text: str, scene_idx: int, total_scenes: int) -> str:
         """씬 위치에 따라 감정 태그 추가 (ElevenLabs용)"""
@@ -174,12 +453,14 @@ class TTSEngine:
 
         return text
 
-    def _synthesize(self, text: str) -> bytes:
+    def _synthesize(self, text: str, scene_idx: int = 0, total_scenes: int = 1) -> bytes:
         """텍스트를 음성으로 변환"""
         if self.engine == "wavenet":
             return self._synthesize_wavenet(text)
         elif self.engine == "elevenlabs":
             return self._synthesize_elevenlabs(text)
+        elif self.engine == "elevenlabs2.5":
+            return self._synthesize_elevenlabs_v25(text, scene_idx, total_scenes)
         elif self.engine == "openai":
             return self._synthesize_openai(text)
 
@@ -218,6 +499,81 @@ class TTSEngine:
         audio_bytes = b"".join(audio_generator)
         return audio_bytes
 
+    def _synthesize_elevenlabs_v25(self, text: str, scene_idx: int, total_scenes: int) -> bytes:
+        """
+        ElevenLabs Turbo v2.5 TTS (SSML + voice_settings 기반 감정 흉내)
+        - 태그를 읽지 않게 제거하고 내부 감정 상태로만 사용
+        - 텍스트 변형 + <break> + 구간별 voice_settings 적용
+        """
+        # 씬 위치에 따른 기본 감정 결정
+        default_emotion = self._get_default_emotion_v25(scene_idx, total_scenes)
+
+        # 텍스트에서 감정 태그 파싱 (태그는 제거됨)
+        segments = parse_emotion_tags_for_turbo(text, default_emotion)
+
+        if not segments:
+            segments = [TurboSegment(emotion=default_emotion, text=text)]
+
+        audio_chunks: List[bytes] = []
+
+        for seg in segments:
+            # 감정에 맞게 텍스트 변형 (구두점, SSML break 등)
+            shaped_text = shape_text_for_turbo(seg.text, seg.emotion)
+
+            if not shaped_text.strip():
+                continue
+
+            # 감정별 voice_settings 적용
+            vs = voice_settings_for_emotion(seg.emotion)
+            vs["speed"] = getattr(self, 'speed', 1.0)
+
+            print(f"[TTSEngine] Turbo v2.5 감정: {seg.emotion}, settings: stability={vs['stability']:.2f}, style={vs['style']:.2f}")
+
+            # Turbo v2.5 API 호출
+            audio_generator = self.client.text_to_speech.convert(
+                text=shaped_text,
+                voice_id=self.voice_id,
+                model_id="eleven_turbo_v2_5",  # Turbo v2.5: SSML 지원, 빠름
+                voice_settings=vs
+            )
+
+            audio_bytes = b"".join(audio_generator)
+            audio_chunks.append(audio_bytes)
+
+        # 모든 세그먼트 오디오 병합
+        if len(audio_chunks) == 1:
+            return audio_chunks[0]
+
+        # 여러 세그먼트면 pydub으로 병합
+        combined = PydubSegment.empty()
+        for chunk in audio_chunks:
+            seg_audio = PydubSegment.from_mp3(io.BytesIO(chunk))
+            combined += seg_audio
+
+        # bytes로 반환
+        output_buffer = io.BytesIO()
+        combined.export(output_buffer, format="mp3")
+        return output_buffer.getvalue()
+
+    def _get_default_emotion_v25(self, scene_idx: int, total_scenes: int) -> str:
+        """씬 위치에 따른 기본 감정 반환 (Turbo v2.5용)"""
+        if not self.style or self.style not in STYLE_DEFAULT_EMOTIONS_V25:
+            return "neutral"
+
+        emotions = STYLE_DEFAULT_EMOTIONS_V25[self.style]
+        position = scene_idx / total_scenes if total_scenes > 0 else 0
+
+        if position < 0.15:  # 도입부 (0-15%)
+            return emotions.get("intro", "neutral")
+        elif position < 0.4:  # 전개부 초반 (15-40%)
+            return emotions.get("body_early", "neutral")
+        elif position < 0.7:  # 전개부 후반 (40-70%)
+            return emotions.get("body_late", "neutral")
+        elif position < 0.9:  # 클라이맥스 (70-90%)
+            return emotions.get("climax", "neutral")
+        else:  # 엔딩 (90-100%)
+            return emotions.get("ending", "calm")
+
     def _synthesize_openai(self, text: str) -> bytes:
         """OpenAI TTS"""
         response = self.client.audio.speech.create(
@@ -231,7 +587,7 @@ class TTSEngine:
 
     def get_elevenlabs_usage(self) -> dict:
         """ElevenLabs 사용량 조회"""
-        if self.engine != "elevenlabs":
+        if self.engine not in ("elevenlabs", "elevenlabs2.5"):
             return None
 
         try:
