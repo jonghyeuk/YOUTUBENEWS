@@ -254,13 +254,42 @@ def generate_script_and_images(topic: str, duration: int, style: str):
             for i, prompt in enumerate(all_image_prompts, 1):
                 prompts_text += f"이미지 {i}: {prompt}\n\n"
 
-            return f"✅ 생성 완료! {len(scenes)}개 씬, {len(all_image_prompts)}장 이미지", preview, prompts_text
+            # AI 기반 유튜브 제목/썸네일 생성
+            try:
+                yt_metadata = pipeline.generate_youtube_metadata()
+                yt_title = yt_metadata.get("title", script.title)
+                yt_thumbnail = yt_metadata.get("thumbnail_text", "")
+                # 대안들도 포함
+                title_alts = yt_metadata.get("title_alternatives", [])
+                thumb_alts = yt_metadata.get("thumbnail_alternatives", [])
+
+                title_info = f"**AI 추천 제목**: {yt_title}"
+                if title_alts:
+                    title_info += f"\n\n**대안**: " + " | ".join(title_alts[:2])
+
+                thumb_info = f"**AI 추천 썸네일**: {yt_thumbnail}"
+                if thumb_alts:
+                    thumb_info += f"\n\n**대안**: " + " | ".join(thumb_alts[:2])
+            except Exception as e:
+                print(f"[YouTube Metadata] 생성 실패: {e}")
+                yt_title = script.title
+                yt_thumbnail = f"오늘 밤\n{duration}분"
+                title_info = f"**기본 제목**: {yt_title}"
+                thumb_info = f"**기본 썸네일**: {yt_thumbnail}"
+
+            return (
+                f"✅ 생성 완료! {len(scenes)}개 씬, {len(all_image_prompts)}장 이미지",
+                preview,
+                prompts_text,
+                yt_title,
+                yt_thumbnail.replace("\\n", "\n")
+            )
 
         except json.JSONDecodeError:
-            return "⚠️ JSON 파싱 실패 - 원본 확인", result_text, ""
+            return "⚠️ JSON 파싱 실패 - 원본 확인", result_text, "", "", ""
 
     except Exception as e:
-        return f"❌ 오류: {e}", "", ""
+        return f"❌ 오류: {e}", "", "", "", ""
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -652,10 +681,17 @@ def get_thumbnail_gallery_images():
 
 
 def generate_thumbnail_texts():
-    """AI가 썸네일 텍스트 자동 생성"""
+    """AI 생성 썸네일 텍스트 가져오기 (이미 생성된 경우)"""
     if not pipeline.project or not pipeline.project.script:
         return "❌ 프로젝트/스크립트 없음", "", "", ""
 
+    # AI 생성 메타데이터가 있으면 사용
+    youtube_metadata = getattr(pipeline.project, 'youtube_metadata', None)
+    if youtube_metadata and youtube_metadata.get("thumbnail_text"):
+        main_text = youtube_metadata["thumbnail_text"].replace("\\n", "\n")
+        return "✅ AI 생성 썸네일 텍스트 적용!", "", main_text, ""
+
+    # 없으면 기존 방식으로 생성
     script = pipeline.project.script
     title = script.title or ""
     style = getattr(pipeline.project, 'style', '정보')
@@ -663,7 +699,6 @@ def generate_thumbnail_texts():
     # 스타일별 텍스트 생성
     if style == "불교종교":
         sub_text = "잠자면서 듣는"
-        # 제목에서 핵심 키워드 추출
         if len(title) > 20:
             main_text = title[:20] + "..."
         else:
@@ -769,7 +804,7 @@ def reset_thumbnail():
 # ═══════════════════════════════════════════════════════════════
 
 def prepare_youtube_upload():
-    """YouTube 업로드용 정보 생성 - config.py 규칙 적용"""
+    """YouTube 업로드용 정보 생성 - AI 생성 메타데이터 우선 사용"""
     import random
 
     if not pipeline.project:
@@ -782,13 +817,18 @@ def prepare_youtube_upload():
     # 영상 길이 계산 (분)
     duration = getattr(project, 'duration', 10)
 
-    # 제목 생성 - 템플릿에서 랜덤 선택
-    title_templates = YOUTUBE_TITLE_TEMPLATES.get(style, YOUTUBE_TITLE_TEMPLATES.get("정보", []))
-    if title_templates:
-        title_template = random.choice(title_templates)
-        title = title_template.format(duration=duration)
+    # AI 생성 메타데이터 우선 사용
+    youtube_metadata = getattr(project, 'youtube_metadata', None)
+    if youtube_metadata and youtube_metadata.get("title"):
+        title = youtube_metadata["title"]
     else:
-        title = script.title if script else project.title
+        # 폴백: 템플릿 기반 제목 생성
+        title_templates = YOUTUBE_TITLE_TEMPLATES.get(style, YOUTUBE_TITLE_TEMPLATES.get("정보", []))
+        if title_templates:
+            title_template = random.choice(title_templates)
+            title = title_template.format(duration=duration)
+        else:
+            title = script.title if script else project.title
 
     # 금지어 체크 및 제거
     for forbidden in YOUTUBE_FORBIDDEN_WORDS:
@@ -883,6 +923,22 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         lines=10,
                         placeholder="스크립트 생성 후 자동으로 채워집니다"
                     )
+
+                    gr.Markdown("---")
+                    gr.Markdown("### 📺 유튜브 제목 / 썸네일 (AI 자동 생성)")
+                    with gr.Row():
+                        yt_title_input = gr.Textbox(
+                            label="📌 유튜브 제목 (수정 가능)",
+                            lines=2,
+                            placeholder="스크립트 생성 후 AI가 자동으로 제목을 만듭니다"
+                        )
+                    with gr.Row():
+                        yt_thumbnail_input = gr.Textbox(
+                            label="🖼️ 썸네일 문구 (수정 가능, 줄바꿈 허용)",
+                            lines=2,
+                            placeholder="예: 오늘 밤\n꼭 들으세요"
+                        )
+                    gr.Markdown("*💡 AI가 대본 내용을 분석해 제목과 썸네일을 추천합니다. 직접 수정도 가능합니다.*")
 
         # ─────────────────────────────────────────────
         # Tab 2: TTS
@@ -1143,11 +1199,11 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     # 스타일 변경시 가이드 업데이트
     style_input.change(update_style_guide, [style_input], [style_guide])
 
-    # Tab 1: 스크립트 생성
+    # Tab 1: 스크립트 생성 + AI 제목/썸네일
     generate_btn.click(
         generate_script_and_images,
         [topic_input, duration_input, style_input],
-        [status, script_preview, image_prompts]
+        [status, script_preview, image_prompts, yt_title_input, yt_thumbnail_input]
     )
 
     # 이미지 프롬프트 자동 복사
