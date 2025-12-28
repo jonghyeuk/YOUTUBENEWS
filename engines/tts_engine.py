@@ -36,6 +36,55 @@ class TurboSegment:
     text: str
 
 
+@dataclass
+class SubtitleSegment:
+    """자막 싱크용 세그먼트 (TTS 텍스트와 분리)"""
+    clean_text: str      # 자막용 클린 텍스트 (SSML 제거)
+    start_time: float    # 시작 시간 (초)
+    end_time: float      # 종료 시간 (초)
+    duration: float      # 길이 (초)
+
+
+def clean_text_for_subtitle(text: str) -> str:
+    """
+    TTS용 텍스트에서 자막용 클린 텍스트 생성
+    - SSML 태그 제거 (<break>, <prosody> 등)
+    - 감정 태그 제거 ([angry], [calm] 등)
+    - 과도한 의성어/말줄임 정리
+    """
+    clean = text
+
+    # 1. SSML 태그 제거
+    clean = re.sub(r'<[^>]+>', '', clean)
+
+    # 2. 감정/pause 태그 제거
+    clean = re.sub(r'\[(short pause|long pause|pause|neutral|calm|sad|angry|happy|fear|suspense|tender|shout|whisper|thoughtful)\]', '', clean, flags=re.IGNORECASE)
+
+    # 3. 기타 대괄호 태그 제거
+    clean = re.sub(r'\[[^\]]+\]', '', clean)
+
+    # 4. 과도한 느낌표/물음표 정리 (3개 이상 → 1개)
+    clean = re.sub(r'!{2,}', '!', clean)
+    clean = re.sub(r'\?{2,}', '?', clean)
+
+    # 5. 연속된 말줄임표 정리
+    clean = re.sub(r'…{2,}', '…', clean)
+    clean = re.sub(r'\.{4,}', '...', clean)
+
+    # 6. 공백 정리
+    clean = re.sub(r'\s+', ' ', clean).strip()
+
+    return clean
+
+
+def extract_break_duration(text: str) -> float:
+    """텍스트에서 <break> 태그들의 총 시간 추출 (초)"""
+    total = 0.0
+    for match in re.finditer(r'<break\s+time="([0-9.]+)s"\s*/>', text):
+        total += float(match.group(1))
+    return total
+
+
 def parse_emotion_tags_for_turbo(text: str, default_emotion: str = "neutral") -> List[TurboSegment]:
     """
     입력 텍스트에서 [angry], [sad], [pause] 같은 태그를 파싱하되,
@@ -307,7 +356,7 @@ class TTSEngine:
         self,
         script: Script,
         output_path: str
-    ) -> Tuple[str, List[AudioSegment]]:
+    ) -> Tuple[str, List[AudioSegment], List[SubtitleSegment]]:
         """
         전체 대본으로 단일 오디오 파일 생성
 
@@ -316,9 +365,10 @@ class TTSEngine:
             output_path: 출력 파일 경로
 
         Returns:
-            (오디오 파일 경로, 씬별 AudioSegment 리스트)
+            (오디오 파일 경로, 씬별 AudioSegment 리스트, 자막용 SubtitleSegment 리스트)
         """
         segments = []
+        subtitle_segments = []  # 자막 싱크용 세그먼트
         combined = PydubSegment.empty()
         current_time = 0.0
         total_scenes = len(script.scenes)
@@ -327,6 +377,9 @@ class TTSEngine:
 
         for i, scene in enumerate(script.scenes):
             print(f"[TTSEngine] 씬 {scene.scene_id}/{total_scenes} 처리 중...")
+
+            # 원본 텍스트 저장 (자막용)
+            original_text = scene.text
 
             # 감정 태그 추가 (ElevenLabs v3 + 스타일 설정 시)
             text_with_emotion = self._add_emotion_tag(scene.text, i, total_scenes)
@@ -345,6 +398,16 @@ class TTSEngine:
             )
             segments.append(segment)
 
+            # 자막용 클린 텍스트 생성 (SSML, 감정 태그 제거)
+            clean_text = clean_text_for_subtitle(original_text)
+            subtitle_seg = SubtitleSegment(
+                clean_text=clean_text,
+                start_time=current_time,
+                end_time=current_time + duration,
+                duration=duration
+            )
+            subtitle_segments.append(subtitle_seg)
+
             # 씬 사이 무음 추가 (호흡 시간)
             silence = PydubSegment.silent(duration=2000)  # 2초
             combined += scene_audio + silence
@@ -356,8 +419,9 @@ class TTSEngine:
 
         total_duration = sum(s.duration for s in segments)
         print(f"[TTSEngine] TTS 생성 완료: {total_duration:.1f}초")
+        print(f"[TTSEngine] 자막 세그먼트: {len(subtitle_segments)}개 생성")
 
-        return output_path, segments
+        return output_path, segments, subtitle_segments
 
     def _add_emotion_tag(self, text: str, scene_idx: int, total_scenes: int) -> str:
         """씬 위치에 따라 감정 태그 추가 (ElevenLabs용)"""

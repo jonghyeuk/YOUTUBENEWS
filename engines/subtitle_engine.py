@@ -1,12 +1,16 @@
 """
 자막 생성 엔진 - 대본 기반 ASS (페이드 효과) + Whisper 옵션
+TTS/자막 싱크를 위해 실제 오디오 길이 기반 타임코드 생성
 """
 import os
 import re
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from models.types import Script, AudioSegment
 from config import FFMPEG_FILTERS
+
+if TYPE_CHECKING:
+    from engines.tts_engine import SubtitleSegment
 
 
 class SubtitleEngine:
@@ -40,7 +44,8 @@ class SubtitleEngine:
         script: Script,
         audio_segments: List[AudioSegment],
         output_path: str,
-        audio_path: Optional[str] = None
+        audio_path: Optional[str] = None,
+        subtitle_segments: Optional[List["SubtitleSegment"]] = None
     ) -> str:
         """
         ASS 자막 파일 생성 (페이드 효과 포함)
@@ -50,6 +55,7 @@ class SubtitleEngine:
             audio_segments: 씬별 오디오 세그먼트
             output_path: 출력 경로 (확장자는 .ass로 변경됨)
             audio_path: 오디오 파일 경로 (Whisper 사용 시 필요)
+            subtitle_segments: TTS에서 반환한 자막용 세그먼트 (실제 오디오 길이 기반)
 
         Returns:
             ASS 파일 경로
@@ -59,6 +65,9 @@ class SubtitleEngine:
 
         if self.use_whisper and audio_path:
             return self._generate_ass_whisper(audio_path, ass_path)
+        elif subtitle_segments:
+            # 실제 오디오 길이 기반 자막 생성 (권장)
+            return self._generate_ass_from_subtitle_segments(subtitle_segments, ass_path)
         else:
             return self._generate_ass_text_based(script, audio_segments, ass_path)
 
@@ -113,6 +122,71 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             f.write(ass_content)
 
         print(f"[SubtitleEngine] Whisper ASS 저장: {output_path}")
+        return output_path
+
+    def _generate_ass_from_subtitle_segments(
+        self,
+        subtitle_segments: List["SubtitleSegment"],
+        output_path: str
+    ) -> str:
+        """
+        TTS에서 반환한 SubtitleSegment로 ASS 생성 (실제 오디오 길이 기반)
+
+        이 방식이 권장됩니다:
+        - TTS 텍스트와 자막 텍스트 분리 (SSML, 감정태그 제거됨)
+        - 실제 오디오 길이 기반으로 정확한 타임코드 생성
+        - 감정에 따른 속도 변화도 자동 반영
+        """
+        ass_content = self._get_ass_header()
+        entry_count = 0
+
+        for seg in subtitle_segments:
+            if not seg.clean_text.strip():
+                continue
+
+            # 씬 텍스트를 문장 단위로 분할
+            sentences = self._split_sentences(seg.clean_text)
+
+            if not sentences:
+                # 분할 안되면 전체를 하나로
+                ass_content += self._format_ass_dialogue(
+                    seg.start_time,
+                    seg.end_time,
+                    seg.clean_text.strip()
+                )
+                entry_count += 1
+                continue
+
+            # 문장별 시간 배분 (실제 오디오 길이 내에서)
+            total_chars = sum(len(s) for s in sentences)
+            current_time = seg.start_time
+
+            for sentence in sentences:
+                if not sentence.strip():
+                    continue
+
+                # 문장 길이 비율로 시간 계산 (실제 오디오 길이 기반)
+                char_ratio = len(sentence) / total_chars if total_chars > 0 else 1
+                duration = seg.duration * char_ratio
+
+                start_time = current_time
+                end_time = current_time + duration
+
+                # ASS 다이얼로그 추가
+                ass_content += self._format_ass_dialogue(
+                    start_time,
+                    end_time,
+                    sentence.strip()
+                )
+
+                current_time = end_time
+                entry_count += 1
+
+        # 파일 저장
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(ass_content)
+
+        print(f"[SubtitleEngine] 실제 오디오 길이 기반 ASS 저장: {output_path} ({entry_count} entries)")
         return output_path
 
     def _generate_ass_text_based(

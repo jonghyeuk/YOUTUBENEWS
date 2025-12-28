@@ -170,17 +170,18 @@ class Pipeline:
         tts_engine = TTSEngine(engine=engine, style=style, speed=speed)
         audio_path = self._get_path("audio_full.mp3")
 
-        audio_path, segments = tts_engine.generate_full_audio(
+        audio_path, segments, subtitle_segments = tts_engine.generate_full_audio(
             script=self.project.script,
             output_path=audio_path
         )
 
         self.project.audio_path = audio_path
         self.project.audio_segments = segments
+        self.project.subtitle_segments = subtitle_segments  # 자막 싱크용
         self.project.current_step = 3
 
         total_duration = sum(s.duration for s in segments)
-        self._log(f"TTS 생성 완료: {total_duration:.1f}초")
+        self._log(f"TTS 생성 완료: {total_duration:.1f}초, 자막 세그먼트: {len(subtitle_segments)}개")
         return audio_path
 
     # ─────────────────────────────────────────────
@@ -272,7 +273,14 @@ class Pipeline:
 
     def step5_generate_subtitles(self, use_whisper: bool = False) -> str:
         """5단계: 자막 생성"""
-        method = "Whisper" if use_whisper else "대본 기반"
+        # 자막 세그먼트가 있으면 실제 오디오 길이 기반 (권장)
+        has_subtitle_segments = hasattr(self.project, 'subtitle_segments') and self.project.subtitle_segments
+        if has_subtitle_segments:
+            method = "실제 오디오 길이 기반"
+        elif use_whisper:
+            method = "Whisper"
+        else:
+            method = "대본 기반 (추정)"
         self._log(f"5단계: 자막 생성 중... ({method})")
 
         subtitle_engine = SubtitleEngine(use_whisper=use_whisper)
@@ -283,13 +291,14 @@ class Pipeline:
             script=self.project.script,
             audio_segments=self.project.audio_segments,
             output_path=subtitle_path,
-            audio_path=self.project.audio_path if use_whisper else None
+            audio_path=self.project.audio_path if use_whisper else None,
+            subtitle_segments=self.project.subtitle_segments if has_subtitle_segments else None
         )
 
         self.project.subtitle_path = actual_path
         self.project.current_step = 5
 
-        self._log("자막 생성 완료")
+        self._log(f"자막 생성 완료 ({method})")
         return actual_path
 
     # ─────────────────────────────────────────────
