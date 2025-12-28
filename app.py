@@ -329,13 +329,14 @@ def preview_tts_script(engine: str):
 
     # ElevenLabs 사용량 표시
     usage_info = ""
-    if engine == "elevenlabs":
+    if engine in ("elevenlabs", "elevenlabs2.5"):
         usage_info = get_elevenlabs_usage_info()
         if usage_info:
             usage_info = f"\n\n{usage_info}\n\n---\n"
 
     # EMOTION_TAGS 가져오기
     from config import EMOTION_TAGS
+    from engines.tts_engine import STYLE_DEFAULT_EMOTIONS_V25
 
     preview = f"## 🎙️ TTS 입력 대사 미리보기\n"
     preview += f"**엔진**: {engine} | **스타일**: {style or '없음'} | **씬**: {total_scenes}개\n"
@@ -346,8 +347,9 @@ def preview_tts_script(engine: str):
     for i, scene in enumerate(script.scenes):
         position = i / total_scenes
 
-        # 감정 태그 결정 (ElevenLabs + 스타일일 때만)
+        # 감정 태그 결정 (ElevenLabs v3 + 스타일일 때만)
         tag = ""
+        emotion_info = ""
         if engine == "elevenlabs" and style and style in EMOTION_TAGS:
             tags = EMOTION_TAGS[style]
             if position < 0.15:
@@ -360,11 +362,29 @@ def preview_tts_script(engine: str):
                 tag = tags.get("climax", "")
             else:
                 tag = tags.get("ending", "")
+        # ElevenLabs Turbo v2.5 감정 흉내 표시
+        elif engine == "elevenlabs2.5" and style and style in STYLE_DEFAULT_EMOTIONS_V25:
+            emotions = STYLE_DEFAULT_EMOTIONS_V25[style]
+            if position < 0.15:
+                emotion_info = emotions.get("intro", "neutral")
+            elif position < 0.4:
+                emotion_info = emotions.get("body_early", "neutral")
+            elif position < 0.7:
+                emotion_info = emotions.get("body_late", "neutral")
+            elif position < 0.9:
+                emotion_info = emotions.get("climax", "neutral")
+            else:
+                emotion_info = emotions.get("ending", "calm")
 
         preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
         if tag:
-            preview += f"🎭 **감정태그**: `{tag}`\n\n"
-        preview += f"```\n{tag} {scene.text}\n```\n\n"
+            preview += f"🎭 **감정태그 (v3)**: `{tag}`\n\n"
+            preview += f"```\n{tag} {scene.text}\n```\n\n"
+        elif emotion_info:
+            preview += f"🎭 **감정흉내 (v2.5)**: `{emotion_info}` → voice_settings 자동 조정\n\n"
+            preview += f"```\n{scene.text}\n```\n\n"
+        else:
+            preview += f"```\n{scene.text}\n```\n\n"
 
     return preview
 
@@ -383,13 +403,14 @@ def generate_tts(engine: str, speed: float = 0.9):
 
         # ElevenLabs 사용량 표시
         usage_info = ""
-        if engine == "elevenlabs":
+        if engine in ("elevenlabs", "elevenlabs2.5"):
             from engines.tts_engine import TTSEngine
-            tts = TTSEngine(engine="elevenlabs", style=style)
+            tts = TTSEngine(engine=engine, style=style)
             usage = tts.get_elevenlabs_usage()
             if usage:
+                model_name = "v3" if engine == "elevenlabs" else "Turbo v2.5"
                 usage_info = (
-                    f"\n\n📊 ElevenLabs 사용량: "
+                    f"\n\n📊 ElevenLabs ({model_name}) 사용량: "
                     f"{usage['used']:,} / {usage['limit']:,} 문자 "
                     f"({usage['percent']}%) | "
                     f"리셋: {usage['reset_date']} | "
@@ -947,7 +968,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
             with gr.Row():
                 with gr.Column(scale=1):
                     tts_engine = gr.Radio(
-                        ["wavenet", "elevenlabs", "openai"],
+                        ["wavenet", "elevenlabs", "elevenlabs2.5", "openai"],
                         value="wavenet",
                         label="TTS 엔진"
                     )
@@ -961,7 +982,8 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     gr.Markdown("""
                     **엔진 설명**:
                     - `wavenet`: Google Cloud TTS (자연스러움)
-                    - `elevenlabs`: 감정 태그 지원 ⭐
+                    - `elevenlabs`: v3 Audio Tags 감정 표현 ⭐
+                    - `elevenlabs2.5`: Turbo v2.5 SSML+voice_settings 감정 흉내 🚀
                     - `openai`: OpenAI TTS
                     """)
                     # ElevenLabs 사용량 표시 (엔진 설명 아래)
