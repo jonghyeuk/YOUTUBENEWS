@@ -136,6 +136,28 @@ class Pipeline:
         self._log(f"스크립트 생성 완료: {len(script.scenes)}개 씬")
         return script
 
+    def generate_youtube_metadata(self) -> dict:
+        """AI 기반 유튜브 제목/썸네일 문구 생성"""
+        if not self.project or not self.project.script:
+            raise ValueError("스크립트가 없습니다")
+
+        self._log("유튜브 제목/썸네일 생성 중... (AI)")
+
+        style = getattr(self.project, 'style', '정보')
+        duration = self.project.duration_min
+
+        metadata = self.script_engine.generate_youtube_metadata(
+            script=self.project.script,
+            style=style,
+            duration_min=duration
+        )
+
+        # 프로젝트에 저장
+        self.project.youtube_metadata = metadata
+
+        self._log(f"유튜브 메타데이터 생성 완료")
+        return metadata
+
     # ─────────────────────────────────────────────
     # Step 3: TTS 생성
     # ─────────────────────────────────────────────

@@ -315,3 +315,100 @@ JSON 형식으로 응답:
             json_str = content.strip()
 
         return json.loads(json_str)
+
+    def generate_youtube_metadata(
+        self,
+        script: Script,
+        style: str = "정보",
+        duration_min: int = 10
+    ) -> dict:
+        """
+        AI 기반 유튜브 제목 및 썸네일 문구 생성
+
+        Args:
+            script: 대본 객체
+            style: 콘텐츠 스타일 (불교종교, 뉴스, 정보 등)
+            duration_min: 영상 길이 (분)
+
+        Returns:
+            {
+                "title": "유튜브 제목",
+                "thumbnail_text": "썸네일 문구 (1~2줄)",
+                "title_alternatives": ["대안 제목1", "대안 제목2"],
+                "thumbnail_alternatives": ["대안 썸네일1", "대안 썸네일2"]
+            }
+        """
+        # 대본 내용 요약
+        script_summary = f"제목: {script.title}\n\n"
+        for scene in script.scenes:
+            script_summary += f"[{scene.title}]\n{scene.text[:200]}...\n\n"
+
+        prompt = f"""당신은 유튜브 SEO 전문가이자 썸네일 카피라이터입니다.
+아래 대본을 분석하여 유튜브 제목과 썸네일 문구를 생성해주세요.
+
+## 대본 내용
+{script_summary}
+
+## 콘텐츠 정보
+- 스타일: {style}
+- 영상 길이: {duration_min}분
+
+## 유튜브 제목 작성 규칙
+1. **후킹(Hooking)이 핵심** - 첫 5글자 내에 호기심/감정 유발
+2. **길이**: 40~60자 (너무 길면 잘림)
+3. **클릭 유도 패턴 활용**:
+   - 경고형: "이것만은 하지 마세요", "절대 ~하면 안됩니다"
+   - 상황저격: "오늘도 생각이 많은 분들께", "잠이 안 오는 밤"
+   - 반전형: "놓아야 해결됩니다", "포기하니까 됐습니다"
+   - 숫자형: "딱 3가지만", "5분만 투자하세요"
+   - 질문형: "왜 항상 불안한가요?", "나만 이런가요?"
+4. **금지어**: 치료, 완치, 100%, 기적, 무조건, 확실한
+5. **대본 핵심 메시지**를 반드시 반영
+
+## 썸네일 문구 작성 규칙
+1. **초단문**: 6~12자 (1줄) 또는 10~18자 (2줄)
+2. **임팩트 최우선**: 한눈에 들어오는 강렬한 메시지
+3. **감정/행동 유발 단어**: 지금, 당장, 꼭, 반드시, 절대, 오늘
+4. **2줄 패턴 예시**:
+   - "오늘 밤\\n꼭 들으세요"
+   - "이런 사람\\n피하세요"
+   - "잠들기 전\\n{duration_min}분"
+5. **대본의 핵심 키워드** 포함
+
+## 출력 형식 (JSON)
+```json
+{{
+  "title": "메인 유튜브 제목",
+  "thumbnail_text": "썸네일 문구 (줄바꿈은 \\n으로)",
+  "title_alternatives": ["대안 제목1", "대안 제목2"],
+  "thumbnail_alternatives": ["대안 썸네일1", "대안 썸네일2"]
+}}
+```
+
+대본의 핵심 메시지와 감정을 정확히 담아 유튜브에서 클릭을 유도하는 제목과 썸네일을 만들어주세요."""
+
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        content = response.content[0].text
+
+        try:
+            result = self._parse_response(content)
+        except json.JSONDecodeError:
+            # 파싱 실패 시 기본값 반환
+            result = {
+                "title": f"{script.title} ({duration_min}분)",
+                "thumbnail_text": f"오늘 밤\\n{duration_min}분",
+                "title_alternatives": [],
+                "thumbnail_alternatives": []
+            }
+
+        print(f"[ScriptEngine] 유튜브 메타데이터 생성 완료")
+        print(f"  - 제목: {result.get('title', '')[:50]}...")
+        print(f"  - 썸네일: {result.get('thumbnail_text', '')}")
+
+        return result
+
