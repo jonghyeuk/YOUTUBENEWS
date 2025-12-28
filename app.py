@@ -820,6 +820,31 @@ def reset_thumbnail():
     return None, "", "", "", 0.4, None, "🔄 리셋 완료 - 이미지를 다시 선택하세요"
 
 
+def reset_project():
+    """새 프로젝트 시작 - 전체 상태 초기화"""
+    global pipeline
+    pipeline = Pipeline()  # 새 파이프라인 인스턴스
+
+    return (
+        "🔄 새 프로젝트 시작! 주제를 입력하세요.",  # status
+        "",  # topic_input
+        10,  # duration_input
+        "정보",  # style_input
+        STYLE_GUIDES["정보"],  # style_guide
+        "*주제를 입력하고 생성 버튼을 누르세요*",  # script_preview
+        "",  # image_prompts
+        "",  # yt_title_input
+        "",  # yt_thumbnail_input
+        None,  # audio_preview
+        "*TTS 엔진 선택 후 '대사 미리보기' 클릭*",  # tts_script_preview
+        [],  # images_gallery
+        "",  # subtitle_preview
+        None,  # video_preview
+        None,  # final_video
+        "",  # final_prompts (Tab 3)
+    )
+
+
 # ═══════════════════════════════════════════════════════════════
 # YouTube 업로드 준비
 # ═══════════════════════════════════════════════════════════════
@@ -902,7 +927,9 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     gr.Markdown("# 🎬 AI 콘텐츠 생성기")
     gr.Markdown("주제 입력 → 스타일 선택 → 스크립트/이미지/영상 자동 생성")
 
-    status = gr.Textbox(label="📊 상태", lines=1, interactive=False)
+    with gr.Row():
+        status = gr.Textbox(label="📊 상태", lines=1, interactive=False, scale=5)
+        reset_btn = gr.Button("🔄 새 프로젝트", variant="secondary", scale=1)
 
     with gr.Tabs():
         # ─────────────────────────────────────────────
@@ -1217,6 +1244,30 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     # ═══════════════════════════════════════════════════════════════
     # 이벤트 연결
     # ═══════════════════════════════════════════════════════════════
+
+    # 새 프로젝트 리셋
+    reset_btn.click(
+        reset_project,
+        [],
+        [
+            status,
+            topic_input,
+            duration_input,
+            style_input,
+            style_guide,
+            script_preview,
+            image_prompts,
+            yt_title_input,
+            yt_thumbnail_input,
+            audio_preview,
+            tts_script_preview,
+            images_gallery,
+            subtitle_preview,
+            video_preview,
+            final_video,
+            final_prompts,
+        ]
+    )
 
     # 스타일 변경시 가이드 업데이트
     style_input.change(update_style_guide, [style_input], [style_guide])
