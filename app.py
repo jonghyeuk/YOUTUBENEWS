@@ -1010,14 +1010,21 @@ def check_youtube_auth():
 
 
 def authenticate_youtube():
-    """YouTube 인증 수행"""
+    """YouTube 인증 수행 (진행 상태 표시)"""
+    # 즉시 진행 상태 표시
+    yield (
+        "🔐 **브라우저에서 Google 로그인 중...**",
+        "### ⏳ 인증 진행 중\n브라우저 창에서 Google 계정으로 로그인하세요.\n\n완료될 때까지 기다려주세요...",
+        gr.update(interactive=False),
+    )
+
     try:
         engine = get_youtube_engine()
         engine.authenticate()
         channel = engine.get_channel_info()
 
         if channel:
-            return (
+            yield (
                 f"✅ **인증 완료!** {channel['title']}",
                 f"### 📺 채널 정보\n"
                 f"- **채널명**: {channel['title']}\n"
@@ -1026,14 +1033,14 @@ def authenticate_youtube():
                 gr.update(interactive=True),
             )
         else:
-            return (
+            yield (
                 "⚠️ 채널 정보를 가져올 수 없습니다",
                 "",
                 gr.update(interactive=False),
             )
 
     except FileNotFoundError as e:
-        return (
+        yield (
             f"❌ {e}",
             "### 설정 방법\n"
             "1. [Google Cloud Console](https://console.cloud.google.com) 접속\n"
@@ -1043,7 +1050,7 @@ def authenticate_youtube():
             gr.update(interactive=False),
         )
     except Exception as e:
-        return (
+        yield (
             f"❌ 인증 실패: {e}",
             "",
             gr.update(interactive=False),
@@ -1051,9 +1058,10 @@ def authenticate_youtube():
 
 
 def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
-    """YouTube에 영상 업로드"""
+    """YouTube에 영상 업로드 (진행 상태 표시)"""
     if not pipeline.project:
-        return "❌ 프로젝트가 없습니다", ""
+        yield "❌ 프로젝트가 없습니다", ""
+        return
 
     # 영상 파일 확인
     video_path = getattr(pipeline.project, 'final_video_path', None)
@@ -1061,12 +1069,16 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
         video_path = getattr(pipeline.project, 'video_path', None)
 
     if not video_path or not os.path.exists(video_path):
-        return "❌ 영상 파일이 없습니다. 먼저 영상을 렌더링하세요.", ""
+        yield "❌ 영상 파일이 없습니다. 먼저 영상을 렌더링하세요.", ""
+        return
 
     # 썸네일 확인
     thumbnail_path = pipeline._get_path("thumbnail.jpg")
     if not os.path.exists(thumbnail_path):
         thumbnail_path = None
+
+    # 즉시 진행 상태 표시
+    yield "⏳ **업로드 준비 중...**", "YouTube 서버에 연결 중입니다..."
 
     try:
         engine = get_youtube_engine()
@@ -1079,6 +1091,10 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
         }
         privacy_status = privacy_map.get(privacy, "private")
 
+        # 파일 크기 표시
+        file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
+        yield f"⏳ **업로드 중...** ({file_size_mb:.1f}MB)", f"### 📤 업로드 진행 중\n- **파일**: {file_size_mb:.1f}MB\n- **제목**: {title[:50]}...\n\n⏳ 잠시만 기다려주세요..."
+
         # 업로드 실행
         result = engine.upload_video(
             video_path=video_path,
@@ -1090,21 +1106,30 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
         )
 
         # 결과 메시지
-        thumb_status = "✅" if result.get("thumbnail_uploaded") else "❌"
         status_korean = {"private": "비공개", "unlisted": "미등록", "public": "공개"}.get(result["status"], result["status"])
 
-        return (
+        # 썸네일 상태 확인
+        thumb_status = "✅"
+        thumb_note = ""
+        if not result.get("thumbnail_uploaded"):
+            thumb_status = "⚠️"
+            if "forbidden" in str(result.get("thumbnail_error", "")).lower():
+                thumb_note = "\n\n⚠️ **썸네일 업로드 실패**: YouTube 채널 전화번호 인증이 필요합니다.\n[YouTube 스튜디오 → 설정 → 채널 → 기능 사용 자격 요건](https://studio.youtube.com)"
+            else:
+                thumb_note = f"\n\n⚠️ 썸네일 업로드 실패: {result.get('thumbnail_error', '알 수 없음')}"
+
+        yield (
             f"🎉 **업로드 완료!**",
             f"### 📺 업로드 결과\n"
             f"- **제목**: {result['title']}\n"
             f"- **상태**: {status_korean}\n"
             f"- **썸네일**: {thumb_status}\n"
             f"- **URL**: [{result['video_id']}]({result['url']})\n\n"
-            f"👆 링크를 클릭하여 YouTube에서 확인하세요!",
+            f"👆 링크를 클릭하여 YouTube에서 확인하세요!{thumb_note}",
         )
 
     except Exception as e:
-        return f"❌ 업로드 실패: {e}", ""
+        yield f"❌ 업로드 실패: {e}", ""
 
 
 def prepare_youtube_upload(language: str = "ko"):
