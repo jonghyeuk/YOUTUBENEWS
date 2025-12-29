@@ -16,7 +16,11 @@ from engines.thumbnail_engine import ThumbnailEngine
 from config import (
     DURATION_SPECS, BGM_CONFIG,
     YOUTUBE_TITLE_TEMPLATES, YOUTUBE_DEFAULT_TAGS,
-    YOUTUBE_DESCRIPTION_TEMPLATE, YOUTUBE_FORBIDDEN_WORDS
+    YOUTUBE_DESCRIPTION_TEMPLATE, YOUTUBE_FORBIDDEN_WORDS,
+    # 다국어 설정
+    LANGUAGE_CONFIG, TRANSLATION_PROMPTS,
+    YOUTUBE_DESCRIPTION_TEMPLATE_JA, YOUTUBE_DEFAULT_TAGS_JA,
+    YOUTUBE_DESCRIPTION_TEMPLATE_EN, YOUTUBE_DEFAULT_TAGS_EN,
 )
 
 # 전역 파이프라인 인스턴스
@@ -168,10 +172,92 @@ def update_style_guide(style: str):
 
 
 # ═══════════════════════════════════════════════════════════════
+# 스크립트 번역 (현지화)
+# ═══════════════════════════════════════════════════════════════
+
+def translate_script_to_language(script_data: dict, language: str) -> dict:
+    """스크립트를 대상 언어로 현지화 번역"""
+    if language == "ko":
+        return script_data  # 한국어면 그대로 반환
+
+    from anthropic import Anthropic
+    client = Anthropic()
+
+    # 번역할 텍스트 추출
+    texts_to_translate = []
+    texts_to_translate.append(f"TITLE: {script_data['title']}")
+
+    for scene in script_data["scenes"]:
+        texts_to_translate.append(f"SCENE_TITLE_{scene['scene_id']}: {scene['title']}")
+        texts_to_translate.append(f"SCENE_TEXT_{scene['scene_id']}: {scene['text']}")
+
+    combined_text = "\n---\n".join(texts_to_translate)
+
+    # 번역 프롬프트 구성
+    base_prompt = TRANSLATION_PROMPTS.get(language, "")
+    if not base_prompt:
+        return script_data
+
+    prompt = f"""{base_prompt}
+
+## 번역할 내용
+{combined_text}
+
+## 출력 형식
+각 항목을 동일한 형식으로 번역하세요:
+TITLE: [번역된 제목]
+---
+SCENE_TITLE_1: [번역된 씬 제목]
+---
+SCENE_TEXT_1: [번역된 나레이션]
+---
+... (모든 항목)
+
+중요: 이미지 프롬프트는 번역하지 마세요 (이미 영어입니다)."""
+
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=8192,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    translated_text = response.content[0].text
+
+    # 번역 결과 파싱
+    translated_data = script_data.copy()
+    translated_data["scenes"] = [scene.copy() for scene in script_data["scenes"]]
+
+    for line in translated_text.split("---"):
+        line = line.strip()
+        if line.startswith("TITLE:"):
+            translated_data["title"] = line.replace("TITLE:", "").strip()
+        elif line.startswith("SCENE_TITLE_"):
+            try:
+                parts = line.split(":", 1)
+                scene_id = int(parts[0].replace("SCENE_TITLE_", ""))
+                for scene in translated_data["scenes"]:
+                    if scene["scene_id"] == scene_id:
+                        scene["title"] = parts[1].strip()
+            except:
+                pass
+        elif line.startswith("SCENE_TEXT_"):
+            try:
+                parts = line.split(":", 1)
+                scene_id = int(parts[0].replace("SCENE_TEXT_", ""))
+                for scene in translated_data["scenes"]:
+                    if scene["scene_id"] == scene_id:
+                        scene["text"] = parts[1].strip()
+            except:
+                pass
+
+    return translated_data
+
+
+# ═══════════════════════════════════════════════════════════════
 # 통합 스크립트 + 이미지 프롬프트 생성
 # ═══════════════════════════════════════════════════════════════
 
-def generate_script_and_images(topic: str, duration: int, style: str):
+def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko"):
     """주제 입력 → 스크립트 + 이미지 프롬프트 한번에 생성"""
     if not topic.strip():
         return "❌ 주제를 입력해주세요", "", ""
@@ -215,20 +301,35 @@ def generate_script_and_images(topic: str, duration: int, style: str):
 
             data = json.loads(json_str)
 
-            # Script 객체 생성
-            from models.types import Script, Scene
-            scenes = []
+            # 이미지 프롬프트 먼저 추출 (번역 전에)
             all_image_prompts = []
-
             for s in data["scenes"]:
                 image_prompts = s.get("image_prompts", [])
                 all_image_prompts.extend(image_prompts)
+
+            # 번역 (한국어가 아닌 경우)
+            lang_info = LANGUAGE_CONFIG.get(language, {})
+            lang_name = lang_info.get("name", "🇰🇷 한국어")
+
+            if language != "ko":
+                print(f"[번역] {lang_name}로 현지화 중...")
+                data = translate_script_to_language(data, language)
+
+            # 언어 설정 저장
+            pipeline.project.language = language
+
+            # Script 객체 생성
+            from models.types import Script, Scene
+            scenes = []
+
+            for i, s in enumerate(data["scenes"]):
+                original_prompts = data["scenes"][i].get("image_prompts", []) if i < len(data["scenes"]) else []
 
                 scenes.append(Scene(
                     scene_id=s["scene_id"],
                     title=s["title"],
                     text=s["text"],
-                    image_count=len(image_prompts),
+                    image_count=len(original_prompts) if original_prompts else 0,
                     importance=s.get("importance", 3)
                 ))
 
@@ -242,7 +343,7 @@ def generate_script_and_images(topic: str, duration: int, style: str):
 
             # 스크립트 미리보기
             preview = f"# {script.title}\n\n"
-            preview += f"**{len(scenes)}개 씬 | 이미지 {len(all_image_prompts)}장**\n\n"
+            preview += f"**{lang_name} | {len(scenes)}개 씬 | 이미지 {len(all_image_prompts)}장**\n\n"
 
             for i, scene in enumerate(script.scenes):
                 preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
@@ -278,7 +379,7 @@ def generate_script_and_images(topic: str, duration: int, style: str):
                 thumb_info = f"**기본 썸네일**: {yt_thumbnail}"
 
             return (
-                f"✅ 생성 완료! {len(scenes)}개 씬, {len(all_image_prompts)}장 이미지",
+                f"✅ 생성 완료! {lang_name} | {len(scenes)}개 씬, {len(all_image_prompts)}장 이미지",
                 preview,
                 prompts_text,
                 yt_title,
@@ -393,8 +494,11 @@ def generate_tts(engine: str, speed: float = 0.9):
     if not pipeline.project or not pipeline.project.script:
         return "❌ 스크립트 생성 필요", None, ""
     try:
-        # 프로젝트에 저장된 스타일 가져오기
+        # 프로젝트에 저장된 스타일과 언어 가져오기
         style = getattr(pipeline.project, 'style', None)
+        language = getattr(pipeline.project, 'language', 'ko')
+        lang_name = LANGUAGE_CONFIG.get(language, {}).get("name", "🇰🇷 한국어")
+
         audio_path = pipeline.step3_generate_tts(engine, style=style, speed=speed)
         total = sum(s.duration for s in pipeline.project.audio_segments)
 
@@ -405,7 +509,7 @@ def generate_tts(engine: str, speed: float = 0.9):
         usage_info = ""
         if engine in ("elevenlabs", "elevenlabs2.5"):
             from engines.tts_engine import TTSEngine
-            tts = TTSEngine(engine=engine, style=style)
+            tts = TTSEngine(engine=engine, style=style, language=language)
             usage = tts.get_elevenlabs_usage()
             if usage:
                 model_name = "v3" if engine == "elevenlabs" else "Turbo v2.5"
@@ -417,7 +521,7 @@ def generate_tts(engine: str, speed: float = 0.9):
                     f"플랜: {usage['tier']}"
                 )
 
-        return f"✅ TTS 완료 ({total:.1f}초, 속도 {speed}x){usage_info}", audio_path, tts_log
+        return f"✅ TTS 완료 ({lang_name}, {total:.1f}초, 속도 {speed}x){usage_info}", audio_path, tts_log
     except Exception as e:
         return f"❌ 오류: {e}", None, ""
 
@@ -831,6 +935,7 @@ def reset_project():
         10,  # duration_input
         "정보",  # style_input
         STYLE_GUIDES["정보"],  # style_guide
+        "ko",  # script_language (한국어 기본값)
         "*주제를 입력하고 생성 버튼을 누르세요*",  # script_preview
         "",  # image_prompts
         "",  # yt_title_input
@@ -1002,8 +1107,8 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
         return f"❌ 업로드 실패: {e}", ""
 
 
-def prepare_youtube_upload():
-    """YouTube 업로드용 정보 생성 - AI 생성 메타데이터 우선 사용"""
+def prepare_youtube_upload(language: str = "ko"):
+    """YouTube 업로드용 정보 생성 - 언어별 템플릿 사용"""
     import random
 
     if not pipeline.project:
@@ -1040,18 +1145,32 @@ def prepare_youtube_upload():
         for i, scene in enumerate(script.scenes[:5], 1):
             scene_summaries += f"📌 {scene.title}\n"
 
-    # 설명 생성 - 템플릿 사용
-    desc_template = YOUTUBE_DESCRIPTION_TEMPLATE.get(style, YOUTUBE_DESCRIPTION_TEMPLATE.get("default", ""))
+    # 언어별 설명 템플릿 선택
+    if language == "ja":
+        desc_templates = YOUTUBE_DESCRIPTION_TEMPLATE_JA
+        tags_dict = YOUTUBE_DEFAULT_TAGS_JA
+        lang_name = "🇯🇵 日本語"
+    elif language == "en":
+        desc_templates = YOUTUBE_DESCRIPTION_TEMPLATE_EN
+        tags_dict = YOUTUBE_DEFAULT_TAGS_EN
+        lang_name = "🇺🇸 English"
+    else:  # ko (기본값)
+        desc_templates = YOUTUBE_DESCRIPTION_TEMPLATE
+        tags_dict = YOUTUBE_DEFAULT_TAGS
+        lang_name = "🇰🇷 한국어"
+
+    # 설명 생성 - 언어별 템플릿 사용
+    desc_template = desc_templates.get(style, desc_templates.get("default", ""))
     description = desc_template.format(
         title=title,
         scene_summaries=scene_summaries
     )
 
-    # 태그 - config에서 가져오기
-    tags = YOUTUBE_DEFAULT_TAGS.get(style, "")
+    # 태그 - 언어별 config에서 가져오기
+    tags = tags_dict.get(style, "")
 
-    # 추가 태그 (제목 키워드 추출)
-    if script and script.title:
+    # 추가 태그 (제목 키워드 추출) - 한국어만
+    if language == "ko" and script and script.title:
         extra_keywords = script.title.replace(",", " ").split()[:3]
         for kw in extra_keywords:
             if len(kw) > 1 and kw not in tags:
@@ -1061,8 +1180,11 @@ def prepare_youtube_upload():
     video_path = getattr(project, 'final_video_path', None) or getattr(project, 'video_path', None)
     thumbnail_path = pipeline._get_path("thumbnail.jpg") if os.path.exists(pipeline._get_path("thumbnail.jpg")) else None
 
+    # 언어별 채널 정보 추가
+    channel_info = LANGUAGE_CONFIG.get(language, {}).get("youtube_channel", "")
+
     return (
-        f"✅ 업로드 정보 준비 완료 (스타일: {style})",
+        f"✅ 업로드 정보 준비 완료 ({lang_name} | {channel_info})",
         title,
         description,
         tags,
@@ -1111,6 +1233,19 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     )
 
                     style_guide = gr.Markdown(STYLE_GUIDES["정보"])
+
+                    # 언어 선택 (스크립트 번역용)
+                    gr.Markdown("### 🌍 출력 언어")
+                    script_language = gr.Radio(
+                        choices=[
+                            ("🇰🇷 한국어", "ko"),
+                            ("🇯🇵 日本語", "ja"),
+                            ("🇺🇸 English", "en"),
+                        ],
+                        value="ko",
+                        label="스크립트 언어",
+                        info="한글로 입력 → 선택한 언어로 현지화 번역"
+                    )
 
                     generate_btn = gr.Button("🚀 스크립트 생성", variant="primary", size="lg")
 
@@ -1338,6 +1473,20 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
 
             gr.Markdown("---")
 
+            # 언어 선택 섹션
+            gr.Markdown("### 🌍 언어 선택 (설명/태그 템플릿)")
+            with gr.Row():
+                yt_language = gr.Radio(
+                    choices=[
+                        ("🇰🇷 한국어", "ko"),
+                        ("🇯🇵 日本語", "ja"),
+                        ("🇺🇸 English", "en"),
+                    ],
+                    value="ko",
+                    label="업로드 언어",
+                    info="선택한 언어의 설명/태그 템플릿이 적용됩니다"
+                )
+
             # 업로드 정보 섹션
             prepare_btn = gr.Button("📋 업로드 정보 준비", variant="secondary")
 
@@ -1436,6 +1585,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
             duration_input,
             style_input,
             style_guide,
+            script_language,
             script_preview,
             image_prompts,
             yt_title_input,
@@ -1453,10 +1603,10 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     # 스타일 변경시 가이드 업데이트
     style_input.change(update_style_guide, [style_input], [style_guide])
 
-    # Tab 1: 스크립트 생성 + AI 제목/썸네일
+    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 추가)
     generate_btn.click(
         generate_script_and_images,
-        [topic_input, duration_input, style_input],
+        [topic_input, duration_input, style_input, script_language],
         [status, script_preview, image_prompts, yt_title_input, yt_thumbnail_input]
     )
 
@@ -1552,10 +1702,10 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         [yt_auth_status, yt_channel_info, yt_upload_btn]
     )
 
-    # 업로드 정보 준비
+    # 업로드 정보 준비 (언어 파라미터 전달)
     prepare_btn.click(
         prepare_youtube_upload,
-        [],
+        [yt_language],
         [status, yt_title, yt_description, yt_tags, yt_project, yt_video, yt_thumb]
     )
 

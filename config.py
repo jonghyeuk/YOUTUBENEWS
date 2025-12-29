@@ -353,3 +353,119 @@ YOUTUBE_THUMBNAIL_RULES = {
     "warn_over_chars": 20,     # 20자 이상이면 경고 (모바일 뭉개짐)
 }
 
+
+# ═══════════════════════════════════════════════════════════════
+# 다국어 설정 - 일본어/영어 지원
+# ═══════════════════════════════════════════════════════════════
+
+# 언어별 설정
+LANGUAGE_CONFIG = {
+    "ko": {
+        "name": "🇰🇷 한국어",
+        "code": "ko",
+        "tts_voice_id": "4p0HBzAAGyju0nYfNntV",  # 한국어 불교 voice
+        "youtube_channel": "@부처님의한마디낭독",
+    },
+    "ja": {
+        "name": "🇯🇵 日本語",
+        "code": "ja",
+        "tts_voice_id": "wcs09USXSN5Bl7FXohVZ",  # 일본어 voice
+        "youtube_channel": "@心を整える夜",
+    },
+    "en": {
+        "name": "🇺🇸 English",
+        "code": "en",
+        "tts_voice_id": "KGZeK6FsnWQdrkDHnDNA",  # 영어 voice
+        "youtube_channel": "@BuddhistBedtimeStories-c8g",
+    },
+}
+
+# 일본어 YouTube 설정
+YOUTUBE_DESCRIPTION_TEMPLATE_JA = {
+    "불교종교": """眠る前に、心を静かに整える仏教の朗読です。
+楽な姿勢で聴いても、集中しなくても大丈夫です。
+
+⏱️ タイムライン
+00:00 はじめに
+{scene_summaries}
+
+📌 チャンネル紹介
+仏様の知恵と心の話を、穏やかな声でお届けします。
+
+※ 医療・治療目的ではなく「心の整理」コンテンツです。
+👍 チャンネル登録・高評価が励みになります。
+
+#仏教 #睡眠朗読 #名言
+""",
+    "default": """📺 {title}
+
+{scene_summaries}
+
+═══════════════════════════════════════
+📢 チャンネル登録・高評価お願いします！
+🔔 通知をオンにして新しい動画をチェック
+═══════════════════════════════════════
+""",
+}
+
+YOUTUBE_DEFAULT_TAGS_JA = {
+    "불교종교": "仏教,仏様の言葉,お釈迦様,名言朗読,仏教オーディオブック,睡眠朗読,眠れる,ASMR,心の勉強,瞑想,ヒーリング,癒し,不安,悩み,人間関係,自己肯定感,心の整理,オーディオブック,哲学,マインドフルネス",
+    "뉴스": "ニュース,時事,情報,トレンド,速報,まとめ",
+    "정보": "情報,豆知識,生活情報,役立つ,常識",
+    "믿거나말거나": "ミステリー,実話,怖い話,衝撃,不思議な話",
+}
+
+# 영어 YouTube 설정
+YOUTUBE_DESCRIPTION_TEMPLATE_EN = {
+    "불교종교": """A peaceful Buddhist reading to help you let go of thoughts and worries before sleep.
+Feel free to listen in any comfortable position. No need to focus.
+
+⏱️ Timestamps
+00:00 Introduction
+{scene_summaries}
+
+📌 About This Channel
+We share Buddha's wisdom and stories for the heart in a calm, soothing voice.
+
+※ This is mindfulness content, not medical advice.
+👍 Subscribe & like to support us!
+
+#Buddhism #SleepStories #Wisdom
+""",
+    "default": """📺 {title}
+
+{scene_summaries}
+
+═══════════════════════════════════════
+📢 Please subscribe and like!
+🔔 Turn on notifications for new videos
+═══════════════════════════════════════
+""",
+}
+
+YOUTUBE_DEFAULT_TAGS_EN = {
+    "불교종교": "Buddhism,Buddha,Buddhist wisdom,sleep stories,bedtime stories,ASMR,meditation,mindfulness,healing,relaxation,anxiety relief,peaceful sleep,spiritual,calming,self care,mental health,audio book,philosophy,zen,inner peace",
+    "뉴스": "news,current events,briefing,update,trending",
+    "정보": "information,tips,life hacks,useful,knowledge",
+    "믿거나말거나": "mystery,true story,creepy,shocking,unbelievable",
+}
+
+# 언어별 스크립트 번역 프롬프트
+TRANSLATION_PROMPTS = {
+    "ja": """당신은 일본어 원어민 작가입니다.
+아래 한국어 내용을 일본어로 번역하되:
+- 직역하지 말고 일본 문화에 맞게 자연스럽게 표현
+- 일본인이 실제 사용하는 표현 사용
+- 불교/명상 콘텐츠의 경우 일본 불교 문화에 맞는 표현 사용
+- "~です/~ます" 체로 정중하고 차분한 어조 유지
+- 한자어는 적절히 사용하되 너무 어렵지 않게""",
+
+    "en": """You are a native English writer.
+Translate the Korean content below to English:
+- Don't translate literally - adapt naturally for Western/American culture
+- Use expressions native English speakers actually use
+- For Buddhist/meditation content, use terms familiar to Western audiences
+- Maintain a calm, soothing, and warm tone
+- Keep sentences clear and easy to follow for relaxation content""",
+}
+

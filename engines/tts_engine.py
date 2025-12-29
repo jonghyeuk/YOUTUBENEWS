@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pydub import AudioSegment as PydubSegment
 
 from models.types import Script, Scene, AudioSegment
-from config import TTS_CONFIG, ELEVENLABS_STYLE_VOICES, EMOTION_TAGS
+from config import TTS_CONFIG, ELEVENLABS_STYLE_VOICES, EMOTION_TAGS, LANGUAGE_CONFIG
 
 
 # ========== ElevenLabs Turbo v2.5 감정 흉내 시스템 ==========
@@ -260,18 +260,27 @@ class TTSEngine:
 
     ENGINES = ["wavenet", "elevenlabs", "elevenlabs2.5", "openai"]
 
-    def __init__(self, engine: str = "wavenet", style: str = None, speed: float = None):
+    # 언어별 WaveNet 음성 설정
+    WAVENET_VOICES = {
+        "ko": {"language_code": "ko-KR", "name": "ko-KR-Wavenet-D"},
+        "ja": {"language_code": "ja-JP", "name": "ja-JP-Wavenet-D"},
+        "en": {"language_code": "en-US", "name": "en-US-Wavenet-D"},
+    }
+
+    def __init__(self, engine: str = "wavenet", style: str = None, speed: float = None, language: str = "ko"):
         """
         Args:
             engine: "wavenet" (기본), "elevenlabs", 또는 "openai"
             style: 콘텐츠 스타일 (뉴스/정보/믿거나말거나/불교종교)
             speed: 음성 속도 (None이면 config/스타일 설정 사용)
+            language: 출력 언어 (ko/ja/en)
         """
         if engine not in self.ENGINES:
             raise ValueError(f"지원하지 않는 엔진: {engine}. 사용 가능: {self.ENGINES}")
 
         self.engine = engine
         self.style = style
+        self.language = language
         self._speed_override = speed  # UI에서 지정한 속도 (우선순위 높음)
         self._init_engine()
 
@@ -287,12 +296,17 @@ class TTSEngine:
             self._init_openai()
 
     def _init_wavenet(self):
-        """Google Cloud TTS 초기화"""
+        """Google Cloud TTS 초기화 (언어별 음성 지원)"""
         from google.cloud import texttospeech
         self.client = texttospeech.TextToSpeechClient()
+
+        # 언어별 WaveNet 음성 설정
+        voice_config = self.WAVENET_VOICES.get(self.language, self.WAVENET_VOICES["ko"])
+        lang_name = LANGUAGE_CONFIG.get(self.language, {}).get("name", "🇰🇷 한국어")
+
         self.voice = texttospeech.VoiceSelectionParams(
-            language_code="ko-KR",
-            name=TTS_CONFIG.get("wavenet_voice", "ko-KR-Wavenet-D")
+            language_code=voice_config["language_code"],
+            name=voice_config["name"]
         )
         # 속도 설정: UI 지정값 > config 값 (0.25 ~ 4.0)
         self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
@@ -301,47 +315,59 @@ class TTSEngine:
             speaking_rate=self.speed,
             pitch=0.0
         )
-        print(f"[TTSEngine] Google WaveNet 초기화 완료 (속도: {self.speed})")
+        print(f"[TTSEngine] Google WaveNet 초기화 완료 ({lang_name}, 속도: {self.speed})")
 
     def _init_elevenlabs(self):
-        """ElevenLabs 초기화 (스타일별 음성 설정)"""
+        """ElevenLabs 초기화 (언어별 + 스타일별 음성 설정)"""
         from elevenlabs.client import ElevenLabs
         self.client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
+
+        # 언어별 voice_id 우선 적용
+        lang_config = LANGUAGE_CONFIG.get(self.language, {})
+        lang_voice_id = lang_config.get("tts_voice_id")
+        lang_name = lang_config.get("name", "🇰🇷 한국어")
 
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            self.voice_id = voice_config["voice_id"]
+            # 언어별 voice_id가 있으면 우선 사용, 없으면 스타일 voice_id 사용
+            self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
             self.stability = voice_config.get("stability", 0.5)
             self.similarity_boost = voice_config.get("similarity_boost", 0.75)
             # 속도: UI 지정값 > 스타일 값 > 전역 설정
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
-            print(f"[TTSEngine] ElevenLabs 초기화 완료 (스타일: {self.style}, 속도: {self.speed})")
+            print(f"[TTSEngine] ElevenLabs 초기화 완료 ({lang_name}, 스타일: {self.style}, 속도: {self.speed})")
         else:
-            self.voice_id = TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
+            self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.stability = 0.5
             self.similarity_boost = 0.75
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
-            print(f"[TTSEngine] ElevenLabs 초기화 완료 (기본 음성, 속도: {self.speed})")
+            print(f"[TTSEngine] ElevenLabs 초기화 완료 ({lang_name}, 기본 음성, 속도: {self.speed})")
 
     def _init_elevenlabs_v25(self):
-        """ElevenLabs Turbo v2.5 초기화 (SSML + voice_settings 기반 감정 흉내)"""
+        """ElevenLabs Turbo v2.5 초기화 (언어별 + SSML + voice_settings 기반 감정 흉내)"""
         from elevenlabs.client import ElevenLabs
         self.client = ElevenLabs(api_key=os.getenv("ELEVENLABS_API_KEY"))
+
+        # 언어별 voice_id 우선 적용
+        lang_config = LANGUAGE_CONFIG.get(self.language, {})
+        lang_voice_id = lang_config.get("tts_voice_id")
+        lang_name = lang_config.get("name", "🇰🇷 한국어")
 
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            self.voice_id = voice_config["voice_id"]
+            # 언어별 voice_id가 있으면 우선 사용
+            self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
             # 속도: UI 지정값 > 스타일 값 > 전역 설정
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
-            print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 (스타일: {self.style}, 속도: {self.speed})")
+            print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 ({lang_name}, 스타일: {self.style}, 속도: {self.speed})")
         else:
-            self.voice_id = TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
+            self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
-            print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 (기본 음성, 속도: {self.speed})")
+            print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 ({lang_name}, 기본 음성, 속도: {self.speed})")
 
     def _init_openai(self):
         """OpenAI TTS 초기화"""
