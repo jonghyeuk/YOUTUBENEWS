@@ -16,7 +16,11 @@ from engines.thumbnail_engine import ThumbnailEngine
 from config import (
     DURATION_SPECS, BGM_CONFIG,
     YOUTUBE_TITLE_TEMPLATES, YOUTUBE_DEFAULT_TAGS,
-    YOUTUBE_DESCRIPTION_TEMPLATE, YOUTUBE_FORBIDDEN_WORDS
+    YOUTUBE_DESCRIPTION_TEMPLATE, YOUTUBE_FORBIDDEN_WORDS,
+    # 다국어 설정
+    LANGUAGE_CONFIG,
+    YOUTUBE_DESCRIPTION_TEMPLATE_JA, YOUTUBE_DEFAULT_TAGS_JA,
+    YOUTUBE_DESCRIPTION_TEMPLATE_EN, YOUTUBE_DEFAULT_TAGS_EN,
 )
 
 # 전역 파이프라인 인스턴스
@@ -1002,8 +1006,8 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
         return f"❌ 업로드 실패: {e}", ""
 
 
-def prepare_youtube_upload():
-    """YouTube 업로드용 정보 생성 - AI 생성 메타데이터 우선 사용"""
+def prepare_youtube_upload(language: str = "ko"):
+    """YouTube 업로드용 정보 생성 - 언어별 템플릿 사용"""
     import random
 
     if not pipeline.project:
@@ -1040,18 +1044,32 @@ def prepare_youtube_upload():
         for i, scene in enumerate(script.scenes[:5], 1):
             scene_summaries += f"📌 {scene.title}\n"
 
-    # 설명 생성 - 템플릿 사용
-    desc_template = YOUTUBE_DESCRIPTION_TEMPLATE.get(style, YOUTUBE_DESCRIPTION_TEMPLATE.get("default", ""))
+    # 언어별 설명 템플릿 선택
+    if language == "ja":
+        desc_templates = YOUTUBE_DESCRIPTION_TEMPLATE_JA
+        tags_dict = YOUTUBE_DEFAULT_TAGS_JA
+        lang_name = "🇯🇵 日本語"
+    elif language == "en":
+        desc_templates = YOUTUBE_DESCRIPTION_TEMPLATE_EN
+        tags_dict = YOUTUBE_DEFAULT_TAGS_EN
+        lang_name = "🇺🇸 English"
+    else:  # ko (기본값)
+        desc_templates = YOUTUBE_DESCRIPTION_TEMPLATE
+        tags_dict = YOUTUBE_DEFAULT_TAGS
+        lang_name = "🇰🇷 한국어"
+
+    # 설명 생성 - 언어별 템플릿 사용
+    desc_template = desc_templates.get(style, desc_templates.get("default", ""))
     description = desc_template.format(
         title=title,
         scene_summaries=scene_summaries
     )
 
-    # 태그 - config에서 가져오기
-    tags = YOUTUBE_DEFAULT_TAGS.get(style, "")
+    # 태그 - 언어별 config에서 가져오기
+    tags = tags_dict.get(style, "")
 
-    # 추가 태그 (제목 키워드 추출)
-    if script and script.title:
+    # 추가 태그 (제목 키워드 추출) - 한국어만
+    if language == "ko" and script and script.title:
         extra_keywords = script.title.replace(",", " ").split()[:3]
         for kw in extra_keywords:
             if len(kw) > 1 and kw not in tags:
@@ -1061,8 +1079,11 @@ def prepare_youtube_upload():
     video_path = getattr(project, 'final_video_path', None) or getattr(project, 'video_path', None)
     thumbnail_path = pipeline._get_path("thumbnail.jpg") if os.path.exists(pipeline._get_path("thumbnail.jpg")) else None
 
+    # 언어별 채널 정보 추가
+    channel_info = LANGUAGE_CONFIG.get(language, {}).get("youtube_channel", "")
+
     return (
-        f"✅ 업로드 정보 준비 완료 (스타일: {style})",
+        f"✅ 업로드 정보 준비 완료 ({lang_name} | {channel_info})",
         title,
         description,
         tags,
@@ -1338,6 +1359,20 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
 
             gr.Markdown("---")
 
+            # 언어 선택 섹션
+            gr.Markdown("### 🌍 언어 선택 (설명/태그 템플릿)")
+            with gr.Row():
+                yt_language = gr.Radio(
+                    choices=[
+                        ("🇰🇷 한국어", "ko"),
+                        ("🇯🇵 日本語", "ja"),
+                        ("🇺🇸 English", "en"),
+                    ],
+                    value="ko",
+                    label="업로드 언어",
+                    info="선택한 언어의 설명/태그 템플릿이 적용됩니다"
+                )
+
             # 업로드 정보 섹션
             prepare_btn = gr.Button("📋 업로드 정보 준비", variant="secondary")
 
@@ -1552,10 +1587,10 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         [yt_auth_status, yt_channel_info, yt_upload_btn]
     )
 
-    # 업로드 정보 준비
+    # 업로드 정보 준비 (언어 파라미터 전달)
     prepare_btn.click(
         prepare_youtube_upload,
-        [],
+        [yt_language],
         [status, yt_title, yt_description, yt_tags, yt_project, yt_video, yt_thumb]
     )
 
