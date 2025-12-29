@@ -22,6 +22,7 @@ google-generativeai>=0.3.0  # Google Imagen
 # Whisper (optional - for accurate timestamps)
 openai-whisper>=20231117
 
-# YouTube (trend analysis & transcript extraction)
+# YouTube (trend analysis, transcript extraction & upload)
 google-api-python-client>=2.100.0
+google-auth-oauthlib>=1.0.0      # OAuth2 인증 (YouTube 업로드용)
 youtube-transcript-api>=0.6.1

@@ -846,8 +846,161 @@ def reset_project():
 
 
 # ═══════════════════════════════════════════════════════════════
-# YouTube 업로드 준비
+# YouTube 업로드
 # ═══════════════════════════════════════════════════════════════
+
+# YouTube 업로드 엔진 인스턴스
+youtube_engine = None
+
+
+def get_youtube_engine():
+    """YouTube 엔진 싱글톤"""
+    global youtube_engine
+    if youtube_engine is None:
+        from engines.youtube_upload_engine import YouTubeUploadEngine
+        youtube_engine = YouTubeUploadEngine()
+    return youtube_engine
+
+
+def check_youtube_auth():
+    """YouTube 인증 상태 확인"""
+    try:
+        engine = get_youtube_engine()
+        status = engine.check_auth_status()
+
+        if not status["has_client_secrets"]:
+            return (
+                "⚠️ **인증 필요**: `client_secrets.json` 파일이 없습니다.",
+                "### 설정 방법\n"
+                "1. [Google Cloud Console](https://console.cloud.google.com) 접속\n"
+                "2. YouTube Data API v3 활성화\n"
+                "3. OAuth 클라이언트 ID 생성 (데스크톱 앱)\n"
+                "4. JSON 다운로드 → `client_secrets.json`으로 저장",
+                gr.update(interactive=False),
+            )
+
+        if status["authenticated"] and status["channel"]:
+            channel = status["channel"]
+            return (
+                f"✅ **인증됨**: {channel['title']}",
+                f"### 📺 채널 정보\n"
+                f"- **채널명**: {channel['title']}\n"
+                f"- **구독자**: {channel['subscribers']}\n"
+                f"- **영상 수**: {channel['videos']}개",
+                gr.update(interactive=True),
+            )
+        else:
+            return (
+                "🔐 **인증 대기**: 아래 버튼을 클릭하여 Google 계정 연결",
+                "인증 버튼 클릭 시 브라우저가 열립니다.\n채널 접근 권한을 허용해주세요.",
+                gr.update(interactive=False),
+            )
+
+    except Exception as e:
+        return (
+            f"❌ 오류: {e}",
+            "",
+            gr.update(interactive=False),
+        )
+
+
+def authenticate_youtube():
+    """YouTube 인증 수행"""
+    try:
+        engine = get_youtube_engine()
+        engine.authenticate()
+        channel = engine.get_channel_info()
+
+        if channel:
+            return (
+                f"✅ **인증 완료!** {channel['title']}",
+                f"### 📺 채널 정보\n"
+                f"- **채널명**: {channel['title']}\n"
+                f"- **구독자**: {channel['subscribers']}\n"
+                f"- **영상 수**: {channel['videos']}개",
+                gr.update(interactive=True),
+            )
+        else:
+            return (
+                "⚠️ 채널 정보를 가져올 수 없습니다",
+                "",
+                gr.update(interactive=False),
+            )
+
+    except FileNotFoundError as e:
+        return (
+            f"❌ {e}",
+            "### 설정 방법\n"
+            "1. [Google Cloud Console](https://console.cloud.google.com) 접속\n"
+            "2. YouTube Data API v3 활성화\n"
+            "3. OAuth 클라이언트 ID 생성\n"
+            "4. JSON 다운로드 → `client_secrets.json`으로 저장",
+            gr.update(interactive=False),
+        )
+    except Exception as e:
+        return (
+            f"❌ 인증 실패: {e}",
+            "",
+            gr.update(interactive=False),
+        )
+
+
+def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
+    """YouTube에 영상 업로드"""
+    if not pipeline.project:
+        return "❌ 프로젝트가 없습니다", ""
+
+    # 영상 파일 확인
+    video_path = getattr(pipeline.project, 'final_video_path', None)
+    if not video_path:
+        video_path = getattr(pipeline.project, 'video_path', None)
+
+    if not video_path or not os.path.exists(video_path):
+        return "❌ 영상 파일이 없습니다. 먼저 영상을 렌더링하세요.", ""
+
+    # 썸네일 확인
+    thumbnail_path = pipeline._get_path("thumbnail.jpg")
+    if not os.path.exists(thumbnail_path):
+        thumbnail_path = None
+
+    try:
+        engine = get_youtube_engine()
+
+        # 공개 상태 매핑
+        privacy_map = {
+            "비공개": "private",
+            "미등록": "unlisted",
+            "공개": "public",
+        }
+        privacy_status = privacy_map.get(privacy, "private")
+
+        # 업로드 실행
+        result = engine.upload_video(
+            video_path=video_path,
+            title=title,
+            description=description,
+            tags=tags,
+            privacy_status=privacy_status,
+            thumbnail_path=thumbnail_path,
+        )
+
+        # 결과 메시지
+        thumb_status = "✅" if result.get("thumbnail_uploaded") else "❌"
+        status_korean = {"private": "비공개", "unlisted": "미등록", "public": "공개"}.get(result["status"], result["status"])
+
+        return (
+            f"🎉 **업로드 완료!**",
+            f"### 📺 업로드 결과\n"
+            f"- **제목**: {result['title']}\n"
+            f"- **상태**: {status_korean}\n"
+            f"- **썸네일**: {thumb_status}\n"
+            f"- **URL**: [{result['video_id']}]({result['url']})\n\n"
+            f"👆 링크를 클릭하여 YouTube에서 확인하세요!",
+        )
+
+    except Exception as e:
+        return f"❌ 업로드 실패: {e}", ""
+
 
 def prepare_youtube_upload():
     """YouTube 업로드용 정보 생성 - AI 생성 메타데이터 우선 사용"""
@@ -1171,11 +1324,22 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         # ─────────────────────────────────────────────
         # Tab 6: YouTube 업로드
         # ─────────────────────────────────────────────
-        with gr.Tab("6️⃣ YouTube 업로드"):
-            gr.Markdown("### 📤 YouTube 업로드 준비")
-            gr.Markdown("*복사하여 YouTube Studio에 붙여넣기*")
+        with gr.Tab("6️⃣ YouTube 업로드") as youtube_tab:
+            gr.Markdown("### 📤 YouTube 자동 업로드")
 
-            prepare_btn = gr.Button("📋 업로드 정보 준비", variant="primary")
+            # 인증 상태 섹션
+            with gr.Row():
+                with gr.Column(scale=2):
+                    yt_auth_status = gr.Markdown("*인증 상태 확인 중...*")
+                with gr.Column(scale=1):
+                    yt_auth_btn = gr.Button("🔐 Google 계정 연결", variant="secondary")
+
+            yt_channel_info = gr.Markdown("")
+
+            gr.Markdown("---")
+
+            # 업로드 정보 섹션
+            prepare_btn = gr.Button("📋 업로드 정보 준비", variant="secondary")
 
             with gr.Row():
                 with gr.Column():
@@ -1183,12 +1347,11 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         label="📌 제목",
                         lines=2,
                         interactive=True,
-                        info="클릭 후 Ctrl+A, Ctrl+C로 복사"
                     )
 
                     yt_description = gr.Textbox(
                         label="📝 설명",
-                        lines=10,
+                        lines=8,
                         interactive=True
                     )
 
@@ -1199,6 +1362,14 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         info="쉼표로 구분"
                     )
 
+                    with gr.Row():
+                        yt_privacy = gr.Radio(
+                            ["비공개", "미등록", "공개"],
+                            value="비공개",
+                            label="🔒 공개 설정",
+                            info="비공개로 먼저 올리고 확인 후 공개 권장"
+                        )
+
                     yt_project = gr.Textbox(
                         label="📁 프로젝트",
                         interactive=False
@@ -1208,16 +1379,26 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     yt_video = gr.Video(label="🎬 영상 파일")
                     yt_thumb = gr.Image(label="🖼️ 썸네일")
 
+            gr.Markdown("---")
+
+            # 업로드 버튼
+            with gr.Row():
+                yt_upload_btn = gr.Button(
+                    "🚀 YouTube 업로드",
+                    variant="primary",
+                    size="lg",
+                    interactive=False,  # 인증 후 활성화
+                )
+
+            yt_upload_result = gr.Markdown("")
+
             gr.Markdown("""
             ---
-            ### 📋 YouTube Studio 업로드 순서
-            1. **제목** 복사 → YouTube Studio에 붙여넣기
-            2. **설명** 복사 → 붙여넣기
-            3. **태그** 복사 → '더보기' 클릭 후 태그 입력
-            4. **썸네일** 우클릭 저장 후 업로드
-            5. 영상 파일 선택하여 업로드
-
-            *🔜 향후 자동 업로드 기능 추가 예정!*
+            ### 💡 사용 방법
+            1. **Google 계정 연결** 클릭 → 브라우저에서 채널 권한 허용
+            2. **업로드 정보 준비** 클릭 → 제목/설명/태그 자동 생성
+            3. 필요시 수정 후 **YouTube 업로드** 클릭
+            4. 업로드 완료 후 링크 클릭하여 확인!
             """)
 
         # ─────────────────────────────────────────────
@@ -1357,10 +1538,32 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     )
 
     # Tab 6: YouTube 업로드
+    # 탭 선택 시 인증 상태 확인
+    youtube_tab.select(
+        check_youtube_auth,
+        [],
+        [yt_auth_status, yt_channel_info, yt_upload_btn]
+    )
+
+    # 인증 버튼
+    yt_auth_btn.click(
+        authenticate_youtube,
+        [],
+        [yt_auth_status, yt_channel_info, yt_upload_btn]
+    )
+
+    # 업로드 정보 준비
     prepare_btn.click(
         prepare_youtube_upload,
         [],
         [status, yt_title, yt_description, yt_tags, yt_project, yt_video, yt_thumb]
+    )
+
+    # 업로드 실행
+    yt_upload_btn.click(
+        upload_to_youtube,
+        [yt_title, yt_description, yt_tags, yt_privacy],
+        [status, yt_upload_result]
     )
 
     # Tab 7: 트렌드
