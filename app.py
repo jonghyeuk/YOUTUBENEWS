@@ -494,8 +494,11 @@ def generate_tts(engine: str, speed: float = 0.9):
     if not pipeline.project or not pipeline.project.script:
         return "❌ 스크립트 생성 필요", None, ""
     try:
-        # 프로젝트에 저장된 스타일 가져오기
+        # 프로젝트에 저장된 스타일과 언어 가져오기
         style = getattr(pipeline.project, 'style', None)
+        language = getattr(pipeline.project, 'language', 'ko')
+        lang_name = LANGUAGE_CONFIG.get(language, {}).get("name", "🇰🇷 한국어")
+
         audio_path = pipeline.step3_generate_tts(engine, style=style, speed=speed)
         total = sum(s.duration for s in pipeline.project.audio_segments)
 
@@ -506,7 +509,7 @@ def generate_tts(engine: str, speed: float = 0.9):
         usage_info = ""
         if engine in ("elevenlabs", "elevenlabs2.5"):
             from engines.tts_engine import TTSEngine
-            tts = TTSEngine(engine=engine, style=style)
+            tts = TTSEngine(engine=engine, style=style, language=language)
             usage = tts.get_elevenlabs_usage()
             if usage:
                 model_name = "v3" if engine == "elevenlabs" else "Turbo v2.5"
@@ -518,7 +521,7 @@ def generate_tts(engine: str, speed: float = 0.9):
                     f"플랜: {usage['tier']}"
                 )
 
-        return f"✅ TTS 완료 ({total:.1f}초, 속도 {speed}x){usage_info}", audio_path, tts_log
+        return f"✅ TTS 완료 ({lang_name}, {total:.1f}초, 속도 {speed}x){usage_info}", audio_path, tts_log
     except Exception as e:
         return f"❌ 오류: {e}", None, ""
 
