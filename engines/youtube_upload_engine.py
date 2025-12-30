@@ -25,7 +25,21 @@ SCOPES = [
 
 # 파일 경로
 CLIENT_SECRETS_FILE = "client_secrets.json"
-TOKEN_FILE = "youtube_token.pickle"
+TOKEN_FILE = "youtube_token.pickle"  # 기본 (레거시 호환)
+
+# 언어별 토큰 파일
+LANGUAGE_TOKEN_FILES = {
+    "ko": "youtube_token_ko.pickle",
+    "ja": "youtube_token_ja.pickle",
+    "en": "youtube_token_en.pickle",
+}
+
+# 언어 표시 이름
+LANGUAGE_NAMES = {
+    "ko": "🇰🇷 한국어",
+    "ja": "🇯🇵 일본어",
+    "en": "🇺🇸 영어",
+}
 
 # 업로드 재시도 설정
 MAX_RETRIES = 3
@@ -35,17 +49,29 @@ RETRY_DELAY = 5  # seconds
 class YouTubeUploadEngine:
     """YouTube 영상 업로드 엔진"""
 
-    def __init__(self):
+    def __init__(self, language: str = None):
+        """
+        Args:
+            language: 언어 코드 (ko, ja, en). None이면 기본 토큰 사용
+        """
         self.youtube = None
         self.credentials = None
+        self.language = language
+        self._token_file = self._get_token_file(language)
+
+    def _get_token_file(self, language: str) -> str:
+        """언어에 맞는 토큰 파일 경로 반환"""
+        if language and language in LANGUAGE_TOKEN_FILES:
+            return LANGUAGE_TOKEN_FILES[language]
+        return TOKEN_FILE
 
     def authenticate(self) -> bool:
         """OAuth2 인증 수행"""
         creds = None
 
         # 저장된 토큰 확인
-        if os.path.exists(TOKEN_FILE):
-            with open(TOKEN_FILE, "rb") as token:
+        if os.path.exists(self._token_file):
+            with open(self._token_file, "rb") as token:
                 creds = pickle.load(token)
 
         # 토큰이 없거나 만료된 경우
@@ -73,7 +99,7 @@ class YouTubeUploadEngine:
                 creds = flow.run_local_server(port=0)
 
             # 토큰 저장
-            with open(TOKEN_FILE, "wb") as token:
+            with open(self._token_file, "wb") as token:
                 pickle.dump(creds, token)
 
         self.credentials = creds
@@ -231,9 +257,11 @@ class YouTubeUploadEngine:
         """인증 상태 확인"""
         result = {
             "has_client_secrets": os.path.exists(CLIENT_SECRETS_FILE),
-            "has_token": os.path.exists(TOKEN_FILE),
+            "has_token": os.path.exists(self._token_file),
             "authenticated": False,
             "channel": None,
+            "language": self.language,
+            "language_name": LANGUAGE_NAMES.get(self.language, "기본"),
         }
 
         if result["has_token"]:
@@ -246,6 +274,15 @@ class YouTubeUploadEngine:
             except Exception as e:
                 result["error"] = str(e)
 
+        return result
+
+    @staticmethod
+    def get_all_channels_status() -> Dict[str, Dict[str, Any]]:
+        """모든 언어의 채널 인증 상태 확인"""
+        result = {}
+        for lang in LANGUAGE_TOKEN_FILES.keys():
+            engine = YouTubeUploadEngine(language=lang)
+            result[lang] = engine.check_auth_status()
         return result
 
 
