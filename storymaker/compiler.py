@@ -6,6 +6,90 @@
 from typing import Dict, Any, Optional
 
 
+# ═══════════════════════════════════════════════════════════════
+# 한국/동양 스타일 강제 프리셋
+# ═══════════════════════════════════════════════════════════════
+
+KOREAN_STYLE_PREFIX = """Korean traditional minhwa folk art style,
+East Asian aesthetic, warm earth tones, soft ink wash texture."""
+
+KOREAN_CHARACTER_ENFORCE = """IMPORTANT: All human characters must be Korean/East Asian ethnicity.
+Korean elderly man with traditional features, weathered kind face,
+wearing traditional Korean hanbok or simple traditional clothes.
+NO western features, NO caucasian faces."""
+
+KOREAN_CONSTRAINTS = """Keep the same Korean elderly character identity across all scenes.
+Traditional Korean art style, minhwa folk painting aesthetic.
+East Asian faces only. No text, no watermark, no signature."""
+
+
+def compile_hybrid_prompt(
+    original_prompt: str,
+    character_type: str = "old_grandfather",
+    world_style: str = "korean_minhwa",
+    camera: str = "MEDIUM"
+) -> str:
+    """
+    기존 프롬프트에 캐릭터/스타일 프리셋을 강제 적용 (하이브리드 방식)
+
+    작가가 만든 창의적 씬 설명은 유지하되,
+    캐릭터와 스타일은 프리셋으로 고정하여 일관성 확보
+
+    Args:
+        original_prompt: 작가가 생성한 원본 이미지 프롬프트
+        character_type: 캐릭터 타입 (old_grandfather, young_scholar 등)
+        world_style: 세계관 스타일 (korean_minhwa, buddha_era 등)
+        camera: 카메라 샷 (WIDE, MEDIUM, CLOSE)
+
+    Returns:
+        프리셋이 적용된 컴파일된 프롬프트
+    """
+
+    # 캐릭터 프리셋
+    character_presets = {
+        "old_grandfather": "Korean elderly grandfather, age 70, East Asian features, weathered kind face, traditional Korean hanbok, gray hair",
+        "old_monk": "Korean elderly Buddhist monk, age 68, shaved head, East Asian features, serene wrinkled face, dark brown traditional robe",
+        "young_monk": "Young Korean Buddhist monk, age 22, shaved head, East Asian features, calm serene face, saffron robe",
+        "young_scholar": "Young Korean scholar, age 25, black topknot hair, East Asian features, traditional white hanbok, thoughtful expression",
+        "village_woman": "Korean village woman, age 40, East Asian features, braided hair, simple traditional hanbok, kind weathered face",
+    }
+
+    # 세계관 프리셋
+    world_presets = {
+        "korean_minhwa": "Korean minhwa folk painting style, traditional Korean art, warm earth tones, soft brushwork",
+        "buddha_era_night": "Ancient Buddhist art style, lantern night lighting, ink muted colors, mystical atmosphere",
+        "buddha_era_day": "Ancient East Asian art style, clear daylight, warm natural colors, peaceful",
+        "joseon_traditional": "Joseon dynasty Korean art style, traditional aesthetics, muted elegant colors",
+    }
+
+    # 카메라 프리셋
+    camera_presets = {
+        "WIDE": "wide shot composition, full scene visible",
+        "MEDIUM": "medium shot composition, upper body focus",
+        "CLOSE": "close-up shot, emotional detail focus",
+    }
+
+    # 프리셋 가져오기
+    char_desc = character_presets.get(character_type, character_presets["old_grandfather"])
+    world_desc = world_presets.get(world_style, world_presets["korean_minhwa"])
+    cam_desc = camera_presets.get(camera, camera_presets["MEDIUM"])
+
+    # 프롬프트 조합 (순서 중요!)
+    # 1. 스타일 먼저 (전체 톤 설정)
+    # 2. 캐릭터 강제 (동양인 고정)
+    # 3. 원본 씬 설명 (창의적 내용 유지)
+    # 4. 카메라
+    # 5. 제약 조건 (마지막)
+
+    compiled = f"""{world_desc}.
+Main character: {char_desc}.
+{cam_desc}.
+Scene description: {original_prompt}
+{KOREAN_CONSTRAINTS}"""
+
+    return compiled.strip()
+
+
 def compile_prompt(
     scene_action: str,
     character: Dict[str, Any],
@@ -35,15 +119,16 @@ def compile_prompt(
     parts = []
 
     # 1) 스타일/세계관 (가장 먼저 - 전체 톤 설정)
-    style_part = f"Style: {world.get('style', 'asian_ink_painting')}"
+    style_part = f"Style: {world.get('style', 'korean_minhwa_folk_painting')}"
     style_part += f", lighting: {world.get('lighting', 'soft')}"
-    style_part += f", color tone: {world.get('color', 'muted')}"
+    style_part += f", color tone: {world.get('color', 'warm_earth_tones')}"
     if world.get('fog'):
         style_part += f", fog: {world.get('fog')}"
     parts.append(style_part + ".")
 
-    # 2) 메인 캐릭터 (고정 속성)
-    char_part = f"Main character: {character.get('name', 'monk')}"
+    # 2) 메인 캐릭터 (고정 속성 + 동양인 강제)
+    char_part = f"Main character: {character.get('name', 'Korean elderly man')}"
+    char_part += ", East Asian/Korean ethnicity"
     if character.get('age'):
         char_part += f", age {character.get('age')}"
     if character.get('gender'):
@@ -73,21 +158,18 @@ def compile_prompt(
     # 5) 씬 액션 (변화하는 부분)
     parts.append(f"Scene: {scene_action}")
 
-    # 6) 제약 조건 (항상 마지막)
-    constraints = "Keep the same character identity across all scenes. "
-    constraints += "Anime illustration style, clean lines, simple background. "
-    constraints += "No text, no watermark, no signature."
-    parts.append(constraints)
+    # 6) 제약 조건 (항상 마지막 - 동양인 강제)
+    parts.append(KOREAN_CONSTRAINTS)
 
     return " ".join(parts)
 
 
 def compile_prompt_simple(
     scene_action: str,
-    style: str = "buddha_era_night",
-    character: str = "young_monk",
+    style: str = "korean_minhwa",
+    character: str = "old_grandfather",
     camera: str = "MEDIUM",
-    place: str = "temple_hall"
+    place: str = "mountain_village"
 ) -> str:
     """
     간단한 문자열 파라미터로 프롬프트 컴파일
@@ -96,17 +178,18 @@ def compile_prompt_simple(
 
     # 기본 스타일 매핑
     style_map = {
+        "korean_minhwa": "Korean minhwa folk painting style, traditional Korean art, warm earth tones",
         "buddha_era_night": "ancient buddhist illustration, lantern night lighting, ink muted colors",
-        "buddha_era_day": "ancient chinese realism, clear daylight, warm natural colors",
-        "joseon_minhwa": "korean minhwa folk painting style, warm earth tones",
+        "buddha_era_day": "ancient East Asian realism, clear daylight, warm natural colors",
         "zen_minimalist": "zen ink wash style, monochrome, minimal",
     }
 
-    # 기본 캐릭터 매핑
+    # 기본 캐릭터 매핑 (동양인 강제)
     char_map = {
-        "young_monk": "young buddhist monk, shaved head, saffron robe, calm serene face",
-        "old_monk": "elderly buddhist monk, white stubble, dark brown robe, wise wrinkled face",
-        "young_scholar": "young scholar, black topknot, white hanbok, thoughtful expression",
+        "old_grandfather": "Korean elderly grandfather, East Asian features, weathered kind face, traditional hanbok",
+        "old_monk": "Korean elderly Buddhist monk, East Asian features, shaved head, dark brown robe, wise wrinkled face",
+        "young_monk": "young Korean Buddhist monk, East Asian features, shaved head, saffron robe, calm serene face",
+        "young_scholar": "young Korean scholar, East Asian features, black topknot, white hanbok, thoughtful expression",
     }
 
     # 기본 카메라 매핑
@@ -116,12 +199,13 @@ def compile_prompt_simple(
         "CLOSE": "close up shot, 85mm lens, face detail",
     }
 
-    style_desc = style_map.get(style, style_map["buddha_era_night"])
-    char_desc = char_map.get(character, char_map["young_monk"])
+    style_desc = style_map.get(style, style_map["korean_minhwa"])
+    char_desc = char_map.get(character, char_map["old_grandfather"])
     cam_desc = cam_map.get(camera, cam_map["MEDIUM"])
 
     prompt = f"{style_desc}. Character: {char_desc}. Location: {place.replace('_', ' ')}. "
     prompt += f"Camera: {cam_desc}. Scene: {scene_action}. "
-    prompt += "Same character identity, anime illustration, no text."
+    prompt += KOREAN_CONSTRAINTS
 
     return prompt
+

@@ -313,7 +313,8 @@ class ImageEngine:
     def generate_images_from_prompts(
         self,
         prompts: List[str],
-        output_dir: str
+        output_dir: str,
+        storymaker_config: dict = None
     ) -> List[str]:
         """
         프롬프트 리스트로 이미지 생성
@@ -321,6 +322,7 @@ class ImageEngine:
         Args:
             prompts: 이미지 프롬프트 리스트
             output_dir: 출력 디렉토리
+            storymaker_config: StoryMaker 설정 (character_type, world_style 등)
 
         Returns:
             생성된 이미지 경로 리스트
@@ -328,18 +330,43 @@ class ImageEngine:
         os.makedirs(output_dir, exist_ok=True)
         image_paths = []
 
+        # StoryMaker 엔진 사용 시 하이브리드 컴파일러 적용
+        if self.is_storymaker:
+            from storymaker.compiler import compile_hybrid_prompt
+            config = storymaker_config or {}
+            character_type = config.get("character_type", "old_grandfather")
+            world_style = config.get("world_style", "korean_minhwa")
+
+            # 카메라 순환 패턴
+            camera_cycle = ["WIDE", "MEDIUM", "CLOSE", "MEDIUM"]
+
         for i, prompt in enumerate(prompts, 1):
             output_path = os.path.join(output_dir, f"image_{i:02d}.png")
 
-            print(f"[ImageEngine] Image {i}/{len(prompts)}")
-            print(f"[ImageEngine] Prompt: {prompt[:80]}...")
+            # StoryMaker: 하이브리드 프롬프트 컴파일
+            if self.is_storymaker:
+                camera = camera_cycle[(i - 1) % len(camera_cycle)]
+                compiled_prompt = compile_hybrid_prompt(
+                    original_prompt=prompt,
+                    character_type=character_type,
+                    world_style=world_style,
+                    camera=camera
+                )
+                print(f"[StoryMaker] Image {i}/{len(prompts)} (Camera: {camera})")
+                print(f"[StoryMaker] Original: {prompt[:60]}...")
+                print(f"[StoryMaker] Compiled: {compiled_prompt[:80]}...")
+                prompt_to_use = compiled_prompt
+            else:
+                print(f"[ImageEngine] Image {i}/{len(prompts)}")
+                print(f"[ImageEngine] Prompt: {prompt[:80]}...")
+                prompt_to_use = prompt
 
             try:
-                self.generator.generate(prompt, output_path)
+                self.generator.generate(prompt_to_use, output_path)
                 image_paths.append(output_path)
-                print(f"[ImageEngine] ✓ Saved")
+                print(f"[{'StoryMaker' if self.is_storymaker else 'ImageEngine'}] ✓ Saved")
             except Exception as e:
-                print(f"[ImageEngine] ✗ Error: {e}")
+                print(f"[{'StoryMaker' if self.is_storymaker else 'ImageEngine'}] ✗ Error: {e}")
 
         return image_paths
 
