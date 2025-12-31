@@ -1,6 +1,6 @@
 """
 Gradio UI - AI 콘텐츠 생성기
-스타일: 뉴스/정보/믿거나말거나/불교종교
+스타일: 뉴스/정보/스토리텔링/불교명상
 """
 import os
 from dotenv import load_dotenv
@@ -13,6 +13,7 @@ import json
 from pipeline import Pipeline
 from engines import ScriptEngine, ImageEngine
 from engines.thumbnail_engine import ThumbnailEngine
+from styles import STYLE_PROMPTS  # 스타일별 프롬프트 (파일 분리됨)
 from config import (
     DURATION_SPECS, BGM_CONFIG,
     YOUTUBE_TITLE_TEMPLATES, YOUTUBE_DEFAULT_TAGS,
@@ -28,115 +29,9 @@ pipeline = Pipeline()
 thumbnail_engine = ThumbnailEngine()
 
 # ═══════════════════════════════════════════════════════════════
-# 스타일별 프롬프트 템플릿
+# 스타일별 프롬프트 템플릿 → styles/ 폴더로 분리됨
+# STYLE_PROMPTS는 styles/__init__.py에서 import
 # ═══════════════════════════════════════════════════════════════
-
-STYLE_PROMPTS = {
-    "뉴스": """당신은 뉴스 리포터입니다. 아래 내용을 뉴스 형식으로 전달하세요.
-
-## 주제/내용
-{topic}
-
-## 작성 규칙
-1. 객관적이고 사실 중심의 어조
-2. "~입니다", "~했습니다" 형식의 뉴스 문체
-3. 핵심 정보를 먼저, 상세 내용은 뒤에
-4. 시청자가 신뢰할 수 있는 톤
-5. {duration}분 분량으로 작성
-
-## 구조
-- 도입: 핵심 내용 요약
-- 본문: 상세 내용 전개
-- 마무리: 시사점 또는 전망""",
-
-    "정보": """당신은 유익한 정보를 전달하는 전문가입니다.
-
-## 주제/내용
-{topic}
-
-## 작성 규칙
-1. 친근하고 이해하기 쉬운 설명
-2. "~해요", "~거든요" 형식의 친근한 문체
-3. 핵심 포인트를 명확히 강조
-4. 실생활에 적용 가능한 팁 포함
-5. {duration}분 분량으로 작성
-
-## 구조
-- 도입: 왜 이 정보가 중요한지
-- 본문: 핵심 정보 1, 2, 3... 순서대로
-- 마무리: 정리 및 실천 방법""",
-
-    "믿거나말거나": """당신은 흥미로운 이야기를 전하는 스토리텔러입니다.
-
-## 주제/내용
-{topic}
-
-## 작성 규칙
-1. 호기심을 자극하는 미스터리한 어조
-2. "~라고 합니다", "~일까요?" 형식
-3. 의문을 던지고 서스펜스 유지
-4. 충격적인 반전이나 결말
-5. {duration}분 분량으로 작성
-
-## 구조
-- 도입: 충격적인 훅으로 시작
-- 본문: 의문점을 하나씩 풀어가며
-- 마무리: 열린 결말 또는 반전""",
-
-    "불교종교": """당신은 불교적 관점에서 삶의 지혜를 전하는 스토리텔러입니다.
-
-## 주제/내용 (사람의 상태/인생 상황)
-{topic}
-
-## 1단계: 감정 코드 분석
-원본 내용이 건드리는 핵심 감정 코드를 파악하세요:
-- 불안 / 죄책감 / 후회 / 구원욕구 / 희망 / 분노 / 고립 / 관계집착
-
-## 2단계: 인생 상황 매핑
-- 삶이 힘들 때 → 위로
-- 돈이 안 풀릴 때 → 마음 다스림
-- 관계가 자꾸 깨질 때 → 인연의 의미
-- 불안해서 잠이 안 올 때 → 명상/평안
-- 나이가 들어 불안할 때 → 지혜로운 늙음
-
-## 3단계: 인트로 작성 (공감기 3단계 - 30초 분량)
-반드시 아래 순서로 인트로를 작성하세요:
-
-### [공감] (15초)
-- 시청자 대부분이 "맞아, 나도 그래" 할 내용
-- 질문형 또는 공감형 문장
-- 60세 이상이 공감할 구체적 상황 묘사
-- 예: "나이가 들수록 몸도 마음도 예전 같지 않아 답답하신가요?"
-
-### [감추기] (10초)
-- "하지만", "그러나" 전환 접속사 사용
-- 권위 있는 출처 언급 (부처님 말씀, 법구경 등)
-- 해답이 있음을 암시하되 구체적으로 말하지 않기
-- 예: "하지만 부처님께서는 분명히 말씀하셨습니다. 현명한 사람은 나이 들수록 더 빛난다고..."
-
-### [기대감] (5초)
-- "오늘은~", "지금부터~" 즉시성 강조
-- 끝까지 들어야 알 수 있는 구조
-- 예: "오늘은 부처님의 말씀을 통해 그 비밀을 알려드리겠습니다."
-
-## 4단계: 본문 작성
-파악한 감정코드 + 인생상황을 기반으로 불교/명상/신비스러운 톤의 서사를 만드세요.
-
-## 작성 규칙
-1. 명상적이고 신비로운 어조
-2. "~입니다", "~합니다" 차분한 문체
-3. 불교적 지혜/교훈 포함 (업보, 인연, 무상, 집착 등)
-4. 시청자의 감정에 공감하며 위로
-5. 시니어(60세 이상) 대상 - 어려운 용어 금지
-6. 구체적인 사례나 비유 포함
-7. {duration}분 분량으로 작성
-
-## 전체 구조
-- 인트로 (30초): 공감 → 감추기 → 기대감
-- 본문: 불교적 관점에서 풀어가는 이야기
-- 전환: 깨달음의 순간
-- 마무리: 따뜻한 위로와 실천 가능한 마음가짐"""
-}
 
 # JSON 출력 형식 + 이미지 프롬프트 통합
 INTEGRATED_OUTPUT_FORMAT = """
@@ -173,16 +68,16 @@ INTEGRATED_OUTPUT_FORMAT = """
 STYLE_IMAGE_GUIDES = {
     "뉴스": "Professional news broadcast style, clean composition, neutral lighting",
     "정보": "Bright, friendly infographic style, clear visuals, warm colors",
-    "믿거나말거나": "Dark mysterious atmosphere, dramatic lighting, suspenseful mood, shadows",
-    "불교종교": "Serene meditation style, golden dawn light, lotus flowers, misty mountains, peaceful temple, soft glow, silhouette meditation pose"
+    "스토리텔링": "Dark mysterious atmosphere, dramatic lighting, suspenseful mood, shadows",
+    "불교명상": "Serene meditation style, golden dawn light, lotus flowers, misty mountains, peaceful temple, soft glow, silhouette meditation pose"
 }
 
 # 스타일별 입력 가이드
 STYLE_GUIDES = {
     "뉴스": "**💡 뉴스**: 사실 기반 내용을 입력하세요.",
     "정보": "**💡 정보**: 설명할 주제를 입력하세요. (예: 항산화 물질 5가지)",
-    "믿거나말거나": "**💡 믿거나말거나**: 미스터리한 주제나 흥미로운 이야기를 입력하세요.",
-    "불교종교": """**💡 불교종교**: '사람의 상태'로 입력하세요!
+    "스토리텔링": "**💡 스토리텔링**: 역사/종교/흥미로운 이야기 주제를 입력하세요.",
+    "불교명상": """**💡 불교명상**: '사람의 상태'로 입력하세요!
 
 ❌ 불교 업보, 기도하면 돈 벌까
 ✅ 삶이 힘들 때, 돈이 안 풀릴 때, 관계가 자꾸 깨질 때
@@ -845,7 +740,7 @@ def generate_thumbnail_texts():
     style = getattr(pipeline.project, 'style', '정보')
 
     # 스타일별 텍스트 생성
-    if style == "불교종교":
+    if style == "불교명상":
         sub_text = "잠자면서 듣는"
         if len(title) > 20:
             main_text = title[:20] + "..."
@@ -856,7 +751,7 @@ def generate_thumbnail_texts():
         sub_text = "긴급 속보"
         main_text = title[:25] if len(title) > 25 else title
         bottom_text = "지금 바로 확인하세요"
-    elif style == "믿거나말거나":
+    elif style == "스토리텔링":
         sub_text = "충격 실화"
         main_text = title[:25] if len(title) > 25 else title
         bottom_text = "이게 진짜라고?"
@@ -1318,7 +1213,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         )
 
                     style_input = gr.Radio(
-                        ["뉴스", "정보", "믿거나말거나", "불교종교"],
+                        ["뉴스", "정보", "스토리텔링", "불교명상"],
                         value="정보",
                         label="스타일"
                     )
