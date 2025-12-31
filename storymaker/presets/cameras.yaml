@@ -1,0 +1,49 @@
+# 카메라 프리셋 - WIDE → MEDIUM → CLOSE 순환 권장
+
+WIDE:
+  shot: wide_shot
+  lens: 24mm
+  angle: straight
+  description: 전경, 장소 전체, 인물 작게
+
+MEDIUM:
+  shot: medium_shot
+  lens: 50mm
+  angle: straight
+  description: 인물 상반신, 표정 보임
+
+CLOSE:
+  shot: close_up
+  lens: 85mm
+  angle: slight_up
+  description: 얼굴 클로즈업, 감정 강조
+
+EXTREME_CLOSE:
+  shot: extreme_close_up
+  lens: 100mm
+  angle: straight
+  description: 눈, 손, 물건 등 디테일
+
+OVER_SHOULDER:
+  shot: over_shoulder
+  lens: 50mm
+  angle: behind_character
+  description: 뒷모습 너머로 대상 보기
+
+LOW_ANGLE:
+  shot: low_angle
+  lens: 35mm
+  angle: looking_up
+  description: 아래에서 위로, 위엄/압도감
+
+HIGH_ANGLE:
+  shot: high_angle
+  lens: 35mm
+  angle: looking_down
+  description: 위에서 아래로, 연약함/작음
+
+BIRD_EYE:
+  shot: birds_eye_view
+  lens: 24mm
+  angle: top_down
+  description: 완전 위에서 내려다봄

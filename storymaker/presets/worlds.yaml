@@ -1,0 +1,56 @@
+# 세계관 프리셋 - 영상 1편당 1개 고정
+# 스타일, 조명, 색감, 안개 설정
+
+buddha_era_night:
+  style: ancient_chinese_painting
+  lighting: lantern_night
+  color: ink_muted
+  fog: low
+
+buddha_era_day:
+  style: ancient_chinese_realism
+  lighting: clear_day
+  color: warm_natural
+  fog: none
+
+buddha_era_mystic:
+  style: buddhist_mystic_ink
+  lighting: moon_night
+  color: cold_blue
+  fog: heavy
+
+joseon_minhwa_day:
+  style: korean_minhwa_folk_painting
+  lighting: soft_daylight
+  color: warm_earth_tones
+  fog: none
+
+joseon_minhwa_night:
+  style: korean_minhwa_folk_painting
+  lighting: lantern_warm
+  color: muted_warm
+  fog: low
+
+zen_minimalist:
+  style: zen_ink_wash
+  lighting: soft_diffused
+  color: monochrome_subtle
+  fog: light
+
+temple_golden:
+  style: buddhist_temple_art
+  lighting: golden_hour
+  color: gold_warm
+  fog: none
+
+mountain_hermitage:
+  style: asian_landscape_painting
+  lighting: misty_morning
+  color: cool_green_gray
+  fog: heavy
+
+ancient_india:
+  style: ancient_indian_art
+  lighting: warm_sunset
+  color: earth_ochre
+  fog: none

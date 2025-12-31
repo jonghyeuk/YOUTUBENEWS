@@ -1,0 +1,72 @@
+# 캐릭터 프리셋 - 주인공은 50편 동안 바꾸지 않음
+# 스토리텔링 영상용 고정 배우
+
+young_monk:
+  name: young_monk
+  gender: male
+  age: 22
+  hair: shaved
+  clothes: saffron_robe
+  face: calm_serene
+  body: slim
+  light: soft_top
+
+old_monk:
+  name: old_monk
+  gender: male
+  age: 68
+  hair: shaved_white
+  clothes: dark_brown_robe
+  face: wrinkled_serene
+  body: thin
+  light: candle_soft
+
+wandering_nun:
+  name: wandering_nun
+  gender: female
+  age: 30
+  hair: shaved
+  clothes: gray_robe
+  face: gentle
+  body: slim
+  light: soft_left
+
+young_scholar:
+  name: young_scholar
+  gender: male
+  age: 25
+  hair: topknot_black
+  clothes: white_hanbok_scholar
+  face: thoughtful
+  body: slim
+  light: natural
+
+old_master:
+  name: old_master
+  gender: male
+  age: 70
+  hair: long_white_beard
+  clothes: simple_hemp_robe
+  face: wise_wrinkled
+  body: thin_tall
+  light: soft_diffused
+
+village_woman:
+  name: village_woman
+  gender: female
+  age: 40
+  hair: braided_back
+  clothes: simple_hanbok
+  face: weathered_kind
+  body: sturdy
+  light: natural
+
+child_disciple:
+  name: child_disciple
+  gender: male
+  age: 10
+  hair: shaved
+  clothes: small_gray_robe
+  face: innocent_curious
+  body: small
+  light: bright_soft
