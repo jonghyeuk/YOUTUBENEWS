@@ -977,23 +977,32 @@ def reset_project():
 # YouTube 업로드
 # ═══════════════════════════════════════════════════════════════
 
-# YouTube 업로드 엔진 인스턴스
-youtube_engine = None
+# YouTube 업로드 엔진 인스턴스 (언어별)
+youtube_engines = {}
 
 
-def get_youtube_engine():
-    """YouTube 엔진 싱글톤"""
-    global youtube_engine
-    if youtube_engine is None:
+def get_youtube_engine(language: str = "ko"):
+    """YouTube 엔진 (언어별 인스턴스)"""
+    global youtube_engines
+    if language not in youtube_engines:
         from engines.youtube_upload_engine import YouTubeUploadEngine
-        youtube_engine = YouTubeUploadEngine()
-    return youtube_engine
+        youtube_engines[language] = YouTubeUploadEngine(language=language)
+    return youtube_engines[language]
 
 
-def check_youtube_auth():
-    """YouTube 인증 상태 확인"""
+def reset_youtube_engine(language: str = "ko"):
+    """YouTube 엔진 리셋 (재인증용)"""
+    global youtube_engines
+    if language in youtube_engines:
+        del youtube_engines[language]
+
+
+def check_youtube_auth(language: str = "ko"):
+    """YouTube 인증 상태 확인 (언어별)"""
+    lang_names = {"ko": "🇰🇷 한국어", "ja": "🇯🇵 일본어", "en": "🇺🇸 영어"}
+
     try:
-        engine = get_youtube_engine()
+        engine = get_youtube_engine(language)
         status = engine.check_auth_status()
 
         if not status["has_client_secrets"]:
@@ -1010,8 +1019,8 @@ def check_youtube_auth():
         if status["authenticated"] and status["channel"]:
             channel = status["channel"]
             return (
-                f"✅ **인증됨**: {channel['title']}",
-                f"### 📺 채널 정보\n"
+                f"✅ **{lang_names.get(language, language)} 채널 연결됨**: {channel['title']}",
+                f"### 📺 {lang_names.get(language, language)} 채널 정보\n"
                 f"- **채널명**: {channel['title']}\n"
                 f"- **구독자**: {channel['subscribers']}\n"
                 f"- **영상 수**: {channel['videos']}개",
@@ -1019,8 +1028,9 @@ def check_youtube_auth():
             )
         else:
             return (
-                "🔐 **인증 대기**: 아래 버튼을 클릭하여 Google 계정 연결",
-                "인증 버튼 클릭 시 브라우저가 열립니다.\n채널 접근 권한을 허용해주세요.",
+                f"🔐 **{lang_names.get(language, language)} 채널 미연결**: 아래에서 인증하세요",
+                f"**{lang_names.get(language, language)}** 채널에 업로드하려면 인증이 필요합니다.\n"
+                "해당 언어 채널의 Google 계정으로 로그인하세요.",
                 gr.update(interactive=False),
             )
 
@@ -1032,24 +1042,54 @@ def check_youtube_auth():
         )
 
 
-def authenticate_youtube():
-    """YouTube 인증 수행 (진행 상태 표시)"""
+def check_all_youtube_channels():
+    """모든 언어의 YouTube 채널 상태 확인"""
+    from engines.youtube_upload_engine import YouTubeUploadEngine
+    lang_names = {"ko": "🇰🇷 한국어", "ja": "🇯🇵 일본어", "en": "🇺🇸 영어"}
+
+    try:
+        all_status = YouTubeUploadEngine.get_all_channels_status()
+
+        lines = ["### 📺 채널 연결 상태"]
+        any_connected = False
+
+        for lang, status in all_status.items():
+            if status["authenticated"] and status["channel"]:
+                lines.append(f"- {lang_names.get(lang, lang)}: ✅ **{status['channel']['title']}**")
+                any_connected = True
+            else:
+                lines.append(f"- {lang_names.get(lang, lang)}: ⚪ 미연결")
+
+        return "\n".join(lines), gr.update(interactive=any_connected)
+
+    except Exception as e:
+        return f"❌ 오류: {e}", gr.update(interactive=False)
+
+
+def authenticate_youtube(language: str = "ko"):
+    """YouTube 인증 수행 (언어별, 진행 상태 표시)"""
+    lang_names = {"ko": "🇰🇷 한국어", "ja": "🇯🇵 일본어", "en": "🇺🇸 영어"}
+    lang_name = lang_names.get(language, language)
+
+    # 기존 엔진 리셋 (새 인증 강제)
+    reset_youtube_engine(language)
+
     # 즉시 진행 상태 표시
     yield (
-        "🔐 **브라우저에서 Google 로그인 중...**",
-        "### ⏳ 인증 진행 중\n브라우저 창에서 Google 계정으로 로그인하세요.\n\n완료될 때까지 기다려주세요...",
+        f"🔐 **{lang_name} 채널 인증 중...**",
+        f"### ⏳ 인증 진행 중\n**{lang_name}** 채널의 Google 계정으로 로그인하세요.\n\n브라우저 창에서 로그인 후 완료될 때까지 기다려주세요...",
         gr.update(interactive=False),
     )
 
     try:
-        engine = get_youtube_engine()
+        engine = get_youtube_engine(language)
         engine.authenticate()
         channel = engine.get_channel_info()
 
         if channel:
             yield (
-                f"✅ **인증 완료!** {channel['title']}",
-                f"### 📺 채널 정보\n"
+                f"✅ **{lang_name} 채널 연결 완료!** {channel['title']}",
+                f"### 📺 {lang_name} 채널 정보\n"
                 f"- **채널명**: {channel['title']}\n"
                 f"- **구독자**: {channel['subscribers']}\n"
                 f"- **영상 수**: {channel['videos']}개",
@@ -1080,8 +1120,11 @@ def authenticate_youtube():
         )
 
 
-def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
-    """YouTube에 영상 업로드 (진행 상태 표시)"""
+def upload_to_youtube(title: str, description: str, tags: str, privacy: str, language: str = "ko"):
+    """YouTube에 영상 업로드 (언어별 채널, 진행 상태 표시)"""
+    lang_names = {"ko": "🇰🇷 한국어", "ja": "🇯🇵 일본어", "en": "🇺🇸 영어"}
+    lang_name = lang_names.get(language, language)
+
     if not pipeline.project:
         yield "❌ 프로젝트가 없습니다", ""
         return
@@ -1101,10 +1144,10 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
         thumbnail_path = None
 
     # 즉시 진행 상태 표시
-    yield "⏳ **업로드 준비 중...**", "YouTube 서버에 연결 중입니다..."
+    yield f"⏳ **{lang_name} 채널에 업로드 준비 중...**", "YouTube 서버에 연결 중입니다..."
 
     try:
-        engine = get_youtube_engine()
+        engine = get_youtube_engine(language)
 
         # 공개 상태 매핑
         privacy_map = {
@@ -1116,7 +1159,7 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
 
         # 파일 크기 표시
         file_size_mb = os.path.getsize(video_path) / (1024 * 1024)
-        yield f"⏳ **업로드 중...** ({file_size_mb:.1f}MB)", f"### 📤 업로드 진행 중\n- **파일**: {file_size_mb:.1f}MB\n- **제목**: {title[:50]}...\n\n⏳ 잠시만 기다려주세요..."
+        yield f"⏳ **{lang_name} 채널에 업로드 중...** ({file_size_mb:.1f}MB)", f"### 📤 {lang_name} 채널에 업로드 진행 중\n- **파일**: {file_size_mb:.1f}MB\n- **제목**: {title[:50]}...\n\n⏳ 잠시만 기다려주세요..."
 
         # 업로드 실행
         result = engine.upload_video(
@@ -1142,8 +1185,8 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str):
                 thumb_note = f"\n\n⚠️ 썸네일 업로드 실패: {result.get('thumbnail_error', '알 수 없음')}"
 
         yield (
-            f"🎉 **업로드 완료!**",
-            f"### 📺 업로드 결과\n"
+            f"🎉 **{lang_name} 채널에 업로드 완료!**",
+            f"### 📺 업로드 결과 ({lang_name})\n"
             f"- **제목**: {result['title']}\n"
             f"- **상태**: {status_korean}\n"
             f"- **썸네일**: {thumb_status}\n"
@@ -1508,21 +1551,10 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         # Tab 6: YouTube 업로드
         # ─────────────────────────────────────────────
         with gr.Tab("6️⃣ YouTube 업로드") as youtube_tab:
-            gr.Markdown("### 📤 YouTube 자동 업로드")
+            gr.Markdown("### 📤 YouTube 자동 업로드 (언어별 채널)")
 
-            # 인증 상태 섹션
-            with gr.Row():
-                with gr.Column(scale=2):
-                    yt_auth_status = gr.Markdown("*인증 상태 확인 중...*")
-                with gr.Column(scale=1):
-                    yt_auth_btn = gr.Button("🔐 Google 계정 연결", variant="secondary")
-
-            yt_channel_info = gr.Markdown("")
-
-            gr.Markdown("---")
-
-            # 언어 선택 섹션
-            gr.Markdown("### 🌍 언어 선택 (설명/태그 템플릿)")
+            # 언어 선택 섹션 (먼저 배치)
+            gr.Markdown("### 🌍 업로드 채널 선택")
             with gr.Row():
                 yt_language = gr.Radio(
                     choices=[
@@ -1531,9 +1563,20 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         ("🇺🇸 English", "en"),
                     ],
                     value="ko",
-                    label="업로드 언어",
-                    info="선택한 언어의 설명/태그 템플릿이 적용됩니다"
+                    label="업로드 채널",
+                    info="각 언어별로 다른 YouTube 채널에 업로드됩니다"
                 )
+
+            # 인증 상태 섹션
+            with gr.Row():
+                with gr.Column(scale=2):
+                    yt_auth_status = gr.Markdown("*인증 상태 확인 중...*")
+                with gr.Column(scale=1):
+                    yt_auth_btn = gr.Button("🔐 선택한 채널 연결", variant="secondary")
+
+            yt_channel_info = gr.Markdown("")
+
+            gr.Markdown("---")
 
             # 업로드 정보 섹션
             prepare_btn = gr.Button("📋 업로드 정보 준비", variant="secondary")
@@ -1592,10 +1635,13 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
             gr.Markdown("""
             ---
             ### 💡 사용 방법
-            1. **Google 계정 연결** 클릭 → 브라우저에서 채널 권한 허용
-            2. **업로드 정보 준비** 클릭 → 제목/설명/태그 자동 생성
-            3. 필요시 수정 후 **YouTube 업로드** 클릭
-            4. 업로드 완료 후 링크 클릭하여 확인!
+            1. **업로드 채널 선택** → 🇰🇷 한국어 / 🇯🇵 일본어 / 🇺🇸 영어 중 선택
+            2. **선택한 채널 연결** 클릭 → 해당 언어 채널의 Google 계정으로 로그인
+            3. **업로드 정보 준비** 클릭 → 언어별 제목/설명/태그 자동 생성
+            4. 필요시 수정 후 **YouTube 업로드** 클릭
+            5. 다른 언어 채널에도 업로드하려면 1~4 반복!
+
+            ⚠️ **각 언어 채널마다 별도 인증이 필요합니다**
             """)
 
         # ─────────────────────────────────────────────
@@ -1736,17 +1782,24 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     )
 
     # Tab 6: YouTube 업로드
-    # 탭 선택 시 인증 상태 확인
+    # 탭 선택 시 인증 상태 확인 (선택된 언어 기준)
     youtube_tab.select(
         check_youtube_auth,
-        [],
+        [yt_language],
         [yt_auth_status, yt_channel_info, yt_upload_btn]
     )
 
-    # 인증 버튼
+    # 언어 선택 변경 시 인증 상태 갱신
+    yt_language.change(
+        check_youtube_auth,
+        [yt_language],
+        [yt_auth_status, yt_channel_info, yt_upload_btn]
+    )
+
+    # 인증 버튼 (선택된 언어 채널 인증)
     yt_auth_btn.click(
         authenticate_youtube,
-        [],
+        [yt_language],
         [yt_auth_status, yt_channel_info, yt_upload_btn]
     )
 
@@ -1757,10 +1810,10 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         [status, yt_title, yt_description, yt_tags, yt_project, yt_video, yt_thumb]
     )
 
-    # 업로드 실행
+    # 업로드 실행 (선택된 언어 채널로 업로드)
     yt_upload_btn.click(
         upload_to_youtube,
-        [yt_title, yt_description, yt_tags, yt_privacy],
+        [yt_title, yt_description, yt_tags, yt_privacy, yt_language],
         [status, yt_upload_result]
     )
 
