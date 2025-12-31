@@ -130,13 +130,14 @@ class ImageEngine:
     """
     개별 이미지 생성 엔진
     - 씬별로 개별 이미지 생성
-    - fal.ai (기본), DALL-E, Imagen 지원
+    - fal.ai (기본), DALL-E, Imagen, StoryMaker 지원
     """
 
     GENERATORS = {
         "fal": FalGenerator,
         "dalle": DalleGenerator,
         "imagen": ImagenGenerator,
+        "storymaker": None,  # 별도 처리 (StoryMakerEngine 사용)
     }
 
     # 엔진별 모델 옵션
@@ -155,6 +156,9 @@ class ImageEngine:
         "dalle": {
             "dall-e-3": "DALL-E 3",
         },
+        "storymaker": {
+            "gpt-image-1": "스토리텔링전용 (GPT Image)",
+        },
     }
 
     def __init__(self, engine: str = "fal", model: str = None):
@@ -168,9 +172,16 @@ class ImageEngine:
         self._generator: Optional[ImageGenerator] = None
 
     @property
-    def generator(self) -> ImageGenerator:
+    def generator(self):
         """지연 초기화된 생성기"""
         if self._generator is None:
+            # StoryMaker는 별도 엔진 사용
+            if self.engine_name == "storymaker":
+                from storymaker import StoryMakerEngine
+                model = self.model or "gpt-image-1"
+                self._generator = StoryMakerEngine(model=model)
+                return self._generator
+
             generator_class = self.GENERATORS.get(self.engine_name)
             if not generator_class:
                 raise ValueError(f"지원하지 않는 엔진: {self.engine_name}")
@@ -182,11 +193,17 @@ class ImageEngine:
                 self._generator = generator_class()
         return self._generator
 
+    @property
+    def is_storymaker(self) -> bool:
+        """StoryMaker 엔진 사용 여부"""
+        return self.engine_name == "storymaker"
+
     def generate_scene_images(
         self,
         script: Script,
         output_dir: str,
-        style_prefix: str = ""
+        style_prefix: str = "",
+        storymaker_config: dict = None
     ) -> List[str]:
         """
         각 씬별로 이미지 생성
@@ -195,12 +212,19 @@ class ImageEngine:
             script: Script 객체
             output_dir: 출력 디렉토리
             style_prefix: 공통 스타일 접두사
+            storymaker_config: StoryMaker 설정 (character, world 등)
 
         Returns:
             생성된 이미지 경로 리스트
         """
         os.makedirs(output_dir, exist_ok=True)
         image_paths = []
+
+        # StoryMaker 엔진 사용 시 별도 처리
+        if self.is_storymaker:
+            return self._generate_with_storymaker(
+                script, output_dir, storymaker_config or {}
+            )
 
         for scene in script.scenes:
             # 씬별 이미지 생성
@@ -216,6 +240,73 @@ class ImageEngine:
                 print(f"[ImageEngine] ✓ Saved: {output_path}")
             except Exception as e:
                 print(f"[ImageEngine] ✗ Error: {e}")
+
+        return image_paths
+
+    def _generate_with_storymaker(
+        self,
+        script: Script,
+        output_dir: str,
+        config: dict
+    ) -> List[str]:
+        """
+        StoryMaker 엔진으로 이미지 생성
+
+        Args:
+            script: Script 객체
+            output_dir: 출력 디렉토리
+            config: StoryMaker 설정 (character, world, camera 등)
+
+        Returns:
+            생성된 이미지 경로 리스트
+        """
+        image_paths = []
+        engine = self.generator  # StoryMakerEngine
+
+        # 기본 설정
+        default_character = config.get("character", "young_monk")
+        default_world = config.get("world", "buddha_era_night")
+        default_camera = config.get("camera", "MEDIUM")
+        default_place = config.get("place", "temple_hall")
+        quality = config.get("quality", "low")
+
+        # 카메라 순환 패턴: WIDE → MEDIUM → CLOSE → MEDIUM
+        camera_cycle = ["WIDE", "MEDIUM", "CLOSE", "MEDIUM"]
+
+        for i, scene in enumerate(script.scenes):
+            output_path = os.path.join(output_dir, f"scene_{scene.scene_id:02d}.png")
+
+            # 씬 텍스트 추출 (image_prompt 우선, 없으면 text 사용)
+            scene_action = scene.image_prompt or scene.text or scene.title
+            # 2문장 이내로 자르기
+            if scene_action:
+                sentences = scene_action.split('.')
+                scene_action = '. '.join(sentences[:2]).strip()
+                if not scene_action.endswith('.'):
+                    scene_action += '.'
+
+            # 카메라 순환
+            camera = camera_cycle[i % len(camera_cycle)]
+
+            print(f"[StoryMaker] Scene {scene.scene_id}: {scene.title}")
+            print(f"[StoryMaker] Action: {scene_action[:80]}...")
+            print(f"[StoryMaker] Camera: {camera}, Character: {default_character}")
+
+            try:
+                engine.generate_scene(
+                    scene_action=scene_action,
+                    output_path=output_path,
+                    character=default_character,
+                    world=default_world,
+                    camera=camera,
+                    place=default_place,
+                    quality=quality
+                )
+                image_paths.append(output_path)
+                print(f"[StoryMaker] ✓ Saved: {output_path}")
+            except Exception as e:
+                print(f"[StoryMaker] ✗ Error: {e}")
+                image_paths.append(None)
 
         return image_paths
 

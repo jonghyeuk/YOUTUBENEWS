@@ -498,6 +498,9 @@ IMAGE_MODEL_OPTIONS = {
     "dalle": [
         ("DALL-E 3", "dall-e-3"),
     ],
+    "storymaker": [
+        ("GPT Image (스토리텔링전용)", "gpt-image-1"),
+    ],
 }
 
 
@@ -1311,7 +1314,12 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
             with gr.Row():
                 with gr.Column():
                     image_engine = gr.Radio(
-                        ["fal", "dalle", "imagen"],
+                        [
+                            ("fal.ai", "fal"),
+                            ("DALL-E", "dalle"),
+                            ("Imagen", "imagen"),
+                            ("스토리텔링전용", "storymaker"),
+                        ],
                         value="fal",
                         label="이미지 엔진"
                     )
@@ -1327,7 +1335,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                             ("flux-ultra (최고품질/$0.06)", "flux-ultra"),
                         ],
                         value="flux-schnell",
-                        info="fal.ai 모델 (엔진 변경시 자동 변경)"
+                        info="엔진 변경 시 자동 변경됩니다"
                     )
 
                     final_prompts = gr.Textbox(

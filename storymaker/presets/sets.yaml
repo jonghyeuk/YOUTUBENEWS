@@ -1,0 +1,61 @@
+# 세트장 프리셋 - 영상 1편당 2개 이내 권장
+
+temple_hall:
+  name: temple_hall
+  description: 사찰 법당 내부, 불상, 향, 등불
+  props: [buddha_statue, incense, lanterns, wooden_floor]
+
+mountain_path:
+  name: mountain_path
+  description: 산길, 나무, 바위, 안개
+  props: [pine_trees, rocks, mist, dirt_path]
+
+forest_cave:
+  name: forest_cave
+  description: 숲속 동굴, 어둡고 신비로운
+  props: [cave_entrance, moss, dim_light, stones]
+
+monk_cell:
+  name: monk_cell
+  description: 승려 방, 간소한 침구, 경전
+  props: [simple_bedding, scripture, wooden_desk, candle]
+
+village_gate:
+  name: village_gate
+  description: 마을 입구, 나무 대문, 초가집
+  props: [wooden_gate, thatched_houses, villagers]
+
+river_bank:
+  name: river_bank
+  description: 강가, 물소리, 버드나무
+  props: [flowing_water, willow_trees, rocks, reeds]
+
+ancient_tomb:
+  name: ancient_tomb
+  description: 고대 무덤, 돌문, 이끼
+  props: [stone_door, moss, darkness, ancient_carvings]
+
+lantern_bridge:
+  name: lantern_bridge
+  description: 등불이 켜진 다리, 밤
+  props: [paper_lanterns, wooden_bridge, water_reflection]
+
+tavern_night:
+  name: tavern_night
+  description: 주막 내부, 밤, 술상
+  props: [wooden_tables, sake_bottles, dim_lanterns, patrons]
+
+meditation_garden:
+  name: meditation_garden
+  description: 선 정원, 모래, 바위, 고요
+  props: [raked_sand, stones, bamboo, silence]
+
+palace_courtyard:
+  name: palace_courtyard
+  description: 궁궐 마당, 기와, 넓은 공간
+  props: [tile_roof, stone_floor, pillars, guards]
+
+bamboo_forest:
+  name: bamboo_forest
+  description: 대나무 숲, 바람 소리
+  props: [tall_bamboo, filtered_light, wind, narrow_path]
