@@ -20,10 +20,12 @@ KOREAN_CONSTRAINTS = """Keep the same Korean elderly character identity across a
 Traditional Korean art style, minhwa folk painting aesthetic.
 East Asian faces only. No text, no watermark, no signature."""
 
-# --- 중국불교 ---
-CHINESE_CONSTRAINTS = """Keep the same Chinese elderly character identity across all scenes.
-Traditional Chinese ink wash painting style, shanshui landscape aesthetic.
-East Asian (Chinese) faces only. No text, no watermark, no signature."""
+# --- 중국불교 (Buddhist Icon Narrative) ---
+CHINESE_CONSTRAINTS = """Buddhist icon narrative painting style. Flat symbolic composition.
+Traditional temple painting/mural style. Strong primary colors (gold, vermillion, blue).
+No perspective realism. Spiritual sacred mood. Storytelling iconography.
+East Asian (Chinese) faces only. No anime, no modern illustration.
+No text, no watermark, no signature."""
 
 # --- 인도불교 (Narrative Concept Art) ---
 INDIAN_CONSTRAINTS = """Narrative concept art illustration style. Soft pencil sketch texture.
@@ -80,13 +82,13 @@ def compile_hybrid_prompt(
             "young_scholar": "Young Korean scholar, age 25, black topknot hair, East Asian features, traditional white hanbok, thoughtful expression",
             "village_woman": "Korean village woman, age 45, East Asian features, braided hair, simple traditional hanbok, kind weathered face",
         },
-        # 중국
+        # 중국 (Buddhist Icon Narrative - 도상화/평면적)
         "china": {
-            "old_grandfather": "Chinese elderly grandfather, age 72, Han Chinese features, long white beard, traditional changshan robe, wise contemplative expression",
-            "old_monk": "Chinese elderly Buddhist master, age 70, shaved head, Han Chinese features, long white beard, saffron and burgundy kasaya robe",
-            "young_monk": "Young Chinese Buddhist monk, age 20, shaved head, Han Chinese features, orange-yellow kasaya, peaceful expression",
-            "young_scholar": "Young Chinese scholar, age 24, Han Chinese features, black hair in traditional bun, blue scholar robe, holding scroll",
-            "village_woman": "Chinese village woman, age 40, Han Chinese features, hair in traditional bun, simple hanfu dress, gentle expression",
+            "old_grandfather": "Iconographic elderly Chinese man, flat symbolic style, Han Chinese features, white beard, traditional robe, halo/nimbus optional",
+            "old_monk": "Buddhist master icon, flat temple painting style, shaved head, golden kasaya robe with patterns, dharma wheel motif, sacred aura",
+            "young_monk": "Young Buddhist monk icon, flat symbolic composition, shaved head, saffron robe, prayer beads, humble posture",
+            "bodhisattva": "Bodhisattva icon, flat symbolic style, golden skin, lotus seat, elaborate crown, dharma mudra, radiant halo",
+            "buddha": "Buddha icon, flat symbolic composition, golden complexion, ushnisha, meditation mudra, lotus throne, radiant mandorla",
         },
         # 인도 (Narrative Concept Art - 실루엣/스케치 중심)
         "india": {
@@ -106,11 +108,11 @@ def compile_hybrid_prompt(
             "joseon_traditional": "Joseon dynasty Korean art style, traditional aesthetics, muted elegant colors, hanok architecture",
             "mountain_temple": "Korean mountain temple (sansa) setting, pine trees, traditional eaves, peaceful atmosphere",
         },
-        # 중국
+        # 중국 (Buddhist Icon Narrative - 불교 도상화)
         "china": {
-            "chinese_ink": "Traditional Chinese ink wash painting (shuimo hua), shanshui style, misty mountains, flowing brushwork",
-            "tang_dynasty": "Tang dynasty art style, rich golden and vermillion colors, ornate Buddhist temple architecture",
-            "zen_garden": "Chinese Zen garden setting, bamboo groves, moon gate, lotus pond, tranquil atmosphere",
+            "buddhist_icon": "Buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood",
+            "temple_mural": "Traditional Chinese temple mural style, flat symbolic composition, gold and vermillion colors, dharma wheel iconography, sacred atmosphere",
+            "dharma_scene": "Buddhist dharma teaching scene, icon narrative style, flat composition, strong primary colors, storytelling iconography",
         },
         # 인도 (Narrative Concept Art 스타일)
         "india": {
@@ -274,9 +276,9 @@ def compile_prompt_simple(
             "mountain_temple": "Korean mountain temple setting, traditional architecture, pine trees",
         },
         "china": {
-            "chinese_ink": "Chinese ink wash painting (shuimo hua), shanshui style, misty mountains, flowing brushwork",
-            "tang_dynasty": "Tang dynasty art style, rich golden and vermillion colors, ornate architecture",
-            "zen_garden": "Chinese Zen garden, bamboo groves, lotus pond, tranquil atmosphere",
+            "buddhist_icon": "Buddhist icon narrative painting, flat symbolic composition, traditional temple painting, strong primary colors, sacred mood",
+            "temple_mural": "Traditional Chinese temple mural style, flat composition, gold and vermillion colors, dharma iconography",
+            "dharma_scene": "Buddhist dharma teaching scene, icon narrative style, flat composition, storytelling iconography",
         },
         "india": {
             "narrative_concept": "Narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast, wide negative space",
@@ -294,10 +296,10 @@ def compile_prompt_simple(
             "young_scholar": "Young Korean scholar, East Asian features, black topknot, white hanbok",
         },
         "china": {
-            "old_grandfather": "Chinese elderly grandfather, Han Chinese features, long white beard, traditional changshan",
-            "old_monk": "Chinese elderly Buddhist master, Han Chinese features, shaved head, saffron kasaya",
-            "young_monk": "Young Chinese Buddhist monk, Han Chinese features, shaved head, orange kasaya",
-            "young_scholar": "Young Chinese scholar, Han Chinese features, traditional bun, blue scholar robe",
+            "old_grandfather": "Iconographic elderly Chinese man, flat symbolic style, white beard, traditional robe",
+            "old_monk": "Buddhist master icon, flat temple painting style, golden kasaya, dharma motif, sacred aura",
+            "young_monk": "Young Buddhist monk icon, flat symbolic composition, saffron robe, prayer beads",
+            "buddha": "Buddha icon, flat symbolic, golden complexion, ushnisha, lotus throne, radiant mandorla",
         },
         "india": {
             "old_grandfather": "Silhouette of Indian elderly man, simple sketch, brown skin tone hint, white dhoti, contemplative pose",

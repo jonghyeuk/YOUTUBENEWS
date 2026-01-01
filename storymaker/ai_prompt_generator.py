@@ -12,42 +12,62 @@ from anthropic import Anthropic
 
 
 # ═══════════════════════════════════════════════════════════════
-# 엔진별 최적화 가이드
+# 엔진별 최적화 가이드 (공식 정의)
 # ═══════════════════════════════════════════════════════════════
 
 ENGINE_OPTIMIZATION = {
     "gpt-image-1": {
-        "name": "GPT Image (Mini)",
+        "name": "GPT-Mini Narrative Illustration",
         "max_length": 1000,
         "aspect_ratio": "1536x1024 → 16:9 crop",
-        "style_hint": "Detailed scene descriptions work well. Natural language prompts. Supports complex compositions.",
-        "avoid": "Very abstract concepts, excessive text descriptions",
-        "prompt_structure": "Start with art style, then scene, then character, then lighting/mood",
+        "primary_use": "빠른 러프 컷, 콘텐츠 아이디어, 배경 설명형 컷",
+        "detail_level": "낮음",
+        "style_hint": "단순 라인 + 최소 음영, 저해상 디테일, 스토리 톤 유지 중심",
+        "avoid": "heavy realism, excessive detail",
+        "prompt_structure": "style first, then scene, then character",
+        "style_block": "style: mini narrative illustration, simple linework, minimal shading, low detail, story driven composition, no heavy realism, soft muted tones",
     },
     "dalle": {
-        "name": "DALL-E 3",
+        "name": "DALL-E Narrative Poster Illustration",
         "max_length": 4000,
         "aspect_ratio": "1792x1024 (native 16:9)",
-        "style_hint": "Very creative interpretation. Detailed prompts get great results. Can handle complex narratives.",
-        "avoid": "Copyrighted characters, real celebrities, violent content",
-        "prompt_structure": "Descriptive narrative style works best",
+        "primary_use": "표지, 썸네일, 타이틀 컷, 상징/시각 해설 이미지",
+        "detail_level": "중간",
+        "style_hint": "종합 일러스트레이션, 배경+인물 조화, 선명한 심볼 중심, 중간 대비",
+        "avoid": "Copyrighted characters, real celebrities",
+        "prompt_structure": "Descriptive narrative style, balanced composition",
+        "style_block": "style: narrative poster illustration, balanced composition, medium detail, clear subject focus, moderate contrast, storytelling symbolism, clean narrative foreground",
     },
     "fal": {
-        "name": "Flux (fal.ai)",
+        "name": "Flux (fal.ai) Buddhist Style",
         "max_length": 500,
         "aspect_ratio": "landscape_16_9 (native)",
-        "style_hint": "Shorter, focused prompts work better. Strong on photorealistic and artistic styles.",
-        "avoid": "Very long prompts, complex multi-scene descriptions",
+        "primary_use": "불교 설화, 교리 설명, 성화, 사찰 벽화 스타일",
+        "detail_level": "중간-높음",
+        "style_hint": "짧고 집중된 프롬프트, 불화/탱화 스타일에 강함",
+        "avoid": "Very long prompts, anime style",
         "prompt_structure": "Concise: style, subject, setting, mood",
+        "style_block": "style: buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood, storytelling iconography, no anime, no modern illustration",
     },
     "imagen": {
-        "name": "Google Imagen 3",
+        "name": "Google Imagine Cinematic Narrative",
         "max_length": 1000,
         "aspect_ratio": "16:9 (native)",
-        "style_hint": "Good with photorealistic and illustrated styles. Clear, structured prompts.",
-        "avoid": "Faces of real people, copyrighted content",
-        "prompt_structure": "Clear subject description, then style, then environment",
+        "primary_use": "영상컷 감성 샘플, 씬 전환 컷, 장면 분위기 연출",
+        "detail_level": "높음",
+        "style_hint": "영화적 프레이밍, 카메라 깊이+공간감, 장면 전환형 조도 처리",
+        "avoid": "Faces of real people, cartoonish exaggeration",
+        "prompt_structure": "cinematic composition, depth of field, emotional framing",
+        "style_block": "style: cinematic narrative illustration, cinematic composition, depth of field, realistic lighting, moderate detail, emotional scene framing, no cartoonish exaggeration",
     },
+}
+
+# 엔진별 용도 요약
+ENGINE_USE_CASES = {
+    "gpt-image-1": "시퀀스 초안, 빠른 러프",
+    "dalle": "표지/썸네일, 상징적 이미지",
+    "fal": "불교 도상화, 사찰 벽화 스타일",
+    "imagen": "영상 컷, 카메라 연출",
 }
 
 
