@@ -25,10 +25,12 @@ CHINESE_CONSTRAINTS = """Keep the same Chinese elderly character identity across
 Traditional Chinese ink wash painting style, shanshui landscape aesthetic.
 East Asian (Chinese) faces only. No text, no watermark, no signature."""
 
-# --- 인도불교 ---
-INDIAN_CONSTRAINTS = """Keep the same Indian/South Asian character identity across all scenes.
-Ancient Gandhara Buddhist art style, warm golden tones.
-South Asian (Indian) faces only. No text, no watermark, no signature."""
+# --- 인도불교 (Narrative Concept Art) ---
+INDIAN_CONSTRAINTS = """Narrative concept art illustration style. Soft pencil sketch texture.
+Desaturated muted colors, low contrast shading, wide negative space.
+Storyboard composition, silhouette-focused characters.
+No cute, no anime gloss, no bright colors.
+No text, no watermark, no signature."""
 
 # 지역별 제약조건 매핑
 REGIONAL_CONSTRAINTS = {
@@ -86,13 +88,13 @@ def compile_hybrid_prompt(
             "young_scholar": "Young Chinese scholar, age 24, Han Chinese features, black hair in traditional bun, blue scholar robe, holding scroll",
             "village_woman": "Chinese village woman, age 40, Han Chinese features, hair in traditional bun, simple hanfu dress, gentle expression",
         },
-        # 인도
+        # 인도 (Narrative Concept Art - 실루엣/스케치 중심)
         "india": {
-            "old_grandfather": "Indian elderly man, age 70, South Asian features, brown skin, white beard, simple white dhoti, wise weathered face",
-            "old_monk": "Indian elderly Buddhist bhikkhu, age 68, South Asian features, brown skin, shaved head, saffron robes, serene expression",
-            "young_monk": "Young Indian Buddhist monk, age 22, South Asian features, brown skin, shaved head, saffron robes, calm demeanor",
-            "buddha": "The Buddha (Siddhartha Gautama), South Asian features, golden-brown skin, ushnisha (crown bump), serene compassionate smile, saffron robes",
-            "village_woman": "Indian village woman, age 35, South Asian features, brown skin, traditional sari, bindi, kind expression",
+            "old_grandfather": "Silhouette of elderly Indian man, pencil sketch style, brown skin hint, simple white dhoti, contemplative distant pose",
+            "old_monk": "Silhouette of Buddhist bhikkhu, soft pencil sketch, saffron robe color accent, meditative posture, minimal detail",
+            "young_monk": "Silhouette of young Buddhist monk, pencil sketch texture, saffron robe hint, peaceful stance, wide negative space",
+            "buddha": "Silhouette of the Buddha in meditation, pencil sketch, ushnisha visible, serene profile, minimal detail, narrative concept art",
+            "village_woman": "Silhouette of Indian village woman, simple sketch, sari draping hint, gentle posture, wide negative space",
         },
     }
 
@@ -110,11 +112,11 @@ def compile_hybrid_prompt(
             "tang_dynasty": "Tang dynasty art style, rich golden and vermillion colors, ornate Buddhist temple architecture",
             "zen_garden": "Chinese Zen garden setting, bamboo groves, moon gate, lotus pond, tranquil atmosphere",
         },
-        # 인도
+        # 인도 (Narrative Concept Art 스타일)
         "india": {
-            "indian_gandhara": "Gandhara Buddhist art style, Greco-Buddhist influences, warm golden and terracotta tones, intricate carvings",
-            "buddha_era": "Ancient India Buddha era setting, sal trees, simple mud huts, Ganges river, warm sunset colors",
-            "ajanta_style": "Ajanta cave painting style, rich earth pigments, flowing lines, spiritual atmosphere",
+            "narrative_concept": "Narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast shading, wide negative space, storyboard composition",
+            "buddha_era": "Ancient India Buddha era, narrative concept art, soft pencil sketch, sepia tones, wide negative space, silhouette focus",
+            "meditation": "Meditative scene, narrative concept art illustration, soft pencil sketch, desaturated colors, wide negative space, contemplative atmosphere",
         },
     }
 
@@ -277,9 +279,9 @@ def compile_prompt_simple(
             "zen_garden": "Chinese Zen garden, bamboo groves, lotus pond, tranquil atmosphere",
         },
         "india": {
-            "indian_gandhara": "Gandhara Buddhist art style, Greco-Buddhist, warm golden and terracotta tones",
-            "buddha_era": "Ancient India Buddha era, sal trees, Ganges river, warm sunset colors",
-            "ajanta_style": "Ajanta cave painting style, rich earth pigments, spiritual atmosphere",
+            "narrative_concept": "Narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast, wide negative space",
+            "buddha_era": "Ancient India Buddha era, narrative concept art, soft pencil sketch, sepia tones, silhouette focus",
+            "meditation": "Meditative scene, soft pencil sketch, desaturated colors, wide negative space, contemplative",
         },
     }
 
@@ -298,10 +300,10 @@ def compile_prompt_simple(
             "young_scholar": "Young Chinese scholar, Han Chinese features, traditional bun, blue scholar robe",
         },
         "india": {
-            "old_grandfather": "Indian elderly man, South Asian features, brown skin, white beard, simple dhoti",
-            "old_monk": "Indian elderly Buddhist bhikkhu, South Asian features, brown skin, saffron robes",
-            "young_monk": "Young Indian Buddhist monk, South Asian features, brown skin, saffron robes",
-            "buddha": "The Buddha, South Asian features, golden-brown skin, ushnisha, saffron robes",
+            "old_grandfather": "Silhouette of Indian elderly man, simple sketch, brown skin tone hint, white dhoti, contemplative pose",
+            "old_monk": "Silhouette of Buddhist bhikkhu, pencil sketch style, saffron robe hint, meditative posture",
+            "young_monk": "Silhouette of young Buddhist monk, simple sketch, saffron robe accent, peaceful stance",
+            "buddha": "Silhouette of the Buddha, pencil sketch, meditation pose, ushnisha, minimal detail, serene",
         },
     }
 
