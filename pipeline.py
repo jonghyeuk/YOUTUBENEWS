@@ -3,10 +3,12 @@
 개별 이미지 생성 방식 (fal.ai/DALL-E/Imagen)
 """
 import os
+import json
 from datetime import datetime
 from typing import Optional, Callable, List
+from dataclasses import asdict
 
-from models.types import Project, Script
+from models.types import Project, Script, Scene, AudioSegment
 from engines import (
     ScriptEngine,
     TTSEngine,
@@ -485,3 +487,199 @@ class Pipeline:
         print(f"[Pipeline] {message}")
         if self.on_progress:
             self.on_progress(message)
+
+    # ─────────────────────────────────────────────
+    # 프로젝트 저장/불러오기
+    # ─────────────────────────────────────────────
+
+    def save_project(self) -> str:
+        """프로젝트 상태를 JSON으로 저장"""
+        if not self.project:
+            raise ValueError("저장할 프로젝트가 없습니다")
+
+        project_path = os.path.join(self.project_dir, self.project.project_id)
+        save_path = os.path.join(project_path, "project.json")
+
+        # Project를 dict로 변환
+        data = {
+            "project_id": self.project.project_id,
+            "title": self.project.title,
+            "duration_min": self.project.duration_min,
+            "topic": self.project.topic,
+            "audio_path": self.project.audio_path,
+            "sheet_image_path": self.project.sheet_image_path,
+            "cut_paths": self.project.cut_paths,
+            "subtitle_path": self.project.subtitle_path,
+            "video_path": self.project.video_path,
+            "final_video_path": self.project.final_video_path,
+            "current_step": self.project.current_step,
+            "status": self.project.status,
+        }
+
+        # Script 저장
+        if self.project.script:
+            data["script"] = {
+                "title": self.project.script.title,
+                "duration_min": self.project.script.duration_min,
+                "total_panels": self.project.script.total_panels,
+                "scenes": [asdict(s) for s in self.project.script.scenes]
+            }
+
+        # AudioSegments 저장
+        if self.project.audio_segments:
+            data["audio_segments"] = [asdict(seg) for seg in self.project.audio_segments]
+
+        with open(save_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+
+        self._log(f"프로젝트 저장 완료: {save_path}")
+        return save_path
+
+    def load_project(self, project_id: str) -> Project:
+        """저장된 프로젝트 불러오기"""
+        project_path = os.path.join(self.project_dir, project_id)
+        load_path = os.path.join(project_path, "project.json")
+
+        if not os.path.exists(load_path):
+            raise FileNotFoundError(f"프로젝트를 찾을 수 없습니다: {load_path}")
+
+        with open(load_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        # Script 복원
+        script = None
+        if "script" in data and data["script"]:
+            scenes = [Scene(**s) for s in data["script"]["scenes"]]
+            script = Script(
+                title=data["script"]["title"],
+                scenes=scenes,
+                duration_min=data["script"]["duration_min"],
+                total_panels=data["script"]["total_panels"]
+            )
+
+        # AudioSegments 복원
+        audio_segments = []
+        if "audio_segments" in data and data["audio_segments"]:
+            audio_segments = [AudioSegment(**seg) for seg in data["audio_segments"]]
+
+        # Project 복원
+        self.project = Project(
+            project_id=data["project_id"],
+            title=data["title"],
+            duration_min=data["duration_min"],
+            topic=data["topic"],
+            script=script,
+            audio_path=data.get("audio_path"),
+            audio_segments=audio_segments,
+            sheet_image_path=data.get("sheet_image_path"),
+            cut_paths=data.get("cut_paths", []),
+            subtitle_path=data.get("subtitle_path"),
+            video_path=data.get("video_path"),
+            final_video_path=data.get("final_video_path"),
+            current_step=data.get("current_step", 0),
+            status=data.get("status", "loaded")
+        )
+
+        self._log(f"프로젝트 불러오기 완료: {project_id}")
+        return self.project
+
+    def list_projects(self) -> List[dict]:
+        """저장된 프로젝트 목록 조회"""
+        projects = []
+
+        if not os.path.exists(self.project_dir):
+            return projects
+
+        for folder in os.listdir(self.project_dir):
+            project_path = os.path.join(self.project_dir, folder)
+            json_path = os.path.join(project_path, "project.json")
+
+            if os.path.isdir(project_path) and os.path.exists(json_path):
+                try:
+                    with open(json_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    projects.append({
+                        "project_id": folder,
+                        "title": data.get("title", folder),
+                        "duration_min": data.get("duration_min", 0),
+                        "status": data.get("status", "unknown"),
+                        "has_images": len(data.get("cut_paths", [])) > 0,
+                        "has_audio": data.get("audio_path") is not None,
+                        "has_video": data.get("final_video_path") is not None,
+                    })
+                except Exception as e:
+                    print(f"[Pipeline] 프로젝트 로드 실패: {folder} - {e}")
+
+        # 최신순 정렬
+        projects.sort(key=lambda x: x["project_id"], reverse=True)
+        return projects
+
+    def regenerate_tts(
+        self,
+        engine: str = "elevenlabs",
+        voice_id: str = None,
+        speed: float = 0.9,
+        style: str = "정보"
+    ) -> str:
+        """
+        기존 스크립트로 TTS만 재생성 (다른 채널용)
+
+        Args:
+            engine: TTS 엔진 (elevenlabs, wavenet, openai)
+            voice_id: 음성 ID (엔진별)
+            speed: 음성 속도
+            style: 스타일 (elevenlabs 설정 적용)
+
+        Returns:
+            새 오디오 파일 경로
+        """
+        if not self.project or not self.project.script:
+            raise ValueError("스크립트가 있는 프로젝트를 먼저 불러오세요")
+
+        self._log(f"TTS 재생성 시작: engine={engine}, style={style}")
+
+        # 새 오디오 파일명 (타임스탬프로 구분)
+        timestamp = datetime.now().strftime("%H%M%S")
+        audio_filename = f"tts_{timestamp}.mp3"
+
+        # 기존 step3 호출
+        audio_path = self.step3_generate_tts(
+            engine=engine,
+            style=style
+        )
+
+        self._log(f"TTS 재생성 완료: {audio_path}")
+        return audio_path
+
+    def regenerate_subtitles(self, use_whisper: bool = False) -> str:
+        """자막만 재생성"""
+        if not self.project or not self.project.audio_path:
+            raise ValueError("오디오가 있는 프로젝트를 먼저 불러오세요")
+
+        return self.step5_generate_subtitles(use_whisper=use_whisper)
+
+    def rerender_video(
+        self,
+        use_ken_burns: bool = True,
+        bgm_path: str = None,
+        bgm_volume: float = 0.15
+    ) -> str:
+        """기존 이미지 + 새 TTS로 영상 재렌더링"""
+        if not self.project:
+            raise ValueError("프로젝트를 먼저 불러오세요")
+
+        # 씬-이미지 매핑 재구성
+        scene_images = {}
+        if self.project.script and self.project.cut_paths:
+            img_idx = 0
+            for scene in self.project.script.scenes:
+                count = scene.image_count or 1
+                scene_images[scene.scene_id] = []
+                for _ in range(count):
+                    if img_idx < len(self.project.cut_paths):
+                        scene_images[scene.scene_id].append(self.project.cut_paths[img_idx])
+                        img_idx += 1
+
+        # 렌더링
+        self.step6_render_video(use_ken_burns=use_ken_burns, bgm_path=bgm_path)
+        return self.step7_burn_subtitles()
