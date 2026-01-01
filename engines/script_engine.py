@@ -8,7 +8,7 @@ from typing import Optional, Dict
 from anthropic import Anthropic
 
 from models.types import Script, Scene
-from config import DURATION_SPECS
+from config import DURATION_SPECS, TRANSLATION_PROMPTS, LANGUAGE_CONFIG
 
 
 # 휴먼터치 프롬프트 템플릿
@@ -411,4 +411,149 @@ JSON 형식으로 응답:
         print(f"  - 썸네일: {result.get('thumbnail_text', '')}")
 
         return result
+
+    def translate_script(
+        self,
+        script: Script,
+        target_language: str,
+        style: str = "불교종교"
+    ) -> Script:
+        """
+        대본을 다른 언어로 번역
+
+        Args:
+            script: 원본 Script 객체 (한국어)
+            target_language: 목표 언어 (ja, en)
+            style: 콘텐츠 스타일
+
+        Returns:
+            번역된 Script 객체
+        """
+        if target_language == "ko":
+            return script  # 한국어면 그대로 반환
+
+        if target_language not in TRANSLATION_PROMPTS:
+            raise ValueError(f"지원하지 않는 언어: {target_language}. 사용 가능: {list(TRANSLATION_PROMPTS.keys())}")
+
+        lang_config = LANGUAGE_CONFIG.get(target_language, {})
+        lang_name = lang_config.get("name", target_language)
+
+        # 번역 프롬프트
+        translation_guide = TRANSLATION_PROMPTS[target_language]
+
+        # 씬별로 번역
+        translated_scenes = []
+
+        for scene in script.scenes:
+            prompt = f"""{translation_guide}
+
+## 원본 (한국어)
+제목: {scene.title}
+내용:
+{scene.text}
+
+## 번역 지침
+- 콘텐츠 스타일: {style}
+- 감정과 분위기를 유지하면서 자연스럽게 번역
+- 현지 문화에 맞게 표현 조정
+
+JSON 형식으로 응답:
+```json
+{{
+  "title": "번역된 제목",
+  "text": "번역된 내용"
+}}
+```"""
+
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=2000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            content = response.content[0].text
+
+            try:
+                translated = self._parse_response(content)
+                translated_scenes.append(Scene(
+                    scene_id=scene.scene_id,
+                    title=translated.get("title", scene.title),
+                    text=translated.get("text", scene.text),
+                    panel_ids=scene.panel_ids
+                ))
+            except json.JSONDecodeError:
+                # 파싱 실패 시 원본 유지
+                print(f"[ScriptEngine] 씬 {scene.scene_id} 번역 파싱 실패, 원본 유지")
+                translated_scenes.append(scene)
+
+        # 제목 번역
+        title_prompt = f"""{translation_guide}
+
+## 원본 제목 (한국어)
+{script.title}
+
+간결하게 번역해주세요. 번역된 제목만 텍스트로 응답:"""
+
+        title_response = self.client.messages.create(
+            model=self.model,
+            max_tokens=200,
+            messages=[{"role": "user", "content": title_prompt}]
+        )
+
+        translated_title = title_response.content[0].text.strip()
+
+        print(f"[ScriptEngine] 대본 번역 완료: {lang_name}")
+        print(f"  - 원본 제목: {script.title}")
+        print(f"  - 번역 제목: {translated_title}")
+        print(f"  - 씬 수: {len(translated_scenes)}개")
+
+        return Script(
+            title=translated_title,
+            scenes=translated_scenes,
+            duration_min=script.duration_min,
+            total_panels=script.total_panels
+        )
+
+    def translate_text(
+        self,
+        text: str,
+        target_language: str,
+        context: str = "일반"
+    ) -> str:
+        """
+        단일 텍스트 번역 (제목, 설명 등)
+
+        Args:
+            text: 원본 텍스트 (한국어)
+            target_language: 목표 언어 (ja, en)
+            context: 번역 컨텍스트 (제목, 설명, 태그 등)
+
+        Returns:
+            번역된 텍스트
+        """
+        if target_language == "ko":
+            return text
+
+        if target_language not in TRANSLATION_PROMPTS:
+            return text
+
+        translation_guide = TRANSLATION_PROMPTS[target_language]
+
+        prompt = f"""{translation_guide}
+
+## 번역 컨텍스트
+{context}
+
+## 원본 (한국어)
+{text}
+
+번역된 텍스트만 응답 (추가 설명 없이):"""
+
+        response = self.client.messages.create(
+            model=self.model,
+            max_tokens=500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+
+        return response.content[0].text.strip()
 
