@@ -69,7 +69,29 @@ STYLE_IMAGE_GUIDES = {
     "뉴스": "Professional news broadcast style, clean composition, neutral lighting",
     "정보": "Bright, friendly infographic style, clear visuals, warm colors",
     "스토리텔링": "Dark mysterious atmosphere, dramatic lighting, suspenseful mood, shadows",
+    "스토리텔링:한국불교": "classical Korean ink-wash narrative painting, Joseon dynasty landscape painting style, soft mineral colors, traditional hanok and village scenery, wide negative space, storytelling composition, gentle brush texture, hand-painted feeling, no anime, no modern illustration, no bright digital colors, no cartoon style",
+    "스토리텔링:중국불교": "buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood, storytelling iconography, no anime, no modern illustration",
+    "스토리텔링:인도불교": "narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast shading, wide negative space, storyboard composition, no cute, no anime gloss, no bright color",
     "불교명상": "Serene meditation style, golden dawn light, lotus flowers, misty mountains, peaceful temple, soft glow, silhouette meditation pose"
+}
+
+# 스타일 → StoryMaker 설정 매핑
+STYLE_TO_STORYMAKER = {
+    "스토리텔링:한국불교": {
+        "region": "korea",
+        "world_style": "classical_inkwash",
+        "character_type": "old_monk",
+    },
+    "스토리텔링:중국불교": {
+        "region": "china",
+        "world_style": "buddhist_icon",
+        "character_type": "old_monk",
+    },
+    "스토리텔링:인도불교": {
+        "region": "india",
+        "world_style": "narrative_concept",
+        "character_type": "old_monk",
+    },
 }
 
 # 스타일별 입력 가이드
@@ -77,6 +99,21 @@ STYLE_GUIDES = {
     "뉴스": "**💡 뉴스**: 사실 기반 내용을 입력하세요.",
     "정보": "**💡 정보**: 설명할 주제를 입력하세요. (예: 항산화 물질 5가지)",
     "스토리텔링": "**💡 스토리텔링**: 역사/종교/흥미로운 이야기 주제를 입력하세요.",
+    "스토리텔링:한국불교": """**💡 한국불교 스토리텔링**: 한국 불교/선종/경전/역사적 일화를 입력하세요.
+
+🎨 **스타일**: 조선 수묵채색 정본화 (Classical Korean Ink-Wash)
+📍 **배경**: 산사, 암자, 한옥마을, 조선 풍경
+👤 **인물**: 스님, 선비, 백성 (한국인 이목구비)""",
+    "스토리텔링:중국불교": """**💡 중국불교 스토리텔링**: 중국 불교 설화/선종 공안/역사적 일화를 입력하세요.
+
+🎨 **스타일**: 불교 도상화 (Buddhist Icon Narrative)
+📍 **배경**: 사찰 벽화, 당송명청 사원
+👤 **인물**: 선사, 보살, 나한 (평면적 도상)""",
+    "스토리텔링:인도불교": """**💡 인도불교 스토리텔링**: 붓다 시대/초기불교/자타카 이야기를 입력하세요.
+
+🎨 **스타일**: 서사 콘셉트아트 (Narrative Concept Art)
+📍 **배경**: 녹야원, 보리수, 간다라 풍경
+👤 **인물**: 붓다, 제자, 수행자 (실루엣 스케치)""",
     "불교명상": """**💡 불교명상**: '사람의 상태'로 입력하세요!
 
 ❌ 불교 업보, 기도하면 돈 벌까
@@ -463,7 +500,7 @@ def parse_image_prompts(prompts_text: str):
     return parsed
 
 
-def generate_images_from_text(prompts_text: str, engine: str, model: str):
+def generate_images_from_text(prompts_text: str, engine: str, model: str, style: str = "정보"):
     if not pipeline.project:
         return "❌ 스크립트 먼저 생성하세요", []
     try:
@@ -471,13 +508,20 @@ def generate_images_from_text(prompts_text: str, engine: str, model: str):
         if not prompts:
             return "❌ 프롬프트 파싱 실패", []
 
+        # 스토리텔링 스타일일 때 StoryMaker 설정 전달
+        storymaker_config = None
+        if style in STYLE_TO_STORYMAKER:
+            storymaker_config = STYLE_TO_STORYMAKER[style]
+            print(f"[App] 스토리텔링 스타일 감지: {style} → {storymaker_config}")
+
         image_paths = pipeline.step4_generate_images_from_prompts(
             prompts=prompts,
             engine=engine,
-            model=model
+            model=model,
+            storymaker_config=storymaker_config
         )
         images = [Image.open(p) for p in image_paths]
-        return f"✅ 이미지 생성 완료 ({len(images)}장, 모델: {model})", images
+        return f"✅ 이미지 생성 완료 ({len(images)}장, 모델: {model}, 스타일: {style})", images
     except Exception as e:
         return f"❌ 오류: {e}", []
 
@@ -1216,7 +1260,9 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         )
 
                     style_input = gr.Radio(
-                        ["뉴스", "정보", "스토리텔링", "불교명상"],
+                        ["뉴스", "정보", "스토리텔링",
+                         "스토리텔링:한국불교", "스토리텔링:중국불교", "스토리텔링:인도불교",
+                         "불교명상"],
                         value="정보",
                         label="스타일"
                     )
@@ -1620,7 +1666,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     image_engine.change(update_model_choices, [image_engine], [image_model])
     gen_images_btn.click(
         generate_images_from_text,
-        [final_prompts, image_engine, image_model],
+        [final_prompts, image_engine, image_model, style_input],
         [status, images_gallery]
     )
 

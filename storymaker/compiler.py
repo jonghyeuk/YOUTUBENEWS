@@ -15,20 +15,26 @@ from typing import Dict, Any, Optional
 # 지역별 스타일 프리셋
 # ═══════════════════════════════════════════════════════════════
 
-# --- 한국불교 ---
+# --- 한국불교 (Classical Korean Ink-Wash) ---
 KOREAN_CONSTRAINTS = """Keep the same Korean elderly character identity across all scenes.
-Traditional Korean art style, minhwa folk painting aesthetic.
-East Asian faces only. No text, no watermark, no signature."""
+Classical Korean ink-wash narrative painting style, Joseon dynasty landscape aesthetic.
+Soft mineral colors, wide negative space, gentle brush texture, hand-painted feeling.
+East Asian (Korean) faces only. No anime, no modern illustration, no bright digital colors.
+No text, no watermark, no signature."""
 
-# --- 중국불교 ---
-CHINESE_CONSTRAINTS = """Keep the same Chinese elderly character identity across all scenes.
-Traditional Chinese ink wash painting style, shanshui landscape aesthetic.
-East Asian (Chinese) faces only. No text, no watermark, no signature."""
+# --- 중국불교 (Buddhist Icon Narrative) ---
+CHINESE_CONSTRAINTS = """Buddhist icon narrative painting style. Flat symbolic composition.
+Traditional temple painting/mural style. Strong primary colors (gold, vermillion, blue).
+No perspective realism. Spiritual sacred mood. Storytelling iconography.
+East Asian (Chinese) faces only. No anime, no modern illustration.
+No text, no watermark, no signature."""
 
-# --- 인도불교 ---
-INDIAN_CONSTRAINTS = """Keep the same Indian/South Asian character identity across all scenes.
-Ancient Gandhara Buddhist art style, warm golden tones.
-South Asian (Indian) faces only. No text, no watermark, no signature."""
+# --- 인도불교 (Narrative Concept Art) ---
+INDIAN_CONSTRAINTS = """Narrative concept art illustration style. Soft pencil sketch texture.
+Desaturated muted colors, low contrast shading, wide negative space.
+Storyboard composition, silhouette-focused characters.
+No cute, no anime gloss, no bright colors.
+No text, no watermark, no signature."""
 
 # 지역별 제약조건 매핑
 REGIONAL_CONSTRAINTS = {
@@ -49,13 +55,16 @@ def compile_hybrid_prompt(
     character_type: str = "old_grandfather",
     world_style: str = "korean_minhwa",
     camera: str = "MEDIUM",
-    region: str = "korea"
+    region: str = "korea",
+    engine: str = "gpt-image-1",
+    engine_style_block: str = None
 ) -> str:
     """
     기존 프롬프트에 캐릭터/스타일 프리셋을 강제 적용 (하이브리드 방식)
 
     작가가 만든 창의적 씬 설명은 유지하되,
     캐릭터와 스타일은 프리셋으로 고정하여 일관성 확보
+    엔진별 최적화된 스타일 블록 적용
 
     Args:
         original_prompt: 작가가 생성한 원본 이미지 프롬프트
@@ -63,6 +72,8 @@ def compile_hybrid_prompt(
         world_style: 세계관 스타일 (korean_minhwa, chinese_ink, indian_gandhara 등)
         camera: 카메라 샷 (WIDE, MEDIUM, CLOSE)
         region: 지역 (korea, china, india)
+        engine: 이미지 엔진 (gpt-image-1, dalle, fal, imagen)
+        engine_style_block: 엔진별 최적화 스타일 블록 (get_regional_style_block에서 가져옴)
 
     Returns:
         프리셋이 적용된 컴파일된 프롬프트
@@ -70,51 +81,52 @@ def compile_hybrid_prompt(
 
     # 지역별 캐릭터 프리셋
     character_presets = {
-        # 한국
+        # 한국 (Classical Ink-Wash 스타일)
         "korea": {
-            "old_grandfather": "Korean elderly grandfather, age 70, East Asian features, weathered kind face, traditional Korean hanbok, gray hair in topknot",
-            "old_monk": "Korean elderly Buddhist monk, age 68, shaved head, East Asian features, serene wrinkled face, dark gray traditional robe",
-            "young_monk": "Young Korean Buddhist monk, age 22, shaved head, East Asian features, calm serene face, gray robe",
-            "young_scholar": "Young Korean scholar, age 25, black topknot hair, East Asian features, traditional white hanbok, thoughtful expression",
-            "village_woman": "Korean village woman, age 45, East Asian features, braided hair, simple traditional hanbok, kind weathered face",
+            "old_grandfather": "Korean elderly grandfather in ink-wash style, age 70, East Asian Korean features, weathered kind face, traditional hanbok, gray topknot, soft brush strokes",
+            "old_monk": "Korean elderly Buddhist monk in ink-wash style, age 68, shaved head, East Asian Korean features, serene wrinkled face, gray-brown traditional robe, contemplative pose",
+            "young_monk": "Young Korean Buddhist monk in ink-wash style, age 22, shaved head, East Asian Korean features, calm serene face, gray robe, gentle brush texture",
+            "young_scholar": "Young Korean scholar in ink-wash style, age 25, black topknot hair, East Asian Korean features, traditional white hanbok, thoughtful expression, soft mineral colors",
+            "village_woman": "Korean village woman in ink-wash style, age 45, East Asian Korean features, braided hair, simple traditional hanbok, kind weathered face, soft brush strokes",
         },
-        # 중국
+        # 중국 (Buddhist Icon Narrative - 도상화/평면적)
         "china": {
-            "old_grandfather": "Chinese elderly grandfather, age 72, Han Chinese features, long white beard, traditional changshan robe, wise contemplative expression",
-            "old_monk": "Chinese elderly Buddhist master, age 70, shaved head, Han Chinese features, long white beard, saffron and burgundy kasaya robe",
-            "young_monk": "Young Chinese Buddhist monk, age 20, shaved head, Han Chinese features, orange-yellow kasaya, peaceful expression",
-            "young_scholar": "Young Chinese scholar, age 24, Han Chinese features, black hair in traditional bun, blue scholar robe, holding scroll",
-            "village_woman": "Chinese village woman, age 40, Han Chinese features, hair in traditional bun, simple hanfu dress, gentle expression",
+            "old_grandfather": "Iconographic elderly Chinese man, flat symbolic style, Han Chinese features, white beard, traditional robe, halo/nimbus optional",
+            "old_monk": "Buddhist master icon, flat temple painting style, shaved head, golden kasaya robe with patterns, dharma wheel motif, sacred aura",
+            "young_monk": "Young Buddhist monk icon, flat symbolic composition, shaved head, saffron robe, prayer beads, humble posture",
+            "bodhisattva": "Bodhisattva icon, flat symbolic style, golden skin, lotus seat, elaborate crown, dharma mudra, radiant halo",
+            "buddha": "Buddha icon, flat symbolic composition, golden complexion, ushnisha, meditation mudra, lotus throne, radiant mandorla",
         },
-        # 인도
+        # 인도 (Narrative Concept Art - 실루엣/스케치 중심)
         "india": {
-            "old_grandfather": "Indian elderly man, age 70, South Asian features, brown skin, white beard, simple white dhoti, wise weathered face",
-            "old_monk": "Indian elderly Buddhist bhikkhu, age 68, South Asian features, brown skin, shaved head, saffron robes, serene expression",
-            "young_monk": "Young Indian Buddhist monk, age 22, South Asian features, brown skin, shaved head, saffron robes, calm demeanor",
-            "buddha": "The Buddha (Siddhartha Gautama), South Asian features, golden-brown skin, ushnisha (crown bump), serene compassionate smile, saffron robes",
-            "village_woman": "Indian village woman, age 35, South Asian features, brown skin, traditional sari, bindi, kind expression",
+            "old_grandfather": "Silhouette of elderly Indian man, pencil sketch style, brown skin hint, simple white dhoti, contemplative distant pose",
+            "old_monk": "Silhouette of Buddhist bhikkhu, soft pencil sketch, saffron robe color accent, meditative posture, minimal detail",
+            "young_monk": "Silhouette of young Buddhist monk, pencil sketch texture, saffron robe hint, peaceful stance, wide negative space",
+            "buddha": "Silhouette of the Buddha in meditation, pencil sketch, ushnisha visible, serene profile, minimal detail, narrative concept art",
+            "village_woman": "Silhouette of Indian village woman, simple sketch, sari draping hint, gentle posture, wide negative space",
         },
     }
 
     # 지역별 세계관 프리셋
     world_presets = {
-        # 한국
+        # 한국 (Classical Ink-Wash 정본 스타일)
         "korea": {
-            "korean_minhwa": "Korean minhwa folk painting style, traditional Korean art, warm earth tones, soft brushwork, dancheong colors",
-            "joseon_traditional": "Joseon dynasty Korean art style, traditional aesthetics, muted elegant colors, hanok architecture",
-            "mountain_temple": "Korean mountain temple (sansa) setting, pine trees, traditional eaves, peaceful atmosphere",
+            "classical_inkwash": "Classical Korean ink-wash narrative painting, Joseon dynasty landscape style, soft mineral colors, wide negative space, gentle brush texture, hand-painted feeling",
+            "korean_minhwa": "Classical Korean ink-wash style with mineral color wash, traditional Korean aesthetic, soft earth tones, gentle brushwork",
+            "joseon_traditional": "Joseon dynasty ink-wash painting style, traditional Korean aesthetics, soft mineral colors, hanok architecture, wide negative space",
+            "mountain_temple": "Korean mountain temple (sansa) in ink-wash style, soft brush strokes, pine trees, misty atmosphere, wide negative space",
         },
-        # 중국
+        # 중국 (Buddhist Icon Narrative - 불교 도상화)
         "china": {
-            "chinese_ink": "Traditional Chinese ink wash painting (shuimo hua), shanshui style, misty mountains, flowing brushwork",
-            "tang_dynasty": "Tang dynasty art style, rich golden and vermillion colors, ornate Buddhist temple architecture",
-            "zen_garden": "Chinese Zen garden setting, bamboo groves, moon gate, lotus pond, tranquil atmosphere",
+            "buddhist_icon": "Buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood",
+            "temple_mural": "Traditional Chinese temple mural style, flat symbolic composition, gold and vermillion colors, dharma wheel iconography, sacred atmosphere",
+            "dharma_scene": "Buddhist dharma teaching scene, icon narrative style, flat composition, strong primary colors, storytelling iconography",
         },
-        # 인도
+        # 인도 (Narrative Concept Art 스타일)
         "india": {
-            "indian_gandhara": "Gandhara Buddhist art style, Greco-Buddhist influences, warm golden and terracotta tones, intricate carvings",
-            "buddha_era": "Ancient India Buddha era setting, sal trees, simple mud huts, Ganges river, warm sunset colors",
-            "ajanta_style": "Ajanta cave painting style, rich earth pigments, flowing lines, spiritual atmosphere",
+            "narrative_concept": "Narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast shading, wide negative space, storyboard composition",
+            "buddha_era": "Ancient India Buddha era, narrative concept art, soft pencil sketch, sepia tones, wide negative space, silhouette focus",
+            "meditation": "Meditative scene, narrative concept art illustration, soft pencil sketch, desaturated colors, wide negative space, contemplative atmosphere",
         },
     }
 
@@ -148,8 +160,52 @@ def compile_hybrid_prompt(
     # 제약 조건
     constraints = REGIONAL_CONSTRAINTS.get(normalized_region, KOREAN_CONSTRAINTS)
 
-    # 프롬프트 조합 (순서 중요!)
-    compiled = f"""{world_desc}.
+    # 엔진별 프롬프트 구조 최적화
+    if engine == "gpt-image-1":
+        # GPT-mini: 짧고 단순하게, 스타일 먼저
+        if engine_style_block:
+            compiled = f"""{engine_style_block}.
+{char_desc}. {cam_desc}.
+{original_prompt}
+{constraints}"""
+        else:
+            compiled = f"""{world_desc}.
+{char_desc}. {cam_desc}.
+{original_prompt}
+{constraints}"""
+
+    elif engine == "fal":
+        # Fal (Flux): 매우 짧게, 핵심만
+        if engine_style_block:
+            compiled = f"""{engine_style_block}. {char_desc}. {cam_desc}. {original_prompt}"""
+        else:
+            compiled = f"""{world_desc}. {char_desc}. {cam_desc}. {original_prompt}"""
+
+    elif engine == "imagen":
+        # Imagen: 영화적 연출, depth of field 강조
+        if engine_style_block:
+            compiled = f"""{engine_style_block}.
+Main character: {char_desc}.
+{cam_desc}, depth of field.
+Scene: {original_prompt}
+{constraints}"""
+        else:
+            compiled = f"""{world_desc}.
+Main character: {char_desc}.
+{cam_desc}, depth of field, cinematic framing.
+Scene: {original_prompt}
+{constraints}"""
+
+    else:
+        # DALL-E 및 기타: 균형잡힌 설명
+        if engine_style_block:
+            compiled = f"""{engine_style_block}.
+Main character: {char_desc}.
+{cam_desc}.
+Scene description: {original_prompt}
+{constraints}"""
+        else:
+            compiled = f"""{world_desc}.
 Main character: {char_desc}.
 {cam_desc}.
 Scene description: {original_prompt}
@@ -267,41 +323,42 @@ def compile_prompt_simple(
     # 지역별 스타일 매핑
     style_maps = {
         "korea": {
-            "korean_minhwa": "Korean minhwa folk painting style, traditional Korean art, warm earth tones, dancheong colors",
-            "joseon_traditional": "Joseon dynasty Korean art style, traditional aesthetics, muted elegant colors",
-            "mountain_temple": "Korean mountain temple setting, traditional architecture, pine trees",
+            "classical_inkwash": "Classical Korean ink-wash narrative painting, Joseon dynasty landscape style, soft mineral colors, wide negative space, gentle brush texture",
+            "korean_minhwa": "Classical Korean ink-wash style with mineral color wash, traditional Korean aesthetic, soft earth tones, gentle brushwork",
+            "joseon_traditional": "Joseon dynasty ink-wash painting style, soft mineral colors, hanok architecture, wide negative space",
+            "mountain_temple": "Korean mountain temple in ink-wash style, soft brush strokes, pine trees, misty atmosphere",
         },
         "china": {
-            "chinese_ink": "Chinese ink wash painting (shuimo hua), shanshui style, misty mountains, flowing brushwork",
-            "tang_dynasty": "Tang dynasty art style, rich golden and vermillion colors, ornate architecture",
-            "zen_garden": "Chinese Zen garden, bamboo groves, lotus pond, tranquil atmosphere",
+            "buddhist_icon": "Buddhist icon narrative painting, flat symbolic composition, traditional temple painting, strong primary colors, sacred mood",
+            "temple_mural": "Traditional Chinese temple mural style, flat composition, gold and vermillion colors, dharma iconography",
+            "dharma_scene": "Buddhist dharma teaching scene, icon narrative style, flat composition, storytelling iconography",
         },
         "india": {
-            "indian_gandhara": "Gandhara Buddhist art style, Greco-Buddhist, warm golden and terracotta tones",
-            "buddha_era": "Ancient India Buddha era, sal trees, Ganges river, warm sunset colors",
-            "ajanta_style": "Ajanta cave painting style, rich earth pigments, spiritual atmosphere",
+            "narrative_concept": "Narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast, wide negative space",
+            "buddha_era": "Ancient India Buddha era, narrative concept art, soft pencil sketch, sepia tones, silhouette focus",
+            "meditation": "Meditative scene, soft pencil sketch, desaturated colors, wide negative space, contemplative",
         },
     }
 
     # 지역별 캐릭터 매핑
     char_maps = {
         "korea": {
-            "old_grandfather": "Korean elderly grandfather, East Asian features, weathered kind face, traditional hanbok",
-            "old_monk": "Korean elderly Buddhist monk, East Asian features, shaved head, dark gray robe",
-            "young_monk": "Young Korean Buddhist monk, East Asian features, shaved head, gray robe",
-            "young_scholar": "Young Korean scholar, East Asian features, black topknot, white hanbok",
+            "old_grandfather": "Korean elderly grandfather in ink-wash style, East Asian Korean features, weathered kind face, traditional hanbok, soft brush strokes",
+            "old_monk": "Korean elderly Buddhist monk in ink-wash style, East Asian Korean features, shaved head, gray-brown robe, gentle brush texture",
+            "young_monk": "Young Korean Buddhist monk in ink-wash style, East Asian Korean features, shaved head, gray robe, soft mineral colors",
+            "young_scholar": "Young Korean scholar in ink-wash style, East Asian Korean features, black topknot, white hanbok, gentle brush strokes",
         },
         "china": {
-            "old_grandfather": "Chinese elderly grandfather, Han Chinese features, long white beard, traditional changshan",
-            "old_monk": "Chinese elderly Buddhist master, Han Chinese features, shaved head, saffron kasaya",
-            "young_monk": "Young Chinese Buddhist monk, Han Chinese features, shaved head, orange kasaya",
-            "young_scholar": "Young Chinese scholar, Han Chinese features, traditional bun, blue scholar robe",
+            "old_grandfather": "Iconographic elderly Chinese man, flat symbolic style, white beard, traditional robe",
+            "old_monk": "Buddhist master icon, flat temple painting style, golden kasaya, dharma motif, sacred aura",
+            "young_monk": "Young Buddhist monk icon, flat symbolic composition, saffron robe, prayer beads",
+            "buddha": "Buddha icon, flat symbolic, golden complexion, ushnisha, lotus throne, radiant mandorla",
         },
         "india": {
-            "old_grandfather": "Indian elderly man, South Asian features, brown skin, white beard, simple dhoti",
-            "old_monk": "Indian elderly Buddhist bhikkhu, South Asian features, brown skin, saffron robes",
-            "young_monk": "Young Indian Buddhist monk, South Asian features, brown skin, saffron robes",
-            "buddha": "The Buddha, South Asian features, golden-brown skin, ushnisha, saffron robes",
+            "old_grandfather": "Silhouette of Indian elderly man, simple sketch, brown skin tone hint, white dhoti, contemplative pose",
+            "old_monk": "Silhouette of Buddhist bhikkhu, pencil sketch style, saffron robe hint, meditative posture",
+            "young_monk": "Silhouette of young Buddhist monk, simple sketch, saffron robe accent, peaceful stance",
+            "buddha": "Silhouette of the Buddha, pencil sketch, meditation pose, ushnisha, minimal detail, serene",
         },
     }
 

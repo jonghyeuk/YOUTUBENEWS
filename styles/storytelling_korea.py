@@ -1,6 +1,7 @@
 """
 한국불교 스토리텔링 스타일
-- 민화풍 시각 스타일
+- 한국 고전 서사 수묵채색 정본화 (Classical Ink-Wash)
+- 조선시대 산수화 스타일, 부드러운 광물색
 - 조선시대 사찰, 산사, 한옥마을 배경
 - 한국 전통 스님, 선비, 백성 캐릭터
 """
@@ -77,38 +78,58 @@ PROMPT = """당신은 "한국 불교/선종/경전/역사적 일화"를 바탕�
 # 이미지 세계관 가이드 (StoryMaker AI용)
 WORLD_STYLE_GUIDE = """## 한국불교 시각 스타일 가이드
 
-### 미술 스타일
-- 한국 전통 민화(民畫) 풍격
-- 단청(丹靑)의 오방색: 청(靑), 적(赤), 황(黃), 백(白), 흑(黑)
-- 한지(韓紙) 질감, 먹의 농담
-- 여백의 미, 선(線)의 흐름
+### 미술 스타일: Classical Korean Ink-Wash (한국 고전 서사 수묵채색 정본화)
+- STYLE_CODE: "KR_CLASSICAL_INKWASH_V1"
+- classical Korean ink-wash narrative painting
+- Joseon dynasty landscape painting style (조선 산수화)
+- soft mineral colors (부드러운 광물색 담채)
+- traditional hanok and village scenery (한옥/마을 풍경)
+- wide negative space (넓은 여백)
+- storytelling composition (서사 구도)
+- gentle brush texture (부드러운 붓질 텍스처)
+- hand-painted feeling (손그림 느낌)
+
+### 핵심 특징
+- 수묵 담채: 먹과 부드러운 광물색의 조화
+- 넓은 여백: 조선 산수화의 여백미
+- 서사 구도: 인물과 배경의 조화로운 배치
+- 손그림 느낌: 디지털 느낌 배제, 전통화 질감
+- 조선 풍경: 한옥, 산사, 마을의 정취
 
 ### 인물 특징
-- 동양인 얼굴, 한국인 이목구비
+- 동양인(한국인) 얼굴, 한국인 이목구비
+- 수묵/담채 스타일의 인물 표현
 - 스님: 회색/갈색 승복, 삭발 또는 두건, 목탁/염주
 - 선비: 갓, 도포, 부채, 책
 - 백성: 한복(저고리/치마/바지), 짚신, 지게
-- 표정: 온화하고 사색적
+- 표정: 온화하고 사색적, 부드러운 선 표현
 
 ### 공간/배경
-- 산사(山寺): 기와지붕, 처마, 단청, 대웅전, 범종각
+- 산사(山寺): 기와지붕, 처마, 소나무, 안개
 - 암자: 작은 초가, 계곡 옆, 대나무 숲
-- 한옥마을: 초가지붕, 돌담길, 장독대
-- 저잣거리: 주막, 대장간, 시장 풍경
+- 한옥마을: 초가지붕, 돌담길, 넓은 마당
+- 조선 산수: 산, 물, 나무의 전통적 구도
 - 자연: 소나무, 대나무, 연꽃, 단풍, 설경
 
-### 소품
-- 목탁, 염주, 불경, 차 도구
-- 등잔, 초롱, 문방사우
-- 항아리, 보자기, 짚신
+### 색감
+- 수묵 기반 + 부드러운 광물색 담채
+- 황토색, 옅은 청록, 담홍, 연회색
+- 저채도, 부드러운 대비
+- 한지 질감의 따뜻한 느낌
 
 ### 조명/분위기
 - 부드러운 자연광, 새벽/황혼의 빛
-- 촛불/등잔불의 따뜻한 조명
 - 안개 낀 산사, 달빛 비치는 마당
+- 명상적이고 고요한 분위기
+- 넓은 여백이 주는 정적인 느낌
 
 ### 금지 요소
-- 서양인 얼굴, 금발/갈색 머리
-- 현대 건물, 콘크리트
+- 선명한 색상, 고채도
+- 애니메이션/만화 스타일
+- 디지털 일러스트 느낌
+- 서양인 얼굴
 - 일본/중국 특유 요소 혼합
-- 텍스트, 워터마크, 서명"""
+- 텍스트, 워터마크, 서명
+
+### 프롬프트 핵심 문구
+classical Korean ink-wash narrative painting, Joseon dynasty landscape painting style, soft mineral colors, traditional hanok and village scenery, wide negative space, storytelling composition, gentle brush texture, hand-painted feeling, no anime, no modern illustration, no bright digital colors, no cartoon style"""

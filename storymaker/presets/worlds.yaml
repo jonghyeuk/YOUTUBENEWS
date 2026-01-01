@@ -1,6 +1,56 @@
 # 세계관 프리셋 - 영상 1편당 1개 고정
 # 스타일, 조명, 색감, 안개 설정
 
+# ═══════════════════════════════════════════════════════════════
+# 한국불교 - Classical Korean Ink-Wash (정본 스타일)
+# ═══════════════════════════════════════════════════════════════
+
+classical_inkwash_day:
+  style: classical_korean_inkwash_narrative_painting
+  lighting: soft_natural
+  color: soft_mineral_colors
+  fog: light
+
+classical_inkwash_dawn:
+  style: classical_korean_inkwash_narrative_painting
+  lighting: dawn_mist
+  color: soft_mineral_colors
+  fog: heavy
+
+classical_inkwash_dusk:
+  style: classical_korean_inkwash_narrative_painting
+  lighting: golden_dusk
+  color: warm_mineral_tones
+  fog: light
+
+joseon_minhwa_day:
+  style: korean_minhwa_folk_painting
+  lighting: soft_daylight
+  color: warm_earth_tones
+  fog: none
+
+joseon_minhwa_night:
+  style: korean_minhwa_folk_painting
+  lighting: lantern_warm
+  color: muted_warm
+  fog: low
+
+# ═══════════════════════════════════════════════════════════════
+# 중국불교 - Buddhist Icon Narrative (불교 도상화)
+# ═══════════════════════════════════════════════════════════════
+
+buddhist_icon_day:
+  style: buddhist_icon_narrative_painting
+  lighting: temple_daylight
+  color: strong_primary_colors
+  fog: none
+
+buddhist_icon_sacred:
+  style: buddhist_icon_narrative_painting
+  lighting: golden_temple
+  color: gold_vermillion
+  fog: none
+
 buddha_era_night:
   style: ancient_chinese_painting
   lighting: lantern_night
@@ -19,17 +69,31 @@ buddha_era_mystic:
   color: cold_blue
   fog: heavy
 
-joseon_minhwa_day:
-  style: korean_minhwa_folk_painting
-  lighting: soft_daylight
-  color: warm_earth_tones
+# ═══════════════════════════════════════════════════════════════
+# 인도불교 - Narrative Concept Art (서사 콘셉트아트)
+# ═══════════════════════════════════════════════════════════════
+
+narrative_concept_day:
+  style: narrative_concept_art_illustration
+  lighting: soft_diffused
+  color: desaturated_muted
   fog: none
 
-joseon_minhwa_night:
-  style: korean_minhwa_folk_painting
-  lighting: lantern_warm
-  color: muted_warm
-  fog: low
+narrative_concept_silhouette:
+  style: narrative_concept_art_illustration
+  lighting: backlit_silhouette
+  color: sepia_muted
+  fog: light
+
+ancient_india:
+  style: ancient_indian_art
+  lighting: warm_sunset
+  color: earth_ochre
+  fog: none
+
+# ═══════════════════════════════════════════════════════════════
+# 공통
+# ═══════════════════════════════════════════════════════════════
 
 zen_minimalist:
   style: zen_ink_wash

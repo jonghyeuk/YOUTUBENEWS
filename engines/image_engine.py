@@ -263,11 +263,11 @@ class ImageEngine:
         image_paths = []
         engine = self.generator  # StoryMakerEngine
 
-        # 기본 설정
-        default_character = config.get("character", "young_monk")
-        default_world = config.get("world", "buddha_era_night")
+        # 기본 설정 (한국불교 Classical Ink-Wash 스타일 기본)
+        default_character = config.get("character", "old_monk")
+        default_world = config.get("world", "joseon_minhwa_day")  # 조선 민화풍
         default_camera = config.get("camera", "MEDIUM")
-        default_place = config.get("place", "temple_hall")
+        default_place = config.get("place", "mountain_temple")  # 산사
         quality = config.get("quality", "low")
 
         # 카메라 순환 패턴: WIDE → MEDIUM → CLOSE → MEDIUM
@@ -333,12 +333,43 @@ class ImageEngine:
         # StoryMaker 엔진 사용 시 하이브리드 컴파일러 적용
         if self.is_storymaker:
             from storymaker.compiler import compile_hybrid_prompt
+            from storymaker.ai_prompt_generator import get_regional_style_block, ENGINE_OPTIMIZATION
+
             config = storymaker_config or {}
-            character_type = config.get("character_type", "old_grandfather")
-            world_style = config.get("world_style", "korean_minhwa")
+            character_type = config.get("character_type", "old_monk")
+            world_style = config.get("world_style", "classical_inkwash")
+            region = config.get("region", "korea")
+
+            # 현재 엔진 (StoryMaker = gpt-image-1)
+            engine_key = "gpt-image-1"
+            engine_config = ENGINE_OPTIMIZATION.get(engine_key, {})
+            max_prompt_length = engine_config.get("max_length", 1000)
+
+            # 지역+엔진별 스타일 블록 가져오기
+            engine_style_block = get_regional_style_block(region, engine_key)
+
+            print(f"[StoryMaker] 설정: region={region}, world_style={world_style}, character={character_type}")
+            print(f"[StoryMaker] 엔진: {engine_key}, 최대길이: {max_prompt_length}자")
 
             # 카메라 순환 패턴
             camera_cycle = ["WIDE", "MEDIUM", "CLOSE", "MEDIUM"]
+        else:
+            # 다른 엔진용 스타일 블록
+            from storymaker.ai_prompt_generator import get_regional_style_block, ENGINE_OPTIMIZATION
+
+            config = storymaker_config or {}
+            region = config.get("region", "korea")
+
+            # 엔진명 매핑
+            engine_map = {"fal": "fal", "dalle": "dalle", "imagen": "imagen"}
+            engine_key = engine_map.get(self.engine_name, "dalle")
+            engine_config = ENGINE_OPTIMIZATION.get(engine_key, {})
+            max_prompt_length = engine_config.get("max_length", 4000)
+
+            # 지역+엔진별 스타일 블록
+            engine_style_block = get_regional_style_block(region, engine_key)
+
+            print(f"[ImageEngine] 엔진: {engine_key}, 지역: {region}")
 
         for i, prompt in enumerate(prompts, 1):
             output_path = os.path.join(output_dir, f"image_{i:02d}.png")
@@ -350,16 +381,32 @@ class ImageEngine:
                     original_prompt=prompt,
                     character_type=character_type,
                     world_style=world_style,
-                    camera=camera
+                    camera=camera,
+                    region=region,
+                    engine=engine_key,
+                    engine_style_block=engine_style_block
                 )
-                print(f"[StoryMaker] Image {i}/{len(prompts)} (Camera: {camera})")
+                # 프롬프트 길이 제한
+                if len(compiled_prompt) > max_prompt_length:
+                    compiled_prompt = compiled_prompt[:max_prompt_length-3] + "..."
+
+                print(f"[StoryMaker] Image {i}/{len(prompts)} (Camera: {camera}, Region: {region})")
                 print(f"[StoryMaker] Original: {prompt[:60]}...")
-                print(f"[StoryMaker] Compiled: {compiled_prompt[:80]}...")
+                print(f"[StoryMaker] Compiled ({len(compiled_prompt)}자): {compiled_prompt[:80]}...")
                 prompt_to_use = compiled_prompt
             else:
-                print(f"[ImageEngine] Image {i}/{len(prompts)}")
-                print(f"[ImageEngine] Prompt: {prompt[:80]}...")
-                prompt_to_use = prompt
+                # 다른 엔진: 엔진별 스타일 블록을 프롬프트 앞에 추가
+                if engine_style_block and storymaker_config:
+                    prompt_to_use = f"{engine_style_block}. {prompt}"
+                else:
+                    prompt_to_use = prompt
+
+                # 프롬프트 길이 제한
+                if len(prompt_to_use) > max_prompt_length:
+                    prompt_to_use = prompt_to_use[:max_prompt_length-3] + "..."
+
+                print(f"[ImageEngine] Image {i}/{len(prompts)} ({engine_key})")
+                print(f"[ImageEngine] Prompt ({len(prompt_to_use)}자): {prompt_to_use[:80]}...")
 
             try:
                 self.generator.generate(prompt_to_use, output_path)
