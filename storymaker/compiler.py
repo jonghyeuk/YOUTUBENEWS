@@ -55,13 +55,16 @@ def compile_hybrid_prompt(
     character_type: str = "old_grandfather",
     world_style: str = "korean_minhwa",
     camera: str = "MEDIUM",
-    region: str = "korea"
+    region: str = "korea",
+    engine: str = "gpt-image-1",
+    engine_style_block: str = None
 ) -> str:
     """
     기존 프롬프트에 캐릭터/스타일 프리셋을 강제 적용 (하이브리드 방식)
 
     작가가 만든 창의적 씬 설명은 유지하되,
     캐릭터와 스타일은 프리셋으로 고정하여 일관성 확보
+    엔진별 최적화된 스타일 블록 적용
 
     Args:
         original_prompt: 작가가 생성한 원본 이미지 프롬프트
@@ -69,6 +72,8 @@ def compile_hybrid_prompt(
         world_style: 세계관 스타일 (korean_minhwa, chinese_ink, indian_gandhara 등)
         camera: 카메라 샷 (WIDE, MEDIUM, CLOSE)
         region: 지역 (korea, china, india)
+        engine: 이미지 엔진 (gpt-image-1, dalle, fal, imagen)
+        engine_style_block: 엔진별 최적화 스타일 블록 (get_regional_style_block에서 가져옴)
 
     Returns:
         프리셋이 적용된 컴파일된 프롬프트
@@ -155,8 +160,52 @@ def compile_hybrid_prompt(
     # 제약 조건
     constraints = REGIONAL_CONSTRAINTS.get(normalized_region, KOREAN_CONSTRAINTS)
 
-    # 프롬프트 조합 (순서 중요!)
-    compiled = f"""{world_desc}.
+    # 엔진별 프롬프트 구조 최적화
+    if engine == "gpt-image-1":
+        # GPT-mini: 짧고 단순하게, 스타일 먼저
+        if engine_style_block:
+            compiled = f"""{engine_style_block}.
+{char_desc}. {cam_desc}.
+{original_prompt}
+{constraints}"""
+        else:
+            compiled = f"""{world_desc}.
+{char_desc}. {cam_desc}.
+{original_prompt}
+{constraints}"""
+
+    elif engine == "fal":
+        # Fal (Flux): 매우 짧게, 핵심만
+        if engine_style_block:
+            compiled = f"""{engine_style_block}. {char_desc}. {cam_desc}. {original_prompt}"""
+        else:
+            compiled = f"""{world_desc}. {char_desc}. {cam_desc}. {original_prompt}"""
+
+    elif engine == "imagen":
+        # Imagen: 영화적 연출, depth of field 강조
+        if engine_style_block:
+            compiled = f"""{engine_style_block}.
+Main character: {char_desc}.
+{cam_desc}, depth of field.
+Scene: {original_prompt}
+{constraints}"""
+        else:
+            compiled = f"""{world_desc}.
+Main character: {char_desc}.
+{cam_desc}, depth of field, cinematic framing.
+Scene: {original_prompt}
+{constraints}"""
+
+    else:
+        # DALL-E 및 기타: 균형잡힌 설명
+        if engine_style_block:
+            compiled = f"""{engine_style_block}.
+Main character: {char_desc}.
+{cam_desc}.
+Scene description: {original_prompt}
+{constraints}"""
+        else:
+            compiled = f"""{world_desc}.
 Main character: {char_desc}.
 {cam_desc}.
 Scene description: {original_prompt}
