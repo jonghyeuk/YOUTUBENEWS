@@ -70,6 +70,48 @@ ENGINE_USE_CASES = {
     "imagen": "영상 컷, 카메라 연출",
 }
 
+# ═══════════════════════════════════════════════════════════════
+# 지역별 엔진 최적화 스타일 블록
+# ═══════════════════════════════════════════════════════════════
+
+REGIONAL_ENGINE_STYLES = {
+    # 한국불교: Classical Korean Ink-Wash (정본 스타일)
+    "korea": {
+        "dalle": "style: classical Korean ink-wash narrative painting, Joseon dynasty landscape painting style, soft mineral colors, traditional hanok and village scenery, wide negative space, storytelling composition, gentle brush texture, hand-painted feeling, no anime, no modern illustration, no bright digital colors, no cartoon style",
+        "gpt-image-1": "style: classical Korean ink wash narrative sketch, traditional Joseon landscape style, soft pencil and ink line, very light mineral wash, wide negative space, storyboard composition, rough hand-drawn feeling, low detail, no bright color, no anime, no modern illustration",
+        "fal": "style: classical Korean ink-wash painting, Joseon dynasty landscape, soft mineral colors, traditional temple and hanok, wide negative space, storytelling composition, no anime, no modern illustration",
+        "imagen": "style: classical Korean ink-wash narrative, cinematic Joseon landscape, soft mineral colors, traditional Korean architecture, depth of field, emotional scene framing, no cartoonish exaggeration",
+    },
+    # 중국불교: Buddhist Icon Narrative (불교 도상화)
+    "china": {
+        "dalle": "style: buddhist icon narrative painting, flat symbolic composition, traditional Chinese temple painting, strong primary colors, gold and vermillion, dharma iconography, no perspective realism, sacred mood, no anime, no modern illustration",
+        "gpt-image-1": "style: buddhist icon narrative sketch, flat symbolic composition, temple painting style, strong primary colors, sacred mood, low detail, no anime, no modern illustration",
+        "fal": "style: buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood, storytelling iconography, no anime, no modern illustration",
+        "imagen": "style: buddhist icon narrative, flat symbolic composition, temple mural style, strong primary colors, sacred atmosphere, cinematic framing, no cartoonish exaggeration",
+    },
+    # 인도불교: Narrative Concept Art (서사 콘셉트아트)
+    "india": {
+        "dalle": "style: narrative concept art illustration, soft pencil sketch texture, desaturated muted colors, low contrast shading, wide negative space, storyboard composition, silhouette-focused, no cute, no anime, no bright colors",
+        "gpt-image-1": "style: narrative concept art sketch, soft pencil texture, desaturated muted colors, wide negative space, storyboard composition, rough silhouette, low detail, no anime, no bright color",
+        "fal": "style: narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast shading, wide negative space, storyboard composition, no cute, no anime gloss, no bright color",
+        "imagen": "style: narrative concept art, soft pencil sketch, desaturated colors, wide negative space, cinematic silhouette composition, depth of field, no cartoonish exaggeration",
+    },
+}
+
+
+def get_regional_style_block(region: str, engine: str) -> str:
+    """지역과 엔진에 맞는 스타일 블록 반환"""
+    region_norm = region.lower()
+    if "한국" in region or "korea" in region:
+        region_norm = "korea"
+    elif "중국" in region or "china" in region:
+        region_norm = "china"
+    elif "인도" in region or "india" in region:
+        region_norm = "india"
+
+    region_styles = REGIONAL_ENGINE_STYLES.get(region_norm, REGIONAL_ENGINE_STYLES["korea"])
+    return region_styles.get(engine, region_styles.get("dalle", ""))
+
 
 class AIPromptGenerator:
     """

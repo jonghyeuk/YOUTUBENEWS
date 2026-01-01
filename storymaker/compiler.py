@@ -15,10 +15,12 @@ from typing import Dict, Any, Optional
 # 지역별 스타일 프리셋
 # ═══════════════════════════════════════════════════════════════
 
-# --- 한국불교 ---
+# --- 한국불교 (Classical Korean Ink-Wash) ---
 KOREAN_CONSTRAINTS = """Keep the same Korean elderly character identity across all scenes.
-Traditional Korean art style, minhwa folk painting aesthetic.
-East Asian faces only. No text, no watermark, no signature."""
+Classical Korean ink-wash narrative painting style, Joseon dynasty landscape aesthetic.
+Soft mineral colors, wide negative space, gentle brush texture, hand-painted feeling.
+East Asian (Korean) faces only. No anime, no modern illustration, no bright digital colors.
+No text, no watermark, no signature."""
 
 # --- 중국불교 (Buddhist Icon Narrative) ---
 CHINESE_CONSTRAINTS = """Buddhist icon narrative painting style. Flat symbolic composition.
@@ -74,13 +76,13 @@ def compile_hybrid_prompt(
 
     # 지역별 캐릭터 프리셋
     character_presets = {
-        # 한국
+        # 한국 (Classical Ink-Wash 스타일)
         "korea": {
-            "old_grandfather": "Korean elderly grandfather, age 70, East Asian features, weathered kind face, traditional Korean hanbok, gray hair in topknot",
-            "old_monk": "Korean elderly Buddhist monk, age 68, shaved head, East Asian features, serene wrinkled face, dark gray traditional robe",
-            "young_monk": "Young Korean Buddhist monk, age 22, shaved head, East Asian features, calm serene face, gray robe",
-            "young_scholar": "Young Korean scholar, age 25, black topknot hair, East Asian features, traditional white hanbok, thoughtful expression",
-            "village_woman": "Korean village woman, age 45, East Asian features, braided hair, simple traditional hanbok, kind weathered face",
+            "old_grandfather": "Korean elderly grandfather in ink-wash style, age 70, East Asian Korean features, weathered kind face, traditional hanbok, gray topknot, soft brush strokes",
+            "old_monk": "Korean elderly Buddhist monk in ink-wash style, age 68, shaved head, East Asian Korean features, serene wrinkled face, gray-brown traditional robe, contemplative pose",
+            "young_monk": "Young Korean Buddhist monk in ink-wash style, age 22, shaved head, East Asian Korean features, calm serene face, gray robe, gentle brush texture",
+            "young_scholar": "Young Korean scholar in ink-wash style, age 25, black topknot hair, East Asian Korean features, traditional white hanbok, thoughtful expression, soft mineral colors",
+            "village_woman": "Korean village woman in ink-wash style, age 45, East Asian Korean features, braided hair, simple traditional hanbok, kind weathered face, soft brush strokes",
         },
         # 중국 (Buddhist Icon Narrative - 도상화/평면적)
         "china": {
@@ -102,11 +104,12 @@ def compile_hybrid_prompt(
 
     # 지역별 세계관 프리셋
     world_presets = {
-        # 한국
+        # 한국 (Classical Ink-Wash 정본 스타일)
         "korea": {
-            "korean_minhwa": "Korean minhwa folk painting style, traditional Korean art, warm earth tones, soft brushwork, dancheong colors",
-            "joseon_traditional": "Joseon dynasty Korean art style, traditional aesthetics, muted elegant colors, hanok architecture",
-            "mountain_temple": "Korean mountain temple (sansa) setting, pine trees, traditional eaves, peaceful atmosphere",
+            "classical_inkwash": "Classical Korean ink-wash narrative painting, Joseon dynasty landscape style, soft mineral colors, wide negative space, gentle brush texture, hand-painted feeling",
+            "korean_minhwa": "Classical Korean ink-wash style with mineral color wash, traditional Korean aesthetic, soft earth tones, gentle brushwork",
+            "joseon_traditional": "Joseon dynasty ink-wash painting style, traditional Korean aesthetics, soft mineral colors, hanok architecture, wide negative space",
+            "mountain_temple": "Korean mountain temple (sansa) in ink-wash style, soft brush strokes, pine trees, misty atmosphere, wide negative space",
         },
         # 중국 (Buddhist Icon Narrative - 불교 도상화)
         "china": {
@@ -271,9 +274,10 @@ def compile_prompt_simple(
     # 지역별 스타일 매핑
     style_maps = {
         "korea": {
-            "korean_minhwa": "Korean minhwa folk painting style, traditional Korean art, warm earth tones, dancheong colors",
-            "joseon_traditional": "Joseon dynasty Korean art style, traditional aesthetics, muted elegant colors",
-            "mountain_temple": "Korean mountain temple setting, traditional architecture, pine trees",
+            "classical_inkwash": "Classical Korean ink-wash narrative painting, Joseon dynasty landscape style, soft mineral colors, wide negative space, gentle brush texture",
+            "korean_minhwa": "Classical Korean ink-wash style with mineral color wash, traditional Korean aesthetic, soft earth tones, gentle brushwork",
+            "joseon_traditional": "Joseon dynasty ink-wash painting style, soft mineral colors, hanok architecture, wide negative space",
+            "mountain_temple": "Korean mountain temple in ink-wash style, soft brush strokes, pine trees, misty atmosphere",
         },
         "china": {
             "buddhist_icon": "Buddhist icon narrative painting, flat symbolic composition, traditional temple painting, strong primary colors, sacred mood",
@@ -290,10 +294,10 @@ def compile_prompt_simple(
     # 지역별 캐릭터 매핑
     char_maps = {
         "korea": {
-            "old_grandfather": "Korean elderly grandfather, East Asian features, weathered kind face, traditional hanbok",
-            "old_monk": "Korean elderly Buddhist monk, East Asian features, shaved head, dark gray robe",
-            "young_monk": "Young Korean Buddhist monk, East Asian features, shaved head, gray robe",
-            "young_scholar": "Young Korean scholar, East Asian features, black topknot, white hanbok",
+            "old_grandfather": "Korean elderly grandfather in ink-wash style, East Asian Korean features, weathered kind face, traditional hanbok, soft brush strokes",
+            "old_monk": "Korean elderly Buddhist monk in ink-wash style, East Asian Korean features, shaved head, gray-brown robe, gentle brush texture",
+            "young_monk": "Young Korean Buddhist monk in ink-wash style, East Asian Korean features, shaved head, gray robe, soft mineral colors",
+            "young_scholar": "Young Korean scholar in ink-wash style, East Asian Korean features, black topknot, white hanbok, gentle brush strokes",
         },
         "china": {
             "old_grandfather": "Iconographic elderly Chinese man, flat symbolic style, white beard, traditional robe",
