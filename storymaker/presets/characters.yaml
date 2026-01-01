@@ -1,6 +1,50 @@
 # 캐릭터 프리셋 - 주인공은 50편 동안 바꾸지 않음
 # 스토리텔링 영상용 고정 배우
 
+# ═══════════════════════════════════════════════════════════════
+# 한국불교 - Classical Korean Ink-Wash 스타일
+# ═══════════════════════════════════════════════════════════════
+
+korean_old_monk:
+  name: korean_old_monk
+  gender: male
+  age: 68
+  ethnicity: East_Asian_Korean
+  hair: shaved
+  clothes: gray_brown_traditional_robe
+  face: serene_wrinkled_korean
+  body: thin
+  style: ink_wash_brush_strokes
+  light: soft_natural
+
+korean_young_monk:
+  name: korean_young_monk
+  gender: male
+  age: 22
+  ethnicity: East_Asian_Korean
+  hair: shaved
+  clothes: gray_robe
+  face: calm_serene_korean
+  body: slim
+  style: ink_wash_brush_strokes
+  light: soft_top
+
+korean_scholar:
+  name: korean_scholar
+  gender: male
+  age: 25
+  ethnicity: East_Asian_Korean
+  hair: black_topknot
+  clothes: white_hanbok_scholar
+  face: thoughtful_korean
+  body: slim
+  style: ink_wash_brush_strokes
+  light: natural
+
+# ═══════════════════════════════════════════════════════════════
+# 기존 (호환성)
+# ═══════════════════════════════════════════════════════════════
+
 young_monk:
   name: young_monk
   gender: male

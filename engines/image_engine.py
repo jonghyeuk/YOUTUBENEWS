@@ -263,11 +263,11 @@ class ImageEngine:
         image_paths = []
         engine = self.generator  # StoryMakerEngine
 
-        # 기본 설정
-        default_character = config.get("character", "young_monk")
-        default_world = config.get("world", "buddha_era_night")
+        # 기본 설정 (한국불교 Classical Ink-Wash 스타일 기본)
+        default_character = config.get("character", "old_monk")
+        default_world = config.get("world", "joseon_minhwa_day")  # 조선 민화풍
         default_camera = config.get("camera", "MEDIUM")
-        default_place = config.get("place", "temple_hall")
+        default_place = config.get("place", "mountain_temple")  # 산사
         quality = config.get("quality", "low")
 
         # 카메라 순환 패턴: WIDE → MEDIUM → CLOSE → MEDIUM
@@ -334,8 +334,11 @@ class ImageEngine:
         if self.is_storymaker:
             from storymaker.compiler import compile_hybrid_prompt
             config = storymaker_config or {}
-            character_type = config.get("character_type", "old_grandfather")
-            world_style = config.get("world_style", "korean_minhwa")
+            character_type = config.get("character_type", "old_monk")
+            world_style = config.get("world_style", "classical_inkwash")
+            region = config.get("region", "korea")
+
+            print(f"[StoryMaker] 설정: region={region}, world_style={world_style}, character={character_type}")
 
             # 카메라 순환 패턴
             camera_cycle = ["WIDE", "MEDIUM", "CLOSE", "MEDIUM"]
@@ -350,9 +353,10 @@ class ImageEngine:
                     original_prompt=prompt,
                     character_type=character_type,
                     world_style=world_style,
-                    camera=camera
+                    camera=camera,
+                    region=region
                 )
-                print(f"[StoryMaker] Image {i}/{len(prompts)} (Camera: {camera})")
+                print(f"[StoryMaker] Image {i}/{len(prompts)} (Camera: {camera}, Region: {region})")
                 print(f"[StoryMaker] Original: {prompt[:60]}...")
                 print(f"[StoryMaker] Compiled: {compiled_prompt[:80]}...")
                 prompt_to_use = compiled_prompt

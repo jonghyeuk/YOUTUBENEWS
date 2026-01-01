@@ -224,9 +224,17 @@ class Pipeline:
         self,
         prompts: List[str],
         engine: str = "fal",
-        model: str = None
+        model: str = None,
+        storymaker_config: dict = None
     ) -> List[str]:
-        """4단계 (대안): 프롬프트 리스트로 이미지 생성"""
+        """4단계 (대안): 프롬프트 리스트로 이미지 생성
+
+        Args:
+            prompts: 이미지 프롬프트 리스트
+            engine: 이미지 엔진 (fal, dalle, imagen, storymaker)
+            model: 모델명
+            storymaker_config: StoryMaker 설정 (region, world_style, character_type)
+        """
         # 모델별 가격 정보
         MODEL_PRICES = {
             "flux-schnell": "$0.003",
@@ -243,14 +251,20 @@ class Pipeline:
         model_info = f", 모델: {model} ({price})" if model else ""
         total_cost = f" ≈ ${len(prompts) * 0.003:.2f}" if model == "flux-schnell" else ""
 
-        self._log(f"4단계: 이미지 생성 중... ({len(prompts)}장, 엔진: {engine}{model_info}{total_cost})")
+        # StoryMaker 설정 로그
+        style_info = ""
+        if storymaker_config:
+            style_info = f", 스타일: {storymaker_config.get('region', 'korea')}"
+
+        self._log(f"4단계: 이미지 생성 중... ({len(prompts)}장, 엔진: {engine}{model_info}{total_cost}{style_info})")
 
         self.image_engine = ImageEngine(engine=engine, model=model)
         images_dir = self._get_path("images")
 
         image_paths = self.image_engine.generate_images_from_prompts(
             prompts=prompts,
-            output_dir=images_dir
+            output_dir=images_dir,
+            storymaker_config=storymaker_config
         )
 
         # 씬에 이미지 경로 할당 (씬별 image_count에 맞게 분배)

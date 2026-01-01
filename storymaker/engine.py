@@ -109,10 +109,10 @@ class StoryMakerEngine:
         self,
         scene_action: str,
         output_path: str,
-        character: str = "young_monk",
-        world: str = "buddha_era_night",
+        character: str = "old_monk",
+        world: str = "joseon_minhwa_day",
         camera: str = "MEDIUM",
-        place: str = "temple_hall",
+        place: str = "mountain_temple",
         quality: str = "low"
     ) -> str:
         """
@@ -162,8 +162,8 @@ class StoryMakerEngine:
         self,
         scenes: List[Dict[str, Any]],
         output_dir: str,
-        default_character: str = "young_monk",
-        default_world: str = "buddha_era_night",
+        default_character: str = "old_monk",
+        default_world: str = "joseon_minhwa_day",
         quality: str = "low"
     ) -> List[str]:
         """
