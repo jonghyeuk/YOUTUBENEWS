@@ -89,86 +89,119 @@ class VideoEngine:
         duration_per_image: float,
         output_path: str
     ):
-        """MoviePy를 사용한 부드러운 줌 효과 씬 클립 생성 (떨림 없음)"""
-        clips = []
+        """FFmpeg zoompan을 사용한 빠른 줌 효과 씬 클립 생성"""
+        temp_clips = []
 
         for i, img_path in enumerate(images):
             # 효과 선택 (줌인/줌아웃 교대)
             effect = self.image_effects[i % len(self.image_effects)]
+            temp_clip = output_path.replace(".mp4", f"_temp_{i:02d}.mp4")
 
-            # 이미지 클립 생성
-            clip = ImageClip(img_path).set_duration(duration_per_image)
+            # FFmpeg zoompan 필터로 줌 효과 생성
+            self._create_zoom_clip_ffmpeg(
+                img_path=img_path,
+                duration=duration_per_image,
+                effect=effect,
+                output_path=temp_clip
+            )
+            temp_clips.append(temp_clip)
 
-            # 부드러운 줌 효과 적용 (부동소수점 계산으로 떨림 방지)
-            if effect == "zoom_in":
-                # 1.0 → 1.15 (15% 확대)
-                zoom_clip = self._apply_smooth_zoom(clip, 1.0, 1.15, duration_per_image)
-            else:  # zoom_out
-                # 1.15 → 1.0 (축소)
-                zoom_clip = self._apply_smooth_zoom(clip, 1.15, 1.0, duration_per_image)
+        # 클립들 합치기 (크로스페이드)
+        if len(temp_clips) == 1:
+            os.rename(temp_clips[0], output_path)
+        else:
+            self._concat_with_crossfade(temp_clips, output_path)
+            # 임시 파일 삭제
+            for tc in temp_clips:
+                if os.path.exists(tc):
+                    os.remove(tc)
 
-            # 페이드 인/아웃 효과 추가 (부드러운 전환)
-            fade_duration = 0.5  # 0.5초 페이드
-            zoom_clip = zoom_clip.fadein(fade_duration).fadeout(fade_duration)
+    def _create_zoom_clip_ffmpeg(
+        self,
+        img_path: str,
+        duration: float,
+        effect: str,
+        output_path: str
+    ):
+        """FFmpeg zoompan 필터로 단일 이미지 줌 클립 생성 (10배 이상 빠름)"""
+        # 총 프레임 수
+        total_frames = int(duration * self.fps)
 
-            clips.append(zoom_clip)
+        # 줌 범위: 1.0 ~ 1.15 (15% 줌)
+        if effect == "zoom_in":
+            # 1.0 → 1.15 줌인
+            zoom_expr = f"min(1+0.15*on/{total_frames},1.15)"
+        else:
+            # 1.15 → 1.0 줌아웃
+            zoom_expr = f"max(1.15-0.15*on/{total_frames},1.0)"
 
-        # 클립들 합치기 (크로스페이드 효과)
-        final_clip = concatenate_videoclips(clips, method="compose", padding=-0.3)
+        # 중앙 고정 (x, y 표현식)
+        x_expr = f"iw/2-(iw/zoom/2)"
+        y_expr = f"ih/2-(ih/zoom/2)"
 
-        # 파일로 저장 (고품질 설정)
-        final_clip.write_videofile(
-            output_path,
-            fps=self.fps,
-            codec=self.codec,
-            audio=False,
-            preset='medium',
-            threads=4,
-            logger=None  # 로그 출력 숨김
+        # zoompan 필터 (bicubic 보간, 부드러운 줌)
+        filter_complex = (
+            f"zoompan=z='{zoom_expr}':x='{x_expr}':y='{y_expr}':"
+            f"d={total_frames}:s={self.width}x{self.height}:fps={self.fps},"
+            f"fade=t=in:st=0:d=0.3,fade=t=out:st={duration-0.3}:d=0.3"
         )
 
-        # 메모리 해제
-        final_clip.close()
-        for clip in clips:
-            clip.close()
+        cmd = [
+            "ffmpeg", "-y",
+            "-loop", "1",
+            "-i", img_path.replace("\\", "/"),
+            "-vf", filter_complex,
+            "-c:v", self.codec,
+            "-t", str(duration),
+            "-pix_fmt", "yuv420p",
+            "-preset", "fast",  # 빠른 인코딩
+            output_path.replace("\\", "/")
+        ]
 
-    def _apply_smooth_zoom(self, clip, start_zoom, end_zoom, duration):
-        """부드러운 줌 효과 적용 (부동소수점 계산으로 떨림 없음)"""
-        from PIL import Image
-        import numpy as np
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        if result.returncode != 0:
+            print(f"[VideoEngine] FFmpeg zoompan error: {result.stderr}")
+            raise RuntimeError(f"FFmpeg zoompan failed: {result.stderr}")
 
-        w, h = clip.size
+    def _concat_with_crossfade(self, clip_paths: List[str], output_path: str):
+        """클립들을 크로스페이드로 합치기"""
+        if len(clip_paths) < 2:
+            return
 
-        def make_frame(gf, t):
-            """각 프레임에 줌 효과 적용"""
-            frame = gf(t)
+        # 첫 번째 클립부터 시작
+        current = clip_paths[0]
+        crossfade_duration = 0.3  # 0.3초 크로스페이드
 
-            # 줌 비율 계산 (시간에 따라 선형 보간)
-            progress = t / duration if duration > 0 else 0
-            zoom = start_zoom + (end_zoom - start_zoom) * progress
+        for i, next_clip in enumerate(clip_paths[1:], 1):
+            temp_output = output_path.replace(".mp4", f"_xfade_{i}.mp4")
 
-            # 새 크기 계산
-            new_w = int(w * zoom)
-            new_h = int(h * zoom)
+            # xfade 필터로 크로스페이드
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", current.replace("\\", "/"),
+                "-i", next_clip.replace("\\", "/"),
+                "-filter_complex", f"xfade=transition=fade:duration={crossfade_duration}:offset=0",
+                "-c:v", self.codec,
+                "-preset", "fast",
+                "-pix_fmt", "yuv420p",
+                temp_output.replace("\\", "/")
+            ]
 
-            # PIL로 고품질 리사이즈 (Lanczos)
-            img = Image.fromarray(frame)
-            img_resized = img.resize((new_w, new_h), Image.LANCZOS)
+            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+            if result.returncode != 0:
+                # 크로스페이드 실패 시 단순 concat
+                print(f"[VideoEngine] xfade failed, using simple concat")
+                self._concat_clips_simple(clip_paths, output_path)
+                return
 
-            # 중앙 크롭 (원본 크기로)
-            left = (new_w - w) // 2
-            top = (new_h - h) // 2
-            img_cropped = img_resized.crop((left, top, left + w, top + h))
+            # 이전 임시 파일 삭제
+            if i > 1 and os.path.exists(current):
+                os.remove(current)
 
-            return np.array(img_cropped)
+            current = temp_output
 
-        # 새 클립 생성
-        new_clip = clip.fl(make_frame)
-
-        # 출력 해상도에 맞게 최종 리사이즈
-        final_clip = new_clip.resize((self.width, self.height))
-
-        return final_clip
+        # 최종 파일 이동
+        os.rename(current, output_path)
 
     def _create_scene_clip_simple(
         self,
