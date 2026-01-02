@@ -669,12 +669,22 @@ def get_project_list():
 
 def on_project_select(evt: gr.SelectData, data):
     """테이블에서 프로젝트 선택 시 ID 자동 입력"""
-    if evt.index is not None and data is not None:
-        row_idx = evt.index[0] if isinstance(evt.index, (list, tuple)) else evt.index
-        if row_idx < len(data):
-            project_id = data[row_idx][0]
-            if not project_id.startswith("("):
-                return project_id
+    try:
+        if evt.index is not None and data is not None:
+            row_idx = evt.index[0] if isinstance(evt.index, (list, tuple)) else evt.index
+            # pandas DataFrame인 경우
+            if hasattr(data, 'iloc'):
+                project_id = data.iloc[row_idx, 0]
+            # 리스트인 경우
+            elif isinstance(data, list) and row_idx < len(data):
+                project_id = data[row_idx][0]
+            else:
+                return ""
+
+            if project_id and not str(project_id).startswith("("):
+                return str(project_id)
+    except Exception as e:
+        print(f"[on_project_select] Error: {e}")
     return ""
 
 
