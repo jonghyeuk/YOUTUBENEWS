@@ -57,6 +57,13 @@ INTEGRATED_OUTPUT_FORMAT = """
 }}
 ```
 
+## ⚠️ 분량 규칙 (매우 중요!)
+- **총 나레이션 글자 수**: 약 {total_chars}자 (TTS 속도 0.9 기준)
+- **씬 개수**: {num_scenes}개
+- **씬당 평균**: 약 {chars_per_scene}자 이상
+- 각 씬의 text가 너무 짧으면 {duration}분이 아닌 5분짜리가 됩니다!
+- 자세하고 풍부하게 서술해주세요
+
 ## 이미지 프롬프트 규칙
 - 영어로 작성
 - 400자 이내
@@ -225,12 +232,25 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         # 분량에 따른 이미지 수 계산
         total_images = duration * 2  # 분당 약 2장
 
+        # 분량에 따른 글자 수 계산 (TTS 속도 0.9 기준, 분당 약 180자)
+        from config import DURATION_SPECS
+        spec = DURATION_SPECS.get(duration, DURATION_SPECS[10])
+        num_scenes = spec["scenes"]
+        total_chars = duration * 180  # 분당 약 180자
+        chars_per_scene = total_chars // num_scenes
+
         # 스타일별 프롬프트 구성
         base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["정보"])
         image_style = STYLE_IMAGE_GUIDES.get(style, "")
 
         prompt = base_prompt.format(topic=topic, duration=duration)
-        prompt += INTEGRATED_OUTPUT_FORMAT.format(duration=duration, total_images=total_images)
+        prompt += INTEGRATED_OUTPUT_FORMAT.format(
+            duration=duration,
+            total_images=total_images,
+            total_chars=total_chars,
+            num_scenes=num_scenes,
+            chars_per_scene=chars_per_scene
+        )
         prompt += f"\n\n## 이미지 스타일\n{image_style}"
 
         # Claude API 호출
