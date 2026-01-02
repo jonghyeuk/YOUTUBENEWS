@@ -1,6 +1,6 @@
 """
 StoryMaker 엔진 - 스토리텔링 전용 이미지 생성
-OpenAI gpt-image-1 (mini) 백엔드 사용
+OpenAI gpt-image-1.5 백엔드 사용
 """
 
 import os
@@ -21,16 +21,16 @@ class StoryMakerEngine:
     - 캐릭터/세계관/카메라/세트 프리셋 시스템
     - 일관된 프롬프트 컴파일
     - 1536x1024 생성 → 16:9 크롭
-    - OpenAI gpt-image-1 백엔드
+    - OpenAI gpt-image-1.5 백엔드
     """
 
     # 프리셋 경로
     PRESETS_DIR = Path(__file__).parent / "presets"
 
-    def __init__(self, model: str = "gpt-image-1"):
+    def __init__(self, model: str = "gpt-image-1.5"):
         """
         Args:
-            model: OpenAI 이미지 모델 (gpt-image-1 또는 dall-e-3)
+            model: OpenAI 이미지 모델 (gpt-image-1.5, gpt-image-1 또는 dall-e-3)
         """
         from openai import OpenAI
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))

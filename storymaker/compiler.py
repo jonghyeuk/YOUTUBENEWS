@@ -56,7 +56,7 @@ def compile_hybrid_prompt(
     world_style: str = "korean_minhwa",
     camera: str = "MEDIUM",
     region: str = "korea",
-    engine: str = "gpt-image-1",
+    engine: str = "gpt-image-1.5",
     engine_style_block: str = None
 ) -> str:
     """
