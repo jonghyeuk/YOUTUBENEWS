@@ -668,9 +668,19 @@ def get_project_list():
 
 
 def load_selected_project(project_id: str):
-    """선택한 프로젝트 불러오기"""
+    """선택한 프로젝트 불러오기 - 모든 탭에 데이터 채움"""
+    # 기본 반환값 (에러 시)
+    empty_result = (
+        "❌ 프로젝트 ID를 입력하세요",  # loaded_project_info
+        "*스크립트가 없습니다*",  # script_preview
+        "",  # image_prompts
+        "",  # final_prompts
+        None,  # audio_preview
+        [],  # images_gallery
+    )
+
     if not project_id or project_id.startswith("("):
-        return "❌ 프로젝트 ID를 입력하세요"
+        return empty_result
 
     try:
         # project.json 있는지 확인
@@ -683,6 +693,7 @@ def load_selected_project(project_id: str):
             # 기존 프로젝트 가져오기 (자동으로 project.json 생성)
             project = pipeline.import_legacy_project(project_id)
 
+        # 1. 프로젝트 정보
         info = f"""### ✅ 프로젝트 불러오기 완료
 
 **제목**: {project.title}
@@ -697,9 +708,54 @@ def load_selected_project(project_id: str):
 
 {'⚠️ **기존 프로젝트**: 스크립트가 없어 TTS 재생성은 불가합니다. 기존 오디오로 영상 재렌더링만 가능합니다.' if not project.script else ''}
 """
-        return info
+
+        # 2. 스크립트 미리보기 (Markdown 포맷)
+        script_md = "*스크립트가 없습니다*"
+        image_prompts_text = ""
+
+        if project.script and project.script.scenes:
+            script_lines = [f"## {project.script.title}\n"]
+            prompts_list = []
+
+            for scene in project.script.scenes:
+                script_lines.append(f"### 씬 {scene.scene_id}: {scene.title}")
+                script_lines.append(f"{scene.text}\n")
+
+                # 이미지 프롬프트 수집
+                if scene.image_prompts:
+                    for prompt in scene.image_prompts:
+                        prompts_list.append(prompt)
+
+            script_md = "\n".join(script_lines)
+            image_prompts_text = "\n".join(prompts_list)
+
+        # 3. 오디오 경로
+        audio_path = project.audio_path if project.audio_path and os.path.exists(project.audio_path) else None
+
+        # 4. 이미지 갤러리
+        images = []
+        if project.cut_paths:
+            for img_path in project.cut_paths:
+                if os.path.exists(img_path):
+                    images.append(img_path)
+
+        return (
+            info,  # loaded_project_info
+            script_md,  # script_preview
+            image_prompts_text,  # image_prompts
+            image_prompts_text,  # final_prompts (이미지 탭용)
+            audio_path,  # audio_preview
+            images,  # images_gallery
+        )
     except Exception as e:
-        return f"❌ 오류: {e}"
+        return (
+            f"❌ 오류: {e}",
+            "*스크립트가 없습니다*",
+            "",
+            "",
+            None,
+            [],
+        )
 
 
 def regenerate_tts_for_repurpose(engine: str, style: str, speed: float):
@@ -1949,11 +2005,18 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     repurpose_tab.select(get_project_list, [], [project_list])
     refresh_projects_btn.click(get_project_list, [], [project_list])
 
-    # 프로젝트 불러오기
+    # 프로젝트 불러오기 - 모든 탭에 데이터 채움
     load_project_btn.click(
         load_selected_project,
         [selected_project_id],
-        [loaded_project_info]
+        [
+            loaded_project_info,  # 재활용 탭 정보
+            script_preview,  # 1️⃣ 스크립트 탭
+            image_prompts,  # 1️⃣ 이미지 프롬프트
+            final_prompts,  # 3️⃣ 이미지 탭 프롬프트
+            audio_preview,  # 2️⃣ TTS 탭 오디오
+            images_gallery,  # 3️⃣ 이미지 갤러리
+        ]
     )
 
     # TTS 재생성
