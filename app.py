@@ -634,7 +634,125 @@ def finalize_video():
         return "❌ 렌더링 필요", None
     try:
         final_path = pipeline.step7_burn_subtitles()
+        # 프로젝트 자동 저장
+        pipeline.save_project()
         return "✅ 최종 영상 완료!", final_path
+    except Exception as e:
+        return f"❌ 오류: {e}", None
+
+
+# ═══════════════════════════════════════════════════════════════
+# 프로젝트 재활용 (다른 채널용)
+# ═══════════════════════════════════════════════════════════════
+
+def get_project_list():
+    """저장된 프로젝트 목록 가져오기"""
+    try:
+        projects = pipeline.list_projects()
+        if not projects:
+            return [["(저장된 프로젝트 없음)", "", 0, "", "", ""]]
+
+        data = []
+        for p in projects:
+            data.append([
+                p["project_id"],
+                p["title"][:30] + "..." if len(p["title"]) > 30 else p["title"],
+                p["duration_min"],
+                "✅" if p["has_images"] else "❌",
+                "✅" if p["has_audio"] else "❌",
+                "✅" if p["has_video"] else "❌",
+            ])
+        return data
+    except Exception as e:
+        return [[f"오류: {e}", "", 0, "", "", ""]]
+
+
+def load_selected_project(project_id: str):
+    """선택한 프로젝트 불러오기"""
+    if not project_id or project_id.startswith("("):
+        return "❌ 프로젝트 ID를 입력하세요"
+
+    try:
+        # project.json 있는지 확인
+        project_path = os.path.join(pipeline.project_dir, project_id)
+        json_path = os.path.join(project_path, "project.json")
+
+        if os.path.exists(json_path):
+            project = pipeline.load_project(project_id)
+        else:
+            # 기존 프로젝트 가져오기 (자동으로 project.json 생성)
+            project = pipeline.import_legacy_project(project_id)
+
+        info = f"""### ✅ 프로젝트 불러오기 완료
+
+**제목**: {project.title}
+**분량**: {project.duration_min}분
+**상태**: {project.status}
+
+---
+**스크립트**: {'✅ ' + str(len(project.script.scenes)) + '개 씬' if project.script else '❌ 없음 (TTS 재생성 불가)'}
+**이미지**: {'✅ ' + str(len(project.cut_paths)) + '장' if project.cut_paths else '❌ 없음'}
+**오디오**: {'✅ 있음' if project.audio_path else '❌ 없음'}
+**영상**: {'✅ 있음' if project.final_video_path else '❌ 없음'}
+
+{'⚠️ **기존 프로젝트**: 스크립트가 없어 TTS 재생성은 불가합니다. 기존 오디오로 영상 재렌더링만 가능합니다.' if not project.script else ''}
+"""
+        return info
+    except Exception as e:
+        return f"❌ 오류: {e}"
+
+
+def regenerate_tts_for_repurpose(engine: str, style: str, speed: float):
+    """TTS 재생성 (재활용용)"""
+    if not pipeline.project or not pipeline.project.script:
+        return "❌ 스크립트가 있는 프로젝트를 먼저 불러오세요", None
+
+    try:
+        audio_path = pipeline.regenerate_tts(engine=engine, style=style, speed=speed)
+        total = sum(s.duration for s in pipeline.project.audio_segments)
+        return f"✅ TTS 재생성 완료 ({total:.1f}초)", audio_path
+    except Exception as e:
+        return f"❌ 오류: {e}", None
+
+
+def regenerate_subtitle_for_repurpose():
+    """자막 재생성 (재활용용)"""
+    if not pipeline.project or not pipeline.project.audio_path:
+        return "❌ 오디오가 있는 프로젝트를 먼저 불러오세요"
+
+    try:
+        subtitle_path = pipeline.regenerate_subtitles()
+        return f"✅ 자막 재생성 완료: {subtitle_path}"
+    except Exception as e:
+        return f"❌ 오류: {e}"
+
+
+def rerender_video_for_repurpose(use_ken_burns: bool, bgm_option: str):
+    """영상 재렌더링 (재활용용)"""
+    if not pipeline.project:
+        return "❌ 프로젝트를 먼저 불러오세요", None
+
+    if not pipeline.project.cut_paths:
+        return "❌ 이미지가 없습니다", None
+
+    if not pipeline.project.audio_path:
+        return "❌ 오디오가 없습니다 (TTS 먼저 생성하세요)", None
+
+    try:
+        # BGM 처리
+        bgm_path = None
+        if bgm_option == "random":
+            bgm_path = pipeline.video_engine.get_random_bgm()
+
+        final_path = pipeline.rerender_video(
+            use_ken_burns=use_ken_burns,
+            bgm_path=bgm_path
+        )
+
+        # 프로젝트 저장
+        pipeline.save_project()
+
+        return f"✅ 재렌더링 완료!", final_path
     except Exception as e:
         return f"❌ 오류: {e}", None
 
@@ -1594,7 +1712,67 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
             """)
 
         # ─────────────────────────────────────────────
-        # Tab 7: 트렌드 분석 (참고용)
+        # Tab 7: 프로젝트 재활용 (다른 채널용)
+        # ─────────────────────────────────────────────
+        with gr.Tab("🔄 재활용") as repurpose_tab:
+            gr.Markdown("### 🔄 프로젝트 재활용")
+            gr.Markdown("*기존 이미지 유지 → TTS/자막 변경 → 다른 채널 업로드*")
+
+            with gr.Row():
+                with gr.Column(scale=1):
+                    # 프로젝트 목록
+                    gr.Markdown("#### 📁 저장된 프로젝트")
+                    refresh_projects_btn = gr.Button("🔄 새로고침", size="sm")
+                    project_list = gr.Dataframe(
+                        headers=["ID", "제목", "분", "이미지", "오디오", "영상"],
+                        datatype=["str", "str", "number", "str", "str", "str"],
+                        interactive=False,
+                        wrap=True
+                    )
+                    selected_project_id = gr.Textbox(label="선택된 프로젝트 ID", interactive=True)
+                    load_project_btn = gr.Button("📥 프로젝트 불러오기", variant="primary")
+
+                with gr.Column(scale=2):
+                    # 불러온 프로젝트 정보
+                    loaded_project_info = gr.Markdown("*프로젝트를 선택하세요*")
+
+                    gr.Markdown("---")
+                    gr.Markdown("#### 🎙️ TTS 재생성")
+
+                    with gr.Row():
+                        repurpose_tts_engine = gr.Dropdown(
+                            label="TTS 엔진",
+                            choices=["elevenlabs", "wavenet", "openai"],
+                            value="elevenlabs"
+                        )
+                        repurpose_style = gr.Dropdown(
+                            label="스타일 (음성 톤)",
+                            choices=["뉴스", "정보", "스토리텔링", "불교명상"],
+                            value="정보"
+                        )
+                        repurpose_speed = gr.Slider(0.5, 1.5, value=0.9, step=0.1, label="속도")
+
+                    regenerate_tts_btn = gr.Button("🎙️ TTS 재생성", variant="secondary")
+                    repurpose_audio_preview = gr.Audio(label="새 오디오 미리듣기")
+
+                    gr.Markdown("---")
+                    gr.Markdown("#### 🎬 영상 재렌더링")
+
+                    with gr.Row():
+                        repurpose_ken_burns = gr.Checkbox(label="줌 효과", value=True)
+                        repurpose_bgm = gr.Dropdown(
+                            label="BGM",
+                            choices=[("없음", ""), ("무작위", "random")],
+                            value=""
+                        )
+
+                    regenerate_subtitle_btn = gr.Button("📝 자막 재생성")
+                    rerender_btn = gr.Button("🎬 영상 재렌더링", variant="primary")
+                    repurpose_status = gr.Markdown()
+                    repurpose_video_preview = gr.Video(label="재렌더링된 영상")
+
+        # ─────────────────────────────────────────────
+        # Tab 8: 트렌드 분석 (참고용)
         # ─────────────────────────────────────────────
         with gr.Tab("📊 트렌드 (참고)"):
             gr.Markdown("### 🔍 YouTube 트렌드 분석")
@@ -1766,7 +1944,40 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         [status, yt_upload_result]
     )
 
-    # Tab 7: 트렌드
+    # Tab 7: 프로젝트 재활용
+    # 탭 선택 시 프로젝트 목록 로드
+    repurpose_tab.select(get_project_list, [], [project_list])
+    refresh_projects_btn.click(get_project_list, [], [project_list])
+
+    # 프로젝트 불러오기
+    load_project_btn.click(
+        load_selected_project,
+        [selected_project_id],
+        [loaded_project_info]
+    )
+
+    # TTS 재생성
+    regenerate_tts_btn.click(
+        regenerate_tts_for_repurpose,
+        [repurpose_tts_engine, repurpose_style, repurpose_speed],
+        [repurpose_status, repurpose_audio_preview]
+    )
+
+    # 자막 재생성
+    regenerate_subtitle_btn.click(
+        regenerate_subtitle_for_repurpose,
+        [],
+        [repurpose_status]
+    )
+
+    # 영상 재렌더링
+    rerender_btn.click(
+        rerender_video_for_repurpose,
+        [repurpose_ken_burns, repurpose_bgm],
+        [repurpose_status, repurpose_video_preview]
+    )
+
+    # Tab 8: 트렌드
     trend_btn.click(analyze_trend, [trend_keyword], [status, trend_result, video_selector])
     extract_btn.click(extract_transcript_and_comments, [video_selector], [status, transcript_result, comments_result])
 
