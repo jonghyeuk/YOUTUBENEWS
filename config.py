@@ -144,6 +144,8 @@ FFMPEG_FILTERS = {
         "outline": 5,  # 외곽선 두께 (더 두껍게)
         "shadow": 2,  # 그림자 (더 진하게)
         "margin_v": 100,  # 하단 마진 (조금 위로)
+        "margin_l": 80,  # 좌측 여백 (잘림 방지)
+        "margin_r": 80,  # 우측 여백 (잘림 방지)
         "alignment": 2,  # 하단 중앙 정렬
     },
 }
