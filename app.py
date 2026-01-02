@@ -1768,11 +1768,11 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
             """)
 
         # ─────────────────────────────────────────────
-        # Tab 7: 프로젝트 재활용 (다른 채널용)
+        # Tab 7: 프로젝트 불러오기
         # ─────────────────────────────────────────────
-        with gr.Tab("🔄 재활용") as repurpose_tab:
-            gr.Markdown("### 🔄 프로젝트 재활용")
-            gr.Markdown("*기존 이미지 유지 → TTS/자막 변경 → 다른 채널 업로드*")
+        with gr.Tab("📂 불러오기") as repurpose_tab:
+            gr.Markdown("### 📂 프로젝트 불러오기")
+            gr.Markdown("*저장된 프로젝트를 불러와서 각 탭에서 확인/수정하세요*")
 
             with gr.Row():
                 with gr.Column(scale=1):
@@ -1785,47 +1785,24 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         interactive=False,
                         wrap=True
                     )
-                    selected_project_id = gr.Textbox(label="선택된 프로젝트 ID", interactive=True)
-                    load_project_btn = gr.Button("📥 프로젝트 불러오기", variant="primary")
+                    selected_project_id = gr.Textbox(label="프로젝트 ID 입력", interactive=True)
+                    load_project_btn = gr.Button("📥 프로젝트 불러오기", variant="primary", size="lg")
 
                 with gr.Column(scale=2):
                     # 불러온 프로젝트 정보
                     loaded_project_info = gr.Markdown("*프로젝트를 선택하세요*")
 
-                    gr.Markdown("---")
-                    gr.Markdown("#### 🎙️ TTS 재생성")
-
-                    with gr.Row():
-                        repurpose_tts_engine = gr.Dropdown(
-                            label="TTS 엔진",
-                            choices=["elevenlabs", "wavenet", "openai"],
-                            value="elevenlabs"
-                        )
-                        repurpose_style = gr.Dropdown(
-                            label="스타일 (음성 톤)",
-                            choices=["뉴스", "정보", "스토리텔링", "불교명상"],
-                            value="정보"
-                        )
-                        repurpose_speed = gr.Slider(0.5, 1.5, value=0.9, step=0.1, label="속도")
-
-                    regenerate_tts_btn = gr.Button("🎙️ TTS 재생성", variant="secondary")
-                    repurpose_audio_preview = gr.Audio(label="새 오디오 미리듣기")
-
-                    gr.Markdown("---")
-                    gr.Markdown("#### 🎬 영상 재렌더링")
-
-                    with gr.Row():
-                        repurpose_ken_burns = gr.Checkbox(label="줌 효과", value=True)
-                        repurpose_bgm = gr.Dropdown(
-                            label="BGM",
-                            choices=[("없음", ""), ("무작위", "random")],
-                            value=""
-                        )
-
-                    regenerate_subtitle_btn = gr.Button("📝 자막 재생성")
-                    rerender_btn = gr.Button("🎬 영상 재렌더링", variant="primary")
-                    repurpose_status = gr.Markdown()
-                    repurpose_video_preview = gr.Video(label="재렌더링된 영상")
+                    gr.Markdown("""
+                    ---
+                    ### 💡 사용 방법
+                    1. 목록에서 프로젝트 ID 복사 → 입력란에 붙여넣기
+                    2. **불러오기** 클릭
+                    3. 각 탭으로 이동해서 확인:
+                       - **1️⃣ 스크립트**: 스크립트 내용
+                       - **2️⃣ TTS**: 오디오 파일
+                       - **3️⃣ 이미지**: 이미지 갤러리
+                    4. 수정 후 저장하면 새 프로젝트로 저장됨
+                    """)
 
         # ─────────────────────────────────────────────
         # Tab 8: 트렌드 분석 (참고용)
@@ -2000,7 +1977,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         [status, yt_upload_result]
     )
 
-    # Tab 7: 프로젝트 재활용
+    # Tab 7: 프로젝트 불러오기
     # 탭 선택 시 프로젝트 목록 로드
     repurpose_tab.select(get_project_list, [], [project_list])
     refresh_projects_btn.click(get_project_list, [], [project_list])
@@ -2010,34 +1987,13 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         load_selected_project,
         [selected_project_id],
         [
-            loaded_project_info,  # 재활용 탭 정보
+            loaded_project_info,  # 불러오기 탭 정보
             script_preview,  # 1️⃣ 스크립트 탭
             image_prompts,  # 1️⃣ 이미지 프롬프트
             final_prompts,  # 3️⃣ 이미지 탭 프롬프트
             audio_preview,  # 2️⃣ TTS 탭 오디오
             images_gallery,  # 3️⃣ 이미지 갤러리
         ]
-    )
-
-    # TTS 재생성
-    regenerate_tts_btn.click(
-        regenerate_tts_for_repurpose,
-        [repurpose_tts_engine, repurpose_style, repurpose_speed],
-        [repurpose_status, repurpose_audio_preview]
-    )
-
-    # 자막 재생성
-    regenerate_subtitle_btn.click(
-        regenerate_subtitle_for_repurpose,
-        [],
-        [repurpose_status]
-    )
-
-    # 영상 재렌더링
-    rerender_btn.click(
-        rerender_video_for_repurpose,
-        [repurpose_ken_burns, repurpose_bgm],
-        [repurpose_status, repurpose_video_preview]
     )
 
     # Tab 8: 트렌드
