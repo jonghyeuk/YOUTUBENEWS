@@ -78,6 +78,8 @@ class SubtitleEngine:
         # ASS 폰트 크기: config에서 가져옴
         fontsize = style.get("fontsize", 108)  # 시니어용: 1.5배 크게
         margin_v = style.get("margin_v", 100)  # 조금 위로
+        margin_l = style.get("margin_l", 80)  # 좌측 여백
+        margin_r = style.get("margin_r", 80)  # 우측 여백
         outline = style.get("outline", 5)  # 외곽선 더 두껍게
         shadow = style.get("shadow", 2)  # 그림자 더 진하게
 
@@ -90,7 +92,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{fontname},{fontsize},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,{outline},{shadow},2,10,10,{margin_v},1
+Style: Default,{fontname},{fontsize},&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,{outline},{shadow},2,{margin_l},{margin_r},{margin_v},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -246,15 +248,53 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         sentences = re.split(r'(?<=[.!?])\s+', text)
         return [s for s in sentences if s.strip()]
 
+    def _wrap_text_for_subtitle(self, text: str, max_chars: int = 20) -> str:
+        """긴 텍스트를 자막용으로 줄바꿈 (\\N 사용)"""
+        if len(text) <= max_chars:
+            return text
+
+        words = text.split()
+        lines = []
+        current_line = ""
+
+        for word in words:
+            # 현재 줄 + 단어가 max_chars를 초과하면 줄바꿈
+            if len(current_line) + len(word) + 1 > max_chars:
+                if current_line:
+                    lines.append(current_line.strip())
+                current_line = word
+            else:
+                current_line += " " + word if current_line else word
+
+        if current_line:
+            lines.append(current_line.strip())
+
+        # 3줄 초과시 2줄로 제한 (화면 가독성)
+        if len(lines) > 2:
+            mid = len(text) // 2
+            # 중간 지점 근처 공백에서 분할
+            split_idx = text.rfind(" ", 0, mid + 10)
+            if split_idx == -1:
+                split_idx = text.find(" ", mid)
+            if split_idx != -1:
+                lines = [text[:split_idx].strip(), text[split_idx:].strip()]
+            else:
+                lines = [text[:mid], text[mid:]]
+
+        return "\\N".join(lines)
+
     def _format_ass_dialogue(self, start: float, end: float, text: str) -> str:
-        """ASS 다이얼로그 라인 생성 (페이드 효과 포함)"""
+        """ASS 다이얼로그 라인 생성 (페이드 효과 + 자동 줄바꿈 포함)"""
         start_str = self._format_ass_timestamp(start)
         end_str = self._format_ass_timestamp(end)
+
+        # 긴 텍스트 줄바꿈 처리
+        wrapped_text = self._wrap_text_for_subtitle(text, max_chars=20)
 
         # 페이드 효과: \fad(페이드인ms, 페이드아웃ms)
         fade_tag = f"{{\\fad({self.fade_in},{self.fade_out})}}"
 
-        return f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{fade_tag}{text}\n"
+        return f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{fade_tag}{wrapped_text}\n"
 
     def _format_ass_timestamp(self, seconds: float) -> str:
         """초를 ASS 타임스탬프 형식으로 변환 (H:MM:SS.cc)"""
