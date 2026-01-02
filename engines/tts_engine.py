@@ -396,7 +396,12 @@ class TTSEngine:
         segments = []
         subtitle_segments = []  # 자막 싱크용 세그먼트
         combined = PydubSegment.empty()
-        current_time = 0.0
+
+        # 시작 무음 추가 (영상 시작 시 급작스럽지 않게)
+        start_silence = PydubSegment.silent(duration=1500)  # 1.5초
+        combined += start_silence
+        current_time = 1.5  # 시작 무음 반영
+
         total_scenes = len(script.scenes)
 
         print(f"[TTSEngine] {total_scenes}개 씬 TTS 생성 시작...")
