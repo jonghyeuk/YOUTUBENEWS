@@ -634,6 +634,8 @@ def finalize_video():
         return "❌ 렌더링 필요", None
     try:
         final_path = pipeline.step7_burn_subtitles()
+        # 프로젝트 자동 저장
+        pipeline.save_project()
         return "✅ 최종 영상 완료!", final_path
     except Exception as e:
         return f"❌ 오류: {e}", None
@@ -1765,6 +1767,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         [yt_title, yt_description, yt_tags, yt_privacy, yt_language],
         [status, yt_upload_result]
     )
+
 
     # Tab 7: 트렌드
     trend_btn.click(analyze_trend, [trend_keyword], [status, trend_result, video_selector])
