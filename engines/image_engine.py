@@ -157,7 +157,7 @@ class ImageEngine:
             "dall-e-3": "DALL-E 3",
         },
         "storymaker": {
-            "gpt-image-1": "스토리텔링전용 (GPT Image)",
+            "gpt-image-1.5": "스토리텔링전용 (GPT Image 1.5)",
         },
     }
 
@@ -178,7 +178,7 @@ class ImageEngine:
             # StoryMaker는 별도 엔진 사용
             if self.engine_name == "storymaker":
                 from storymaker import StoryMakerEngine
-                model = self.model or "gpt-image-1"
+                model = self.model or "gpt-image-1.5"
                 self._generator = StoryMakerEngine(model=model)
                 return self._generator
 
@@ -340,8 +340,8 @@ class ImageEngine:
             world_style = config.get("world_style", "classical_inkwash")
             region = config.get("region", "korea")
 
-            # 현재 엔진 (StoryMaker = gpt-image-1)
-            engine_key = "gpt-image-1"
+            # 현재 엔진 (StoryMaker = gpt-image-1.5)
+            engine_key = "gpt-image-1.5"
             engine_config = ENGINE_OPTIMIZATION.get(engine_key, {})
             max_prompt_length = engine_config.get("max_length", 1000)
 
