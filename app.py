@@ -278,14 +278,31 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
         result_text = response.content[0].text
 
-        # JSON 파싱
+        # JSON 파싱 (더 robust하게)
         try:
+            json_str = None
+
+            # 방법 1: ```json 코드 블록에서 추출
             if "```json" in result_text:
                 start = result_text.find("```json") + 7
                 end = result_text.find("```", start)
-                json_str = result_text[start:end]
-            else:
-                json_str = result_text
+                json_str = result_text[start:end].strip()
+            # 방법 2: ``` 코드 블록에서 추출 (json 태그 없이)
+            elif "```" in result_text and "{" in result_text:
+                start = result_text.find("```") + 3
+                end = result_text.find("```", start)
+                if end > start:
+                    json_str = result_text[start:end].strip()
+
+            # 방법 3: { } 사이에서 JSON 추출
+            if not json_str or not json_str.startswith("{"):
+                first_brace = result_text.find("{")
+                last_brace = result_text.rfind("}")
+                if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                    json_str = result_text[first_brace:last_brace + 1]
+
+            if not json_str:
+                raise json.JSONDecodeError("No JSON found", result_text, 0)
 
             data = json.loads(json_str)
 
