@@ -402,6 +402,8 @@ class TTSEngine:
         combined += start_silence
         current_time = 1.5  # 시작 무음 반영
 
+        print(f"[TTSEngine] ⏱️ 시작 무음 1.5초 추가됨 (combined 길이: {len(combined)}ms)")
+
         total_scenes = len(script.scenes)
 
         print(f"[TTSEngine] {total_scenes}개 씬 TTS 생성 시작...")
