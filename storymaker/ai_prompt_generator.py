@@ -16,6 +16,17 @@ from anthropic import Anthropic
 # ═══════════════════════════════════════════════════════════════
 
 ENGINE_OPTIMIZATION = {
+    "gpt-image-1.5": {
+        "name": "GPT-1.5 Narrative Illustration",
+        "max_length": 1000,
+        "aspect_ratio": "1536x1024 → 16:9 crop",
+        "primary_use": "고정 스타일 정밀 프롬프트, 스토리텔링 이미지",
+        "detail_level": "중간",
+        "style_hint": "일관된 스타일 + 정밀 프롬프트, 스토리 톤 유지 중심",
+        "avoid": "heavy realism, excessive detail, anime style",
+        "prompt_structure": "style first, then scene, then character",
+        "style_block": "style: narrative illustration, consistent style, medium detail, story driven composition, soft muted tones",
+    },
     "gpt-image-1": {
         "name": "GPT-Mini Narrative Illustration",
         "max_length": 1000,
@@ -64,6 +75,7 @@ ENGINE_OPTIMIZATION = {
 
 # 엔진별 용도 요약
 ENGINE_USE_CASES = {
+    "gpt-image-1.5": "고품질 스토리텔링, 일관된 스타일",
     "gpt-image-1": "시퀀스 초안, 빠른 러프",
     "dalle": "표지/썸네일, 상징적 이미지",
     "fal": "불교 도상화, 사찰 벽화 스타일",
@@ -78,6 +90,7 @@ REGIONAL_ENGINE_STYLES = {
     # 한국불교: Classical Korean Ink-Wash (정본 스타일)
     "korea": {
         "dalle": "style: classical Korean ink-wash narrative painting, Joseon dynasty landscape painting style, soft mineral colors, traditional hanok and village scenery, wide negative space, storytelling composition, gentle brush texture, hand-painted feeling, no anime, no modern illustration, no bright digital colors, no cartoon style",
+        "gpt-image-1.5": "style: classical Korean ink-wash narrative painting, Joseon dynasty landscape style, soft mineral colors, traditional hanok and village scenery, wide negative space, storytelling composition, gentle brush texture, hand-painted feeling, no anime, no modern illustration",
         "gpt-image-1": "style: classical Korean ink wash narrative sketch, traditional Joseon landscape style, soft pencil and ink line, very light mineral wash, wide negative space, storyboard composition, rough hand-drawn feeling, low detail, no bright color, no anime, no modern illustration",
         "fal": "style: classical Korean ink-wash painting, Joseon dynasty landscape, soft mineral colors, traditional temple and hanok, wide negative space, storytelling composition, no anime, no modern illustration",
         "imagen": "style: classical Korean ink-wash narrative, cinematic Joseon landscape, soft mineral colors, traditional Korean architecture, depth of field, emotional scene framing, no cartoonish exaggeration",
@@ -85,6 +98,7 @@ REGIONAL_ENGINE_STYLES = {
     # 중국불교: Buddhist Icon Narrative (불교 도상화)
     "china": {
         "dalle": "style: buddhist icon narrative painting, flat symbolic composition, traditional Chinese temple painting, strong primary colors, gold and vermillion, dharma iconography, no perspective realism, sacred mood, no anime, no modern illustration",
+        "gpt-image-1.5": "style: buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, dharma iconography, no perspective realism, sacred mood, no anime, no modern illustration",
         "gpt-image-1": "style: buddhist icon narrative sketch, flat symbolic composition, temple painting style, strong primary colors, sacred mood, low detail, no anime, no modern illustration",
         "fal": "style: buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood, storytelling iconography, no anime, no modern illustration",
         "imagen": "style: buddhist icon narrative, flat symbolic composition, temple mural style, strong primary colors, sacred atmosphere, cinematic framing, no cartoonish exaggeration",
@@ -92,6 +106,7 @@ REGIONAL_ENGINE_STYLES = {
     # 인도불교: Narrative Concept Art (서사 콘셉트아트)
     "india": {
         "dalle": "style: narrative concept art illustration, soft pencil sketch texture, desaturated muted colors, low contrast shading, wide negative space, storyboard composition, silhouette-focused, no cute, no anime, no bright colors",
+        "gpt-image-1.5": "style: narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast shading, wide negative space, storyboard composition, silhouette-focused, no anime, no bright colors",
         "gpt-image-1": "style: narrative concept art sketch, soft pencil texture, desaturated muted colors, wide negative space, storyboard composition, rough silhouette, low detail, no anime, no bright color",
         "fal": "style: narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast shading, wide negative space, storyboard composition, no cute, no anime gloss, no bright color",
         "imagen": "style: narrative concept art, soft pencil sketch, desaturated colors, wide negative space, cinematic silhouette composition, depth of field, no cartoonish exaggeration",
@@ -129,7 +144,7 @@ class AIPromptGenerator:
         self,
         scenes: List[Dict],
         world_style_guide: str,
-        target_engine: str = "gpt-image-1",
+        target_engine: str = "gpt-image-1.5",
         character_consistency: bool = True
     ) -> List[str]:
         """
@@ -138,7 +153,7 @@ class AIPromptGenerator:
         Args:
             scenes: 씬 리스트 [{scene_id, title, text}, ...]
             world_style_guide: 세계관 스타일 가이드 (WORLD_STYLE_GUIDE)
-            target_engine: 대상 이미지 엔진 (gpt-image-1, dalle, fal, imagen)
+            target_engine: 대상 이미지 엔진 (gpt-image-1.5, gpt-image-1, dalle, fal, imagen)
             character_consistency: 캐릭터 일관성 유지 여부
 
         Returns:
@@ -198,7 +213,7 @@ class AIPromptGenerator:
         self,
         scene_text: str,
         world_style_guide: str,
-        target_engine: str = "gpt-image-1",
+        target_engine: str = "gpt-image-1.5",
         camera: str = "medium shot"
     ) -> str:
         """
@@ -334,7 +349,7 @@ class AIPromptGenerator:
 def generate_prompts_for_script(
     script,
     style: str,
-    target_engine: str = "gpt-image-1"
+    target_engine: str = "gpt-image-1.5"
 ) -> List[str]:
     """
     대본 객체에서 이미지 프롬프트 생성 (편의 함수)
