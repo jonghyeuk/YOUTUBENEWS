@@ -634,192 +634,7 @@ def finalize_video():
         return "❌ 렌더링 필요", None
     try:
         final_path = pipeline.step7_burn_subtitles()
-        # 프로젝트 자동 저장
-        pipeline.save_project()
         return "✅ 최종 영상 완료!", final_path
-    except Exception as e:
-        return f"❌ 오류: {e}", None
-
-
-# ═══════════════════════════════════════════════════════════════
-# 프로젝트 재활용 (다른 채널용)
-# ═══════════════════════════════════════════════════════════════
-
-def get_project_list():
-    """저장된 프로젝트 목록 가져오기"""
-    try:
-        projects = pipeline.list_projects()
-        if not projects:
-            return [["(저장된 프로젝트 없음)", "", 0, "", "", ""]]
-
-        data = []
-        for p in projects:
-            data.append([
-                p["project_id"],
-                p["title"][:30] + "..." if len(p["title"]) > 30 else p["title"],
-                p["duration_min"],
-                "✅" if p["has_images"] else "❌",
-                "✅" if p["has_audio"] else "❌",
-                "✅" if p["has_video"] else "❌",
-            ])
-        return data
-    except Exception as e:
-        return [[f"오류: {e}", "", 0, "", "", ""]]
-
-
-def load_selected_project(project_id: str):
-    """선택한 프로젝트 불러오기 - 정보만 표시"""
-    if not project_id or project_id.startswith("("):
-        return "❌ 프로젝트 ID를 입력하세요"
-
-    try:
-        # project.json 있는지 확인
-        project_path = os.path.join(pipeline.project_dir, project_id)
-        json_path = os.path.join(project_path, "project.json")
-
-        if os.path.exists(json_path):
-            project = pipeline.load_project(project_id)
-        else:
-            # 기존 프로젝트 가져오기 (자동으로 project.json 생성)
-            project = pipeline.import_legacy_project(project_id)
-
-        # 프로젝트 정보만 표시
-        info = f"""### ✅ 프로젝트 불러오기 완료
-
-**제목**: {project.title}
-**분량**: {project.duration_min}분
-**상태**: {project.status}
-
----
-| 항목 | 상태 |
-|------|------|
-| 스크립트 | {'✅ ' + str(len(project.script.scenes)) + '개 씬' if project.script else '❌ 없음'} |
-| 이미지 | {'✅ ' + str(len(project.cut_paths)) + '장' if project.cut_paths else '❌ 없음'} |
-| 오디오 | {'✅ 있음' if project.audio_path else '❌ 없음'} |
-| 영상 | {'✅ 있음' if project.final_video_path else '❌ 없음'} |
-
----
-👉 **각 탭으로 이동해서 확인하세요**
-"""
-        return info
-    except Exception as e:
-        return f"❌ 오류: {e}"
-
-
-def load_project_script():
-    """불러온 프로젝트의 스크립트 로드 (탭 선택 시)"""
-    if not pipeline.project:
-        return "*프로젝트를 먼저 불러오세요*", ""
-
-    project = pipeline.project
-    script_md = "*스크립트가 없습니다*"
-    image_prompts_text = ""
-
-    if project.script and project.script.scenes:
-        script_lines = [f"## {project.script.title}\n"]
-        prompts_list = []
-
-        for scene in project.script.scenes:
-            script_lines.append(f"### 씬 {scene.scene_id}: {scene.title}")
-            script_lines.append(f"{scene.text}\n")
-
-            if scene.image_prompts:
-                for prompt in scene.image_prompts:
-                    prompts_list.append(prompt)
-
-        script_md = "\n".join(script_lines)
-        image_prompts_text = "\n".join(prompts_list)
-
-    return script_md, image_prompts_text
-
-
-def load_project_audio():
-    """불러온 프로젝트의 오디오 로드 (탭 선택 시)"""
-    if not pipeline.project:
-        return None
-
-    project = pipeline.project
-    if project.audio_path and os.path.exists(project.audio_path):
-        return project.audio_path
-    return None
-
-
-def load_project_images():
-    """불러온 프로젝트의 이미지 로드 (탭 선택 시)"""
-    if not pipeline.project:
-        return [], ""
-
-    project = pipeline.project
-    images = []
-    if project.cut_paths:
-        for img_path in project.cut_paths:
-            if os.path.exists(img_path):
-                images.append(img_path)
-
-    # 이미지 프롬프트도 함께 반환
-    image_prompts_text = ""
-    if project.script and project.script.scenes:
-        prompts_list = []
-        for scene in project.script.scenes:
-            if scene.image_prompts:
-                for prompt in scene.image_prompts:
-                    prompts_list.append(prompt)
-        image_prompts_text = "\n".join(prompts_list)
-
-    return images, image_prompts_text
-
-
-def regenerate_tts_for_repurpose(engine: str, style: str, speed: float):
-    """TTS 재생성 (재활용용)"""
-    if not pipeline.project or not pipeline.project.script:
-        return "❌ 스크립트가 있는 프로젝트를 먼저 불러오세요", None
-
-    try:
-        audio_path = pipeline.regenerate_tts(engine=engine, style=style, speed=speed)
-        total = sum(s.duration for s in pipeline.project.audio_segments)
-        return f"✅ TTS 재생성 완료 ({total:.1f}초)", audio_path
-    except Exception as e:
-        return f"❌ 오류: {e}", None
-
-
-def regenerate_subtitle_for_repurpose():
-    """자막 재생성 (재활용용)"""
-    if not pipeline.project or not pipeline.project.audio_path:
-        return "❌ 오디오가 있는 프로젝트를 먼저 불러오세요"
-
-    try:
-        subtitle_path = pipeline.regenerate_subtitles()
-        return f"✅ 자막 재생성 완료: {subtitle_path}"
-    except Exception as e:
-        return f"❌ 오류: {e}"
-
-
-def rerender_video_for_repurpose(use_ken_burns: bool, bgm_option: str):
-    """영상 재렌더링 (재활용용)"""
-    if not pipeline.project:
-        return "❌ 프로젝트를 먼저 불러오세요", None
-
-    if not pipeline.project.cut_paths:
-        return "❌ 이미지가 없습니다", None
-
-    if not pipeline.project.audio_path:
-        return "❌ 오디오가 없습니다 (TTS 먼저 생성하세요)", None
-
-    try:
-        # BGM 처리
-        bgm_path = None
-        if bgm_option == "random":
-            bgm_path = pipeline.video_engine.get_random_bgm()
-
-        final_path = pipeline.rerender_video(
-            use_ken_burns=use_ken_burns,
-            bgm_path=bgm_path
-        )
-
-        # 프로젝트 저장
-        pipeline.save_project()
-
-        return f"✅ 재렌더링 완료!", final_path
     except Exception as e:
         return f"❌ 오류: {e}", None
 
@@ -1428,7 +1243,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         # ─────────────────────────────────────────────
         # Tab 1: 스크립트 생성 (통합)
         # ─────────────────────────────────────────────
-        with gr.Tab("1️⃣ 스크립트 생성") as script_tab:
+        with gr.Tab("1️⃣ 스크립트 생성"):
             with gr.Row():
                 with gr.Column(scale=1):
                     topic_input = gr.Textbox(
@@ -1541,7 +1356,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         # ─────────────────────────────────────────────
         # Tab 3: 이미지 생성
         # ─────────────────────────────────────────────
-        with gr.Tab("3️⃣ 이미지 생성") as image_tab:
+        with gr.Tab("3️⃣ 이미지 생성"):
             with gr.Row():
                 with gr.Column():
                     image_engine = gr.Radio(
@@ -1779,44 +1594,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
             """)
 
         # ─────────────────────────────────────────────
-        # Tab 7: 프로젝트 불러오기
-        # ─────────────────────────────────────────────
-        with gr.Tab("📂 불러오기") as repurpose_tab:
-            gr.Markdown("### 📂 프로젝트 불러오기")
-            gr.Markdown("*저장된 프로젝트를 불러와서 각 탭에서 확인/수정하세요*")
-
-            with gr.Row():
-                with gr.Column(scale=1):
-                    # 프로젝트 목록
-                    gr.Markdown("#### 📁 저장된 프로젝트")
-                    refresh_projects_btn = gr.Button("🔄 새로고침", size="sm")
-                    project_list = gr.Dataframe(
-                        headers=["ID", "제목", "분", "이미지", "오디오", "영상"],
-                        datatype=["str", "str", "number", "str", "str", "str"],
-                        interactive=False,
-                        wrap=True
-                    )
-                    selected_project_id = gr.Textbox(label="프로젝트 ID 입력", interactive=True)
-                    load_project_btn = gr.Button("📥 프로젝트 불러오기", variant="primary", size="lg")
-
-                with gr.Column(scale=2):
-                    # 불러온 프로젝트 정보
-                    loaded_project_info = gr.Markdown("*프로젝트를 선택하세요*")
-
-                    gr.Markdown("""
-                    ---
-                    ### 💡 사용 방법
-                    1. 목록에서 프로젝트 ID 복사 → 입력란에 붙여넣기
-                    2. **불러오기** 클릭
-                    3. 각 탭으로 이동해서 확인:
-                       - **1️⃣ 스크립트**: 스크립트 내용
-                       - **2️⃣ TTS**: 오디오 파일
-                       - **3️⃣ 이미지**: 이미지 갤러리
-                    4. 수정 후 저장하면 새 프로젝트로 저장됨
-                    """)
-
-        # ─────────────────────────────────────────────
-        # Tab 8: 트렌드 분석 (참고용)
+        # Tab 7: 트렌드 분석 (참고용)
         # ─────────────────────────────────────────────
         with gr.Tab("📊 트렌드 (참고)"):
             gr.Markdown("### 🔍 YouTube 트렌드 분석")
@@ -1988,24 +1766,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         [status, yt_upload_result]
     )
 
-    # Tab 7: 프로젝트 불러오기
-    # 탭 선택 시 프로젝트 목록 로드
-    repurpose_tab.select(get_project_list, [], [project_list])
-    refresh_projects_btn.click(get_project_list, [], [project_list])
-
-    # 프로젝트 불러오기 - 정보만 표시
-    load_project_btn.click(
-        load_selected_project,
-        [selected_project_id],
-        [loaded_project_info]
-    )
-
-    # 각 탭 선택 시 불러온 프로젝트 데이터 표시
-    script_tab.select(load_project_script, [], [script_preview, image_prompts])
-    tts_tab.select(load_project_audio, [], [audio_preview])
-    image_tab.select(load_project_images, [], [images_gallery, final_prompts])
-
-    # Tab 8: 트렌드
+    # Tab 7: 트렌드
     trend_btn.click(analyze_trend, [trend_keyword], [status, trend_result, video_selector])
     extract_btn.click(extract_transcript_and_comments, [video_selector], [status, transcript_result, comments_result])
 
