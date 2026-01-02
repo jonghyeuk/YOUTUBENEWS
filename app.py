@@ -673,7 +673,15 @@ def load_selected_project(project_id: str):
         return "❌ 프로젝트 ID를 입력하세요"
 
     try:
-        project = pipeline.load_project(project_id)
+        # project.json 있는지 확인
+        project_path = os.path.join(pipeline.project_dir, project_id)
+        json_path = os.path.join(project_path, "project.json")
+
+        if os.path.exists(json_path):
+            project = pipeline.load_project(project_id)
+        else:
+            # 기존 프로젝트 가져오기 (자동으로 project.json 생성)
+            project = pipeline.import_legacy_project(project_id)
 
         info = f"""### ✅ 프로젝트 불러오기 완료
 
@@ -682,10 +690,12 @@ def load_selected_project(project_id: str):
 **상태**: {project.status}
 
 ---
-**스크립트**: {'✅ ' + str(len(project.script.scenes)) + '개 씬' if project.script else '❌ 없음'}
+**스크립트**: {'✅ ' + str(len(project.script.scenes)) + '개 씬' if project.script else '❌ 없음 (TTS 재생성 불가)'}
 **이미지**: {'✅ ' + str(len(project.cut_paths)) + '장' if project.cut_paths else '❌ 없음'}
 **오디오**: {'✅ 있음' if project.audio_path else '❌ 없음'}
 **영상**: {'✅ 있음' if project.final_video_path else '❌ 없음'}
+
+{'⚠️ **기존 프로젝트**: 스크립트가 없어 TTS 재생성은 불가합니다. 기존 오디오로 영상 재렌더링만 가능합니다.' if not project.script else ''}
 """
         return info
     except Exception as e:

@@ -584,7 +584,7 @@ class Pipeline:
         return self.project
 
     def list_projects(self) -> List[dict]:
-        """저장된 프로젝트 목록 조회"""
+        """저장된 프로젝트 목록 조회 (기존 폴더도 자동 인식)"""
         projects = []
 
         if not os.path.exists(self.project_dir):
@@ -594,7 +594,11 @@ class Pipeline:
             project_path = os.path.join(self.project_dir, folder)
             json_path = os.path.join(project_path, "project.json")
 
-            if os.path.isdir(project_path) and os.path.exists(json_path):
+            if not os.path.isdir(project_path):
+                continue
+
+            # project.json이 있는 경우
+            if os.path.exists(json_path):
                 try:
                     with open(json_path, "r", encoding="utf-8") as f:
                         data = json.load(f)
@@ -609,10 +613,119 @@ class Pipeline:
                     })
                 except Exception as e:
                     print(f"[Pipeline] 프로젝트 로드 실패: {folder} - {e}")
+            else:
+                # project.json이 없는 기존 폴더 스캔
+                project_info = self._scan_legacy_project(project_path, folder)
+                if project_info:
+                    projects.append(project_info)
 
         # 최신순 정렬
         projects.sort(key=lambda x: x["project_id"], reverse=True)
         return projects
+
+    def _scan_legacy_project(self, project_path: str, folder: str) -> dict:
+        """기존 프로젝트 폴더 스캔하여 정보 추출"""
+        # 이미지 찾기
+        images_dir = os.path.join(project_path, "images")
+        cut_paths = []
+        if os.path.exists(images_dir):
+            for f in sorted(os.listdir(images_dir)):
+                if f.endswith((".png", ".jpg", ".jpeg")):
+                    cut_paths.append(os.path.join(images_dir, f))
+
+        # 오디오 찾기
+        audio_path = None
+        for f in os.listdir(project_path):
+            if f.startswith("tts") and f.endswith(".mp3"):
+                audio_path = os.path.join(project_path, f)
+                break
+
+        # 영상 찾기
+        video_path = None
+        final_video_path = None
+        for f in os.listdir(project_path):
+            if f == "final.mp4":
+                final_video_path = os.path.join(project_path, f)
+            elif f == "video.mp4":
+                video_path = os.path.join(project_path, f)
+
+        # 아무것도 없으면 스킵
+        if not cut_paths and not audio_path and not final_video_path:
+            return None
+
+        # 제목 추출 (폴더명에서)
+        title = folder.rsplit("_", 2)[0].replace("_", " ") if "_" in folder else folder
+
+        return {
+            "project_id": folder,
+            "title": title[:30],
+            "duration_min": 0,
+            "status": "legacy",
+            "has_images": len(cut_paths) > 0,
+            "has_audio": audio_path is not None,
+            "has_video": final_video_path is not None,
+        }
+
+    def import_legacy_project(self, project_id: str) -> Project:
+        """기존 프로젝트 폴더를 정식 프로젝트로 가져오기"""
+        project_path = os.path.join(self.project_dir, project_id)
+
+        if not os.path.isdir(project_path):
+            raise FileNotFoundError(f"프로젝트 폴더를 찾을 수 없습니다: {project_path}")
+
+        # 이미지 스캔
+        images_dir = os.path.join(project_path, "images")
+        cut_paths = []
+        if os.path.exists(images_dir):
+            for f in sorted(os.listdir(images_dir)):
+                if f.endswith((".png", ".jpg", ".jpeg")):
+                    cut_paths.append(os.path.join(images_dir, f))
+
+        # 오디오 스캔
+        audio_path = None
+        for f in os.listdir(project_path):
+            if f.startswith("tts") and f.endswith(".mp3"):
+                audio_path = os.path.join(project_path, f)
+                break
+
+        # 영상 스캔
+        video_path = None
+        final_video_path = None
+        subtitle_path = None
+        for f in os.listdir(project_path):
+            if f == "final.mp4":
+                final_video_path = os.path.join(project_path, f)
+            elif f == "video.mp4":
+                video_path = os.path.join(project_path, f)
+            elif f.endswith(".srt"):
+                subtitle_path = os.path.join(project_path, f)
+
+        # 제목 추출
+        title = project_id.rsplit("_", 2)[0].replace("_", " ") if "_" in project_id else project_id
+
+        # Project 생성
+        self.project = Project(
+            project_id=project_id,
+            title=title,
+            duration_min=0,
+            topic=title,
+            script=None,  # 스크립트는 복원 불가
+            audio_path=audio_path,
+            audio_segments=[],
+            sheet_image_path=None,
+            cut_paths=cut_paths,
+            subtitle_path=subtitle_path,
+            video_path=video_path,
+            final_video_path=final_video_path,
+            current_step=0,
+            status="imported"
+        )
+
+        # project.json 저장
+        self.save_project()
+
+        self._log(f"기존 프로젝트 가져오기 완료: {project_id}")
+        return self.project
 
     def regenerate_tts(
         self,
