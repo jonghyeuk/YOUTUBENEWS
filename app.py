@@ -667,6 +667,17 @@ def get_project_list():
         return [[f"오류: {e}", "", 0, "", "", ""]]
 
 
+def on_project_select(evt: gr.SelectData, data):
+    """테이블에서 프로젝트 선택 시 ID 자동 입력"""
+    if evt.index is not None and data is not None:
+        row_idx = evt.index[0] if isinstance(evt.index, (list, tuple)) else evt.index
+        if row_idx < len(data):
+            project_id = data[row_idx][0]
+            if not project_id.startswith("("):
+                return project_id
+    return ""
+
+
 def load_selected_project(project_id: str):
     """선택한 프로젝트 불러오기"""
     if not project_id or project_id.startswith("("):
@@ -1948,6 +1959,9 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     # 탭 선택 시 프로젝트 목록 로드
     repurpose_tab.select(get_project_list, [], [project_list])
     refresh_projects_btn.click(get_project_list, [], [project_list])
+
+    # 테이블 클릭 시 프로젝트 ID 자동 입력
+    project_list.select(on_project_select, [project_list], [selected_project_id])
 
     # 프로젝트 불러오기
     load_project_btn.click(
