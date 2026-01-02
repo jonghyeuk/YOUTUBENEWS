@@ -689,9 +689,20 @@ def on_project_select(evt: gr.SelectData, data):
 
 
 def load_selected_project(project_id: str):
-    """선택한 프로젝트 불러오기"""
+    """선택한 프로젝트 불러오기 - 모든 탭 UI 업데이트"""
     if not project_id or project_id.startswith("("):
-        return "❌ 프로젝트 ID를 입력하세요"
+        return (
+            "❌ 프로젝트 ID를 입력하세요",  # loaded_project_info
+            "",  # status
+            "*주제를 입력하고 생성 버튼을 누르세요*",  # script_preview
+            "",  # image_prompts
+            "",  # final_prompts
+            None,  # audio_preview
+            [],  # images_gallery
+            "",  # subtitle_preview
+            None,  # video_preview
+            None,  # final_video
+        )
 
     try:
         # project.json 있는지 확인
@@ -704,6 +715,43 @@ def load_selected_project(project_id: str):
             # 기존 프로젝트 가져오기 (자동으로 project.json 생성)
             project = pipeline.import_legacy_project(project_id)
 
+        # === 각 탭 데이터 준비 ===
+
+        # 1. 스크립트 미리보기
+        script_preview_text = "*스크립트 없음*"
+        image_prompts_text = ""
+        if project.script:
+            script_preview_text = f"# {project.script.title}\n\n"
+            script_preview_text += f"**{len(project.script.scenes)}개 씬**\n\n"
+            for scene in project.script.scenes:
+                script_preview_text += f"### 씬 {scene.scene_id}: {scene.title}\n"
+                script_preview_text += f"🖼️ {scene.image_count}장\n\n"
+                script_preview_text += f"{scene.text}\n\n---\n\n"
+                # 이미지 프롬프트
+                for i, prompt in enumerate(scene.image_prompts, 1):
+                    image_prompts_text += f"이미지 {scene.scene_id}-{i}: {prompt}\n\n"
+
+        # 2. 오디오
+        audio_file = project.audio_path if project.audio_path and os.path.exists(project.audio_path) else None
+
+        # 3. 이미지 갤러리
+        images = []
+        if project.cut_paths:
+            for img_path in project.cut_paths:
+                if os.path.exists(img_path):
+                    images.append(Image.open(img_path))
+
+        # 4. 자막
+        subtitle_text = ""
+        if project.subtitle_path and os.path.exists(project.subtitle_path):
+            with open(project.subtitle_path, "r", encoding="utf-8") as f:
+                subtitle_text = f.read()[:2000]
+
+        # 5. 영상
+        video_file = project.video_path if project.video_path and os.path.exists(project.video_path) else None
+        final_video_file = project.final_video_path if project.final_video_path and os.path.exists(project.final_video_path) else None
+
+        # 상태 정보
         info = f"""### ✅ 프로젝트 불러오기 완료
 
 **제목**: {project.title}
@@ -713,14 +761,33 @@ def load_selected_project(project_id: str):
 ---
 **스크립트**: {'✅ ' + str(len(project.script.scenes)) + '개 씬' if project.script else '❌ 없음 (TTS 재생성 불가)'}
 **이미지**: {'✅ ' + str(len(project.cut_paths)) + '장' if project.cut_paths else '❌ 없음'}
-**오디오**: {'✅ 있음' if project.audio_path else '❌ 없음'}
-**영상**: {'✅ 있음' if project.final_video_path else '❌ 없음'}
+**오디오**: {'✅ 있음' if audio_file else '❌ 없음'}
+**영상**: {'✅ 있음' if final_video_file else '❌ 없음'}
 
 {'⚠️ **기존 프로젝트**: 스크립트가 없어 TTS 재생성은 불가합니다. 기존 오디오로 영상 재렌더링만 가능합니다.' if not project.script else ''}
 """
-        return info
+
+        status_msg = f"✅ 프로젝트 불러오기 완료: {project.title}"
+
+        return (
+            info,  # loaded_project_info
+            status_msg,  # status
+            script_preview_text,  # script_preview
+            image_prompts_text,  # image_prompts
+            image_prompts_text,  # final_prompts
+            audio_file,  # audio_preview
+            images,  # images_gallery
+            subtitle_text,  # subtitle_preview
+            video_file,  # video_preview
+            final_video_file,  # final_video
+        )
+
     except Exception as e:
-        return f"❌ 오류: {e}"
+        return (
+            f"❌ 오류: {e}",
+            f"❌ 오류: {e}",
+            "", "", "", None, [], "", None, None
+        )
 
 
 def regenerate_tts_for_repurpose(engine: str, style: str, speed: float):
@@ -1973,11 +2040,22 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     # 테이블 클릭 시 프로젝트 ID 자동 입력
     project_list.select(on_project_select, [project_list], [selected_project_id])
 
-    # 프로젝트 불러오기
+    # 프로젝트 불러오기 - 모든 탭 UI 업데이트
     load_project_btn.click(
         load_selected_project,
         [selected_project_id],
-        [loaded_project_info]
+        [
+            loaded_project_info,  # 재활용 탭 정보
+            status,  # 메인 상태
+            script_preview,  # 스크립트 탭
+            image_prompts,  # 이미지 프롬프트
+            final_prompts,  # 이미지 생성 탭 프롬프트
+            audio_preview,  # TTS 탭 오디오
+            images_gallery,  # 이미지 갤러리
+            subtitle_preview,  # 자막
+            video_preview,  # 영상
+            final_video,  # 최종 영상
+        ]
     )
 
     # TTS 재생성
