@@ -404,6 +404,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
 def get_elevenlabs_usage_info():
     """ElevenLabs 사용량 정보 가져오기 (모든 계정)"""
+    import os
     from engines.tts_engine import TTSEngine
     results = []
 
@@ -422,18 +423,21 @@ def get_elevenlabs_usage_info():
         print(f"[ElevenLabs] 기본 계정 조회 오류: {e}")
 
     # limkony 계정 사용량
-    try:
-        tts_limkony = TTSEngine(engine="elevenlabs2.5_limkony", style=None)
-        usage_limkony = tts_limkony.get_elevenlabs_usage()
-        if usage_limkony:
-            results.append(
-                f"🔵 **ElevenLabs (limkony)**: "
-                f"{usage_limkony['used']:,} / {usage_limkony['limit']:,} 문자 "
-                f"({usage_limkony['percent']}%) | "
-                f"리셋: {usage_limkony['reset_date']} | {usage_limkony['tier']}"
-            )
-    except Exception as e:
-        print(f"[ElevenLabs] limkony 계정 조회 오류: {e}")
+    if os.getenv("ELEVENLABS_API_KEY_LIMKONY"):
+        try:
+            tts_limkony = TTSEngine(engine="elevenlabs2.5_limkony", style=None)
+            usage_limkony = tts_limkony.get_elevenlabs_usage()
+            if usage_limkony:
+                results.append(
+                    f"🔵 **ElevenLabs (limkony)**: "
+                    f"{usage_limkony['used']:,} / {usage_limkony['limit']:,} 문자 "
+                    f"({usage_limkony['percent']}%) | "
+                    f"리셋: {usage_limkony['reset_date']} | {usage_limkony['tier']}"
+                )
+        except Exception as e:
+            results.append(f"🔵 **ElevenLabs (limkony)**: ⚠️ 조회 실패 - {e}")
+    else:
+        results.append("🔵 **ElevenLabs (limkony)**: ⚠️ API 키 미설정 (.env에 ELEVENLABS_API_KEY_LIMKONY 추가)")
 
     return "\n\n".join(results) if results else ""
 
@@ -1409,8 +1413,8 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     **엔진 설명**:
                     - `wavenet`: Google Cloud TTS (자연스러움)
                     - `elevenlabs`: v3 Audio Tags 감정 표현 ⭐
-                    - `elevenlabs2.5`: Turbo v2.5 SSML+voice_settings 🚀
-                    - `elevenlabs2.5_limkony`: Turbo v2.5 (limkony) 🔵
+                    - `elevenlabs2.5`: Turbo v2.5 감정 흉내 🚀
+                    - `elevenlabs2.5_limkony`: Turbo v2.5 감정 흉내 (limkony) 🔵
                     - `openai`: OpenAI TTS
                     """)
                     # ElevenLabs 사용량 표시 (엔진 설명 아래)
