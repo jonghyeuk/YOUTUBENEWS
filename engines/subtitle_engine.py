@@ -243,43 +243,45 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         return output_path
 
     def _split_sentences(self, text: str) -> List[str]:
-        """텍스트를 문장 단위로 분할"""
-        # 한국어 문장 분리 (마침표, 물음표, 느낌표 기준)
-        sentences = re.split(r'(?<=[.!?])\s+', text)
+        """텍스트를 문장 단위로 분할 (다국어 지원)"""
+        # 다국어 문장 부호: 한국어/영어(.!?) + 일본어(。！？)
+        sentences = re.split(r'(?<=[.!?。！？])\s*', text)
         return [s for s in sentences if s.strip()]
 
     def _wrap_text_for_subtitle(self, text: str, max_chars: int = 20) -> str:
-        """긴 텍스트를 자막용으로 줄바꿈 (\\N 사용)"""
+        """긴 텍스트를 자막용으로 줄바꿈 - 다국어 지원 (\\N 사용)"""
         if len(text) <= max_chars:
             return text
 
-        words = text.split()
-        lines = []
-        current_line = ""
+        # 공백이 있는 언어(영어)와 없는 언어(한국어/일본어) 모두 지원
+        has_spaces = ' ' in text and len(text.split()) > 1
 
-        for word in words:
-            # 현재 줄 + 단어가 max_chars를 초과하면 줄바꿈
-            if len(current_line) + len(word) + 1 > max_chars:
-                if current_line:
-                    lines.append(current_line.strip())
-                current_line = word
-            else:
-                current_line += " " + word if current_line else word
+        if has_spaces:
+            # 영어: 단어 단위 분할
+            words = text.split()
+            lines = []
+            current_line = ""
 
-        if current_line:
-            lines.append(current_line.strip())
+            for word in words:
+                if len(current_line) + len(word) + 1 > max_chars:
+                    if current_line:
+                        lines.append(current_line.strip())
+                    current_line = word
+                else:
+                    current_line += " " + word if current_line else word
 
-        # 3줄 초과시 2줄로 제한 (화면 가독성)
+            if current_line:
+                lines.append(current_line.strip())
+        else:
+            # 한국어/일본어: 글자 단위 분할
+            lines = []
+            for i in range(0, len(text), max_chars):
+                lines.append(text[i:i + max_chars])
+
+        # 2줄로 제한 (화면 가독성)
         if len(lines) > 2:
             mid = len(text) // 2
-            # 중간 지점 근처 공백에서 분할
-            split_idx = text.rfind(" ", 0, mid + 10)
-            if split_idx == -1:
-                split_idx = text.find(" ", mid)
-            if split_idx != -1:
-                lines = [text[:split_idx].strip(), text[split_idx:].strip()]
-            else:
-                lines = [text[:mid], text[mid:]]
+            lines = [text[:mid], text[mid:]]
 
         return "\\N".join(lines)
 
