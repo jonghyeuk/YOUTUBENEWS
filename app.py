@@ -495,13 +495,18 @@ def preview_tts_script(engine: str):
     return preview
 
 
-def generate_tts(engine: str, speed: float = 0.9):
+def generate_tts(engine: str, speed: float = 0.9, language: str = None):
     if not pipeline.project or not pipeline.project.script:
         return "❌ 스크립트 생성 필요", None, ""
     try:
-        # 프로젝트에 저장된 스타일과 언어 가져오기
+        # 프로젝트에 저장된 스타일 가져오기
         style = getattr(pipeline.project, 'style', None)
-        language = getattr(pipeline.project, 'language', 'ko')
+
+        # 언어: 파라미터로 전달된 값 우선, 없으면 프로젝트 저장값 사용
+        if language:
+            pipeline.project.language = language  # 프로젝트 언어 업데이트
+        else:
+            language = getattr(pipeline.project, 'language', 'ko')
         lang_name = LANGUAGE_CONFIG.get(language, {}).get("name", "🇰🇷 한국어")
 
         audio_path = pipeline.step3_generate_tts(engine, style=style, speed=speed)
@@ -1712,7 +1717,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     # 탭 선택 시 ElevenLabs 사용량 로드
     tts_tab.select(get_elevenlabs_usage_info, [], [elevenlabs_usage_display])
     tts_preview_btn.click(preview_tts_script, [tts_engine], [tts_script_preview])
-    tts_btn.click(generate_tts, [tts_engine, tts_speed], [status, audio_preview, tts_script_preview])
+    tts_btn.click(generate_tts, [tts_engine, tts_speed, script_language], [status, audio_preview, tts_script_preview])
 
     # Tab 3: 이미지 생성
     image_engine.change(update_model_choices, [image_engine], [image_model])

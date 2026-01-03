@@ -108,6 +108,9 @@ class VideoEngine:
 
         # 클립들 합치기 (크로스페이드)
         if len(temp_clips) == 1:
+            # Windows 호환: 대상 파일이 이미 있으면 삭제 후 rename
+            if os.path.exists(output_path):
+                os.remove(output_path)
             os.rename(temp_clips[0], output_path)
         else:
             self._concat_with_crossfade(temp_clips, output_path)
@@ -200,7 +203,9 @@ class VideoEngine:
 
             current = temp_output
 
-        # 최종 파일 이동
+        # 최종 파일 이동 (Windows 호환: 대상 파일이 이미 있으면 삭제)
+        if os.path.exists(output_path):
+            os.remove(output_path)
         os.rename(current, output_path)
 
     def _create_scene_clip_simple(
