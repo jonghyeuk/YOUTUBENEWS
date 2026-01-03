@@ -258,7 +258,7 @@ STYLE_DEFAULT_EMOTIONS_V25 = {
 class TTSEngine:
     """TTS 음성 생성 엔진 (WaveNet / ElevenLabs v3 / ElevenLabs Turbo v2.5 / OpenAI)"""
 
-    ENGINES = ["wavenet", "elevenlabs", "elevenlabs2.5", "openai"]
+    ENGINES = ["wavenet", "elevenlabs", "elevenlabs2.5", "elevenlabs2.5_limkony", "openai"]
 
     # 언어별 WaveNet 음성 설정
     WAVENET_VOICES = {

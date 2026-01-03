@@ -486,8 +486,8 @@ def preview_tts_script(engine: str):
                 tag = tags.get("climax", "")
             else:
                 tag = tags.get("ending", "")
-        # ElevenLabs Turbo v2.5 감정 흉내 표시
-        elif engine == "elevenlabs2.5" and style and style in STYLE_DEFAULT_EMOTIONS_V25:
+        # ElevenLabs Turbo v2.5 감정 흉내 표시 (limkony 포함)
+        elif engine in ("elevenlabs2.5", "elevenlabs2.5_limkony") and style and style in STYLE_DEFAULT_EMOTIONS_V25:
             emotions = STYLE_DEFAULT_EMOTIONS_V25[style]
             if position < 0.15:
                 emotion_info = emotions.get("intro", "neutral")
