@@ -159,7 +159,7 @@ class AIPromptGenerator:
         Returns:
             이미지 프롬프트 리스트
         """
-        engine_config = ENGINE_OPTIMIZATION.get(target_engine, ENGINE_OPTIMIZATION["gpt-image-1"])
+        engine_config = ENGINE_OPTIMIZATION.get(target_engine, ENGINE_OPTIMIZATION["gpt-image-1.5"])
 
         # 카메라 순환 패턴
         camera_cycle = ["wide shot", "medium shot", "close-up", "medium shot"]
@@ -228,7 +228,7 @@ class AIPromptGenerator:
         Returns:
             이미지 프롬프트 (영어)
         """
-        engine_config = ENGINE_OPTIMIZATION.get(target_engine, ENGINE_OPTIMIZATION["gpt-image-1"])
+        engine_config = ENGINE_OPTIMIZATION.get(target_engine, ENGINE_OPTIMIZATION["gpt-image-1.5"])
 
         prompt = f"""당신은 전문 영화 스토리보드 아티스트입니다.
 다음 씬 설명을 읽고, 이미지 생성 AI용 프롬프트를 영어로 작성하세요.

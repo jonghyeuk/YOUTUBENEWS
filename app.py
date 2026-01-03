@@ -593,7 +593,7 @@ IMAGE_MODEL_OPTIONS = {
         ("DALL-E 3", "dall-e-3"),
     ],
     "storymaker": [
-        ("GPT Image (스토리텔링전용)", "gpt-image-1"),
+        ("GPT Image 1.5 (스토리텔링전용)", "gpt-image-1.5"),
     ],
 }
 

@@ -161,7 +161,7 @@ def compile_hybrid_prompt(
     constraints = REGIONAL_CONSTRAINTS.get(normalized_region, KOREAN_CONSTRAINTS)
 
     # 엔진별 프롬프트 구조 최적화
-    if engine == "gpt-image-1":
+    if engine in ("gpt-image-1", "gpt-image-1.5"):
         # GPT-mini: 짧고 단순하게, 스타일 먼저
         if engine_style_block:
             compiled = f"""{engine_style_block}.
