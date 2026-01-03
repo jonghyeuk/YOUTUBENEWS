@@ -292,6 +292,8 @@ class TTSEngine:
             self._init_elevenlabs()
         elif self.engine == "elevenlabs2.5":
             self._init_elevenlabs_v25()
+        elif self.engine == "elevenlabs2.5_limkony":
+            self._init_elevenlabs_v25_limkony()
         elif self.engine == "openai":
             self._init_openai()
 
@@ -368,6 +370,32 @@ class TTSEngine:
             self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
             print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 ({lang_name}, 기본 음성, 속도: {self.speed})")
+
+    def _init_elevenlabs_v25_limkony(self):
+        """ElevenLabs Turbo v2.5 (limkony 계정) 초기화 - 별도 API 키 사용"""
+        from elevenlabs.client import ElevenLabs
+        # limkony 전용 API 키 사용
+        api_key = os.getenv("ELEVENLABS_API_KEY_LIMKONY")
+        if not api_key:
+            raise ValueError("ELEVENLABS_API_KEY_LIMKONY 환경변수가 설정되지 않았습니다")
+        self.client = ElevenLabs(api_key=api_key)
+
+        # 언어별 voice_id 우선 적용
+        lang_config = LANGUAGE_CONFIG.get(self.language, {})
+        lang_voice_id = lang_config.get("tts_voice_id")
+        lang_name = lang_config.get("name", "🇰🇷 한국어")
+
+        # 스타일별 음성 설정 가져오기
+        if self.style and self.style in ELEVENLABS_STYLE_VOICES:
+            voice_config = ELEVENLABS_STYLE_VOICES[self.style]
+            self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+            style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
+            self.speed = self._speed_override if self._speed_override else style_speed
+            print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 스타일: {self.style}, 속도: {self.speed})")
+        else:
+            self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
+            self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
+            print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 기본 음성, 속도: {self.speed})")
 
     def _init_openai(self):
         """OpenAI TTS 초기화"""
@@ -493,6 +521,9 @@ class TTSEngine:
         elif self.engine == "elevenlabs":
             return self._synthesize_elevenlabs(text)
         elif self.engine == "elevenlabs2.5":
+            return self._synthesize_elevenlabs_v25(text, scene_idx, total_scenes)
+        elif self.engine == "elevenlabs2.5_limkony":
+            # limkony 계정도 동일한 v2.5 합성 로직 사용 (API 키만 다름)
             return self._synthesize_elevenlabs_v25(text, scene_idx, total_scenes)
         elif self.engine == "openai":
             return self._synthesize_openai(text)
@@ -620,7 +651,7 @@ class TTSEngine:
 
     def get_elevenlabs_usage(self) -> dict:
         """ElevenLabs 사용량 조회"""
-        if self.engine not in ("elevenlabs", "elevenlabs2.5"):
+        if self.engine not in ("elevenlabs", "elevenlabs2.5", "elevenlabs2.5_limkony"):
             return None
 
         try:
