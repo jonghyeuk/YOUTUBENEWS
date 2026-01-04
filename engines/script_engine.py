@@ -320,20 +320,24 @@ JSON 형식으로 응답:
         self,
         script: Script,
         style: str = "정보",
-        duration_min: int = 10
+        duration_min: int = 10,
+        language: str = "ko"
     ) -> dict:
         """
-        AI 기반 유튜브 제목 및 썸네일 문구 생성
+        AI 기반 유튜브 제목 및 썸네일 문구 생성 (다국어 지원)
 
         Args:
             script: 대본 객체
             style: 콘텐츠 스타일 (불교종교, 뉴스, 정보 등)
             duration_min: 영상 길이 (분)
+            language: 출력 언어 (ko, ja, en)
 
         Returns:
             {
                 "title": "유튜브 제목",
-                "thumbnail_text": "썸네일 문구 (1~2줄)",
+                "thumbnail_top_text": "썸네일 상단 텍스트",
+                "thumbnail_main_text": "썸네일 메인 텍스트",
+                "thumbnail_text": "썸네일 문구 (레거시 호환)",
                 "title_alternatives": ["대안 제목1", "대안 제목2"],
                 "thumbnail_alternatives": ["대안 썸네일1", "대안 썸네일2"]
             }
@@ -342,6 +346,21 @@ JSON 형식으로 응답:
         script_summary = f"제목: {script.title}\n\n"
         for scene in script.scenes:
             script_summary += f"[{scene.title}]\n{scene.text[:200]}...\n\n"
+
+        # 언어별 설정
+        lang_config = LANGUAGE_CONFIG.get(language, LANGUAGE_CONFIG["ko"])
+        lang_name = lang_config.get("name", "한국어")
+
+        # 스타일별 태그 매핑
+        style_tags = {
+            "스토리텔링:한국불교": "옛날이야기/민담/설화/야화",
+            "스토리텔링:중국불교": "옛날이야기/민담/설화/야화",
+            "스토리텔링:인도불교": "옛날이야기/민담/설화/야화",
+            "불교명상": "명상/힐링/수면/잠",
+            "정보": "정보/꿀팁/알아두면좋은",
+            "뉴스": "뉴스/이슈/핫토픽",
+        }
+        category_tags = style_tags.get(style, "")
 
         prompt = f"""당신은 유튜브 SEO 전문가이자 썸네일 카피라이터입니다.
 아래 대본을 분석하여 유튜브 제목과 썸네일 문구를 생성해주세요.
@@ -352,39 +371,48 @@ JSON 형식으로 응답:
 ## 콘텐츠 정보
 - 스타일: {style}
 - 영상 길이: {duration_min}분
+- **출력 언어: {lang_name}** (모든 텍스트를 이 언어로 작성)
 
 ## 유튜브 제목 작성 규칙
 1. **후킹(Hooking)이 핵심** - 첫 5글자 내에 호기심/감정 유발
-2. **길이**: 40~60자 (너무 길면 잘림)
-3. **클릭 유도 패턴 활용**:
-   - 경고형: "이것만은 하지 마세요", "절대 ~하면 안됩니다"
-   - 상황저격: "오늘도 생각이 많은 분들께", "잠이 안 오는 밤"
-   - 반전형: "놓아야 해결됩니다", "포기하니까 됐습니다"
-   - 숫자형: "딱 3가지만", "5분만 투자하세요"
-   - 질문형: "왜 항상 불안한가요?", "나만 이런가요?"
-4. **금지어**: 치료, 완치, 100%, 기적, 무조건, 확실한
-5. **대본 핵심 메시지**를 반드시 반영
+2. **형식**: "메인 제목 [{category_tags}]" (대괄호 태그 필수)
+3. **예시** (한국어):
+   - "어머니를 버린 아들과 아들을 살린 어머니 [옛날이야기/민담/설화/야화]"
+   - "잔인한 운명을 뒤엎은 마지막 한 수 [옛날이야기/민담/설화/야화]"
+   - "고요한 새벽 내 방에 든 낯선 여인 [옛날이야기/민담/설화/야화]"
+4. **클릭 유도 패턴**:
+   - 반전형: 의외의 결말 암시
+   - 감정형: 호기심/궁금증 유발
+   - 긴장형: 무슨 일이 벌어질까?
+5. **금지어**: 치료, 완치, 100%, 기적, 무조건
 
-## 썸네일 문구 작성 규칙
-1. **초단문**: 6~12자 (1줄) 또는 10~18자 (2줄)
-2. **임팩트 최우선**: 한눈에 들어오는 강렬한 메시지
-3. **감정/행동 유발 단어**: 지금, 당장, 꼭, 반드시, 절대, 오늘
-4. **2줄 패턴 예시**:
-   - "오늘 밤\\n꼭 들으세요"
-   - "이런 사람\\n피하세요"
-   - "잠들기 전\\n{duration_min}분"
-5. **대본의 핵심 키워드** 포함
+## 썸네일 문구 작성 규칙 (가장 중요!)
+유튜브 썸네일에 적을 텍스트입니다. 눈길을 확 끌어야 합니다.
+제목과는 별도로 **궁금증을 유발**해야 합니다.
+
+### 상단 텍스트 (thumbnail_top_text)
+- 3~8자 정도의 짧은 문구
+- 관심을 끄는 도입부
+- 예: "그날 밤", "결국", "진짜 이유", "아무도 모르는"
+
+### 메인 텍스트 (thumbnail_main_text)
+- 8~20자 정도
+- 핵심 내용 + 궁금증 유발
+- 줄바꿈 가능 (\\n 사용)
+- 예: "아들이 어머니를\\n버린 진짜 이유", "운명을 바꾼\\n마지막 선택"
 
 ## 출력 형식 (JSON)
 ```json
 {{
-  "title": "메인 유튜브 제목",
-  "thumbnail_text": "썸네일 문구 (줄바꿈은 \\n으로)",
+  "title": "유튜브 제목 [{category_tags}]",
+  "thumbnail_top_text": "상단 텍스트",
+  "thumbnail_main_text": "메인 텍스트 (줄바꿈은 \\n으로)",
   "title_alternatives": ["대안 제목1", "대안 제목2"],
   "thumbnail_alternatives": ["대안 썸네일1", "대안 썸네일2"]
 }}
 ```
 
+**중요**: 모든 텍스트는 반드시 **{lang_name}**로 작성하세요!
 대본의 핵심 메시지와 감정을 정확히 담아 유튜브에서 클릭을 유도하는 제목과 썸네일을 만들어주세요."""
 
         response = self.client.messages.create(
@@ -397,18 +425,30 @@ JSON 형식으로 응답:
 
         try:
             result = self._parse_response(content)
+            # 레거시 호환: thumbnail_text 생성
+            top = result.get("thumbnail_top_text", "")
+            main = result.get("thumbnail_main_text", "")
+            if top and main:
+                result["thumbnail_text"] = f"{top}\\n{main}"
+            elif main:
+                result["thumbnail_text"] = main
+            else:
+                result["thumbnail_text"] = result.get("thumbnail_text", f"오늘 밤\\n{duration_min}분")
         except json.JSONDecodeError:
             # 파싱 실패 시 기본값 반환
             result = {
-                "title": f"{script.title} ({duration_min}분)",
-                "thumbnail_text": f"오늘 밤\\n{duration_min}분",
+                "title": f"{script.title}",
+                "thumbnail_top_text": "오늘 밤",
+                "thumbnail_main_text": f"꼭 들으세요",
+                "thumbnail_text": f"오늘 밤\\n꼭 들으세요",
                 "title_alternatives": [],
                 "thumbnail_alternatives": []
             }
 
-        print(f"[ScriptEngine] 유튜브 메타데이터 생성 완료")
+        print(f"[ScriptEngine] 유튜브 메타데이터 생성 완료 ({lang_name})")
         print(f"  - 제목: {result.get('title', '')[:50]}...")
-        print(f"  - 썸네일: {result.get('thumbnail_text', '')}")
+        print(f"  - 상단: {result.get('thumbnail_top_text', '')}")
+        print(f"  - 메인: {result.get('thumbnail_main_text', '')}")
 
         return result
 
