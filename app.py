@@ -851,17 +851,36 @@ def get_thumbnail_gallery_images():
 
 
 def generate_thumbnail_texts():
-    """AI 생성 썸네일 텍스트 가져오기 (이미 생성된 경우)"""
+    """AI 생성 썸네일 텍스트 가져오기 (상단/메인 분리)"""
     if not pipeline.project or not pipeline.project.script:
         return "❌ 프로젝트/스크립트 없음", "", "", ""
 
     # AI 생성 메타데이터가 있으면 사용
     youtube_metadata = getattr(pipeline.project, 'youtube_metadata', None)
-    if youtube_metadata and youtube_metadata.get("thumbnail_text"):
-        main_text = youtube_metadata["thumbnail_text"].replace("\\n", "\n")
-        return "✅ AI 생성 썸네일 텍스트 적용!", "", main_text, ""
+    if youtube_metadata:
+        # 새 필드 우선 사용 (thumbnail_top_text, thumbnail_main_text)
+        top_text = youtube_metadata.get("thumbnail_top_text", "")
+        main_text = youtube_metadata.get("thumbnail_main_text", "")
 
-    # 없으면 기존 방식으로 생성
+        # 새 필드가 없으면 레거시 필드 사용
+        if not top_text and not main_text:
+            legacy_text = youtube_metadata.get("thumbnail_text", "")
+            if legacy_text:
+                parts = legacy_text.replace("\\n", "\n").split("\n", 1)
+                if len(parts) >= 2:
+                    top_text = parts[0]
+                    main_text = parts[1]
+                else:
+                    main_text = parts[0]
+
+        # 줄바꿈 처리
+        top_text = top_text.replace("\\n", "\n")
+        main_text = main_text.replace("\\n", "\n")
+
+        if top_text or main_text:
+            return "✅ AI 생성 썸네일 텍스트 적용!", top_text, main_text, ""
+
+    # AI 메타데이터 없으면 기존 방식으로 생성
     script = pipeline.project.script
     title = script.title or ""
     style = getattr(pipeline.project, 'style', '정보')
@@ -878,10 +897,10 @@ def generate_thumbnail_texts():
         sub_text = "긴급 속보"
         main_text = title[:25] if len(title) > 25 else title
         bottom_text = "지금 바로 확인하세요"
-    elif style == "스토리텔링":
-        sub_text = "충격 실화"
+    elif "스토리텔링" in style:
+        sub_text = "그날 밤"
         main_text = title[:25] if len(title) > 25 else title
-        bottom_text = "이게 진짜라고?"
+        bottom_text = ""
     else:  # 정보
         sub_text = "꼭 알아야 할"
         main_text = title[:25] if len(title) > 25 else title
