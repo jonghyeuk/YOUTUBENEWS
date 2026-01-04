@@ -248,6 +248,29 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         sentences = re.split(r'(?<=[.!?。！？])\s*', text)
         return [s for s in sentences if s.strip()]
 
+    def _escape_ass_special_chars(self, text: str) -> str:
+        """ASS 특수문자 이스케이프 - 자막 깨짐 방지"""
+        # 순서 중요: 백슬래시 먼저 처리
+        text = text.replace("\\", "\\\\")  # 백슬래시
+        text = text.replace("{", "\\{")    # 중괄호 시작 (ASS 태그와 충돌)
+        text = text.replace("}", "\\}")    # 중괄호 끝
+        return text
+
+    def _calculate_dynamic_fade(self, duration: float, text_len: int) -> tuple:
+        """자막 길이/시간에 따른 동적 페이드 계산 (밀리초 반환)"""
+        # 매우 짧은 자막 (1.5초 미만)
+        if duration < 1.5:
+            return (150, 150)
+        # 짧은 자막 (1.5~2.5초)
+        elif duration < 2.5:
+            return (200, 200)
+        # 중간 자막 (2.5~4초)
+        elif duration < 4.0:
+            return (300, 300)
+        # 긴 자막 (4초 이상)
+        else:
+            return (400, 350)
+
     def _wrap_text_for_subtitle(self, text: str, max_chars: int = 20) -> str:
         """긴 텍스트를 자막용으로 줄바꿈 - 다국어 지원 (\\N 사용)"""
         if len(text) <= max_chars:
@@ -286,15 +309,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         return "\\N".join(lines)
 
     def _format_ass_dialogue(self, start: float, end: float, text: str) -> str:
-        """ASS 다이얼로그 라인 생성 (페이드 효과 + 자동 줄바꿈 포함)"""
+        """ASS 다이얼로그 라인 생성 (특수문자 escape + 동적 페이드 + 자동 줄바꿈)"""
         start_str = self._format_ass_timestamp(start)
         end_str = self._format_ass_timestamp(end)
 
-        # 긴 텍스트 줄바꿈 처리
-        wrapped_text = self._wrap_text_for_subtitle(text, max_chars=20)
+        # 1. 특수문자 이스케이프 (ASS 태그 충돌 방지)
+        escaped_text = self._escape_ass_special_chars(text)
 
-        # 페이드 효과: \fad(페이드인ms, 페이드아웃ms)
-        fade_tag = f"{{\\fad({self.fade_in},{self.fade_out})}}"
+        # 2. 긴 텍스트 줄바꿈 처리 (최대 2줄, 20자/줄)
+        wrapped_text = self._wrap_text_for_subtitle(escaped_text, max_chars=20)
+
+        # 3. 동적 페이드 효과 (자막 길이에 따라 조절)
+        duration = end - start
+        fade_in, fade_out = self._calculate_dynamic_fade(duration, len(text))
+        fade_tag = f"{{\\fad({fade_in},{fade_out})}}"
 
         return f"Dialogue: 0,{start_str},{end_str},Default,,0,0,0,,{fade_tag}{wrapped_text}\n"
 
