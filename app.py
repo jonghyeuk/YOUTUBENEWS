@@ -1298,15 +1298,16 @@ def prepare_youtube_upload(language: str = "ko"):
         scene_summaries=scene_summaries
     )
 
-    # 태그 - 언어별 config에서 가져오기
-    tags = tags_dict.get(style, "")
-
-    # 추가 태그 (제목 키워드 추출) - 한국어만
-    if language == "ko" and script and script.title:
-        extra_keywords = script.title.replace(",", " ").split()[:3]
-        for kw in extra_keywords:
-            if len(kw) > 1 and kw not in tags:
-                tags += f", {kw}"
+    # 태그 - AI 생성 태그 우선 사용
+    if youtube_metadata and youtube_metadata.get("tags"):
+        ai_tags = youtube_metadata["tags"]
+        if isinstance(ai_tags, list):
+            tags = ", ".join(ai_tags)
+        else:
+            tags = ai_tags
+    else:
+        # 폴백: 언어별 기본 태그
+        tags = tags_dict.get(style, "")
 
     # 파일 경로
     video_path = getattr(project, 'final_video_path', None) or getattr(project, 'video_path', None)
