@@ -271,42 +271,49 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         else:
             return (400, 350)
 
-    def _wrap_text_for_subtitle(self, text: str, max_chars: int = 20) -> str:
-        """긴 텍스트를 자막용으로 줄바꿈 - 다국어 지원 (\\N 사용)"""
+    def _wrap_text_for_subtitle(self, text: str, max_chars: int = 22) -> str:
+        """긴 텍스트를 자막용으로 줄바꿈 - 띄어쓰기/쉼표 기준 (\\N 사용)"""
         if len(text) <= max_chars:
             return text
 
-        # 공백이 있는 언어(영어)와 없는 언어(한국어/일본어) 모두 지원
-        has_spaces = ' ' in text and len(text.split()) > 1
+        # 2줄로 제한, 자연스러운 위치에서 분할
+        # 우선순위: 쉼표 > 띄어쓰기 > 중간점
+        mid = len(text) // 2
 
-        if has_spaces:
-            # 영어: 단어 단위 분할
-            words = text.split()
-            lines = []
-            current_line = ""
+        # 1. 중간 근처에서 쉼표 찾기 (±10자 범위)
+        best_split = None
+        for offset in range(0, 12):
+            # 중간 이후 쉼표
+            pos = text.find(', ', mid + offset)
+            if pos != -1 and pos < len(text) - 5:
+                best_split = pos + 1  # 쉼표 뒤에서 자름
+                break
+            # 중간 이전 쉼표
+            pos = text.rfind(', ', 0, mid - offset + 1)
+            if pos != -1 and pos > 5:
+                best_split = pos + 1
+                break
 
-            for word in words:
-                if len(current_line) + len(word) + 1 > max_chars:
-                    if current_line:
-                        lines.append(current_line.strip())
-                    current_line = word
-                else:
-                    current_line += " " + word if current_line else word
+        # 2. 쉼표 없으면 띄어쓰기 찾기
+        if best_split is None:
+            for offset in range(0, 12):
+                pos = text.find(' ', mid + offset)
+                if pos != -1 and pos < len(text) - 3:
+                    best_split = pos
+                    break
+                pos = text.rfind(' ', 0, mid - offset + 1)
+                if pos != -1 and pos > 3:
+                    best_split = pos
+                    break
 
-            if current_line:
-                lines.append(current_line.strip())
-        else:
-            # 한국어/일본어: 글자 단위 분할
-            lines = []
-            for i in range(0, len(text), max_chars):
-                lines.append(text[i:i + max_chars])
+        # 3. 그래도 없으면 중간에서 자름 (최후의 수단)
+        if best_split is None:
+            best_split = mid
 
-        # 2줄로 제한 (화면 가독성)
-        if len(lines) > 2:
-            mid = len(text) // 2
-            lines = [text[:mid], text[mid:]]
+        line1 = text[:best_split].strip()
+        line2 = text[best_split:].strip()
 
-        return "\\N".join(lines)
+        return f"{line1}\\N{line2}"
 
     def _format_ass_dialogue(self, start: float, end: float, text: str) -> str:
         """ASS 다이얼로그 라인 생성 (특수문자 escape + 동적 페이드 + 자동 줄바꿈)"""

@@ -324,7 +324,7 @@ JSON 형식으로 응답:
         language: str = "ko"
     ) -> dict:
         """
-        AI 기반 유튜브 제목 및 썸네일 문구 생성 (다국어 지원)
+        AI 기반 유튜브 제목, 썸네일 문구, 태그 생성 (다국어 지원)
 
         Args:
             script: 대본 객체
@@ -338,6 +338,7 @@ JSON 형식으로 응답:
                 "thumbnail_top_text": "썸네일 상단 텍스트",
                 "thumbnail_main_text": "썸네일 메인 텍스트",
                 "thumbnail_text": "썸네일 문구 (레거시 호환)",
+                "tags": ["태그1", "태그2", ...],
                 "title_alternatives": ["대안 제목1", "대안 제목2"],
                 "thumbnail_alternatives": ["대안 썸네일1", "대안 썸네일2"]
             }
@@ -363,7 +364,7 @@ JSON 형식으로 응답:
         category_tags = style_tags.get(style, "")
 
         prompt = f"""당신은 유튜브 SEO 전문가이자 썸네일 카피라이터입니다.
-아래 대본을 분석하여 유튜브 제목과 썸네일 문구를 생성해주세요.
+아래 대본을 분석하여 유튜브 제목, 썸네일 문구, 태그를 생성해주세요.
 
 ## 대본 내용
 {script_summary}
@@ -373,47 +374,55 @@ JSON 형식으로 응답:
 - 영상 길이: {duration_min}분
 - **출력 언어: {lang_name}** (모든 텍스트를 이 언어로 작성)
 
-## 유튜브 제목 작성 규칙
+## 1. 유튜브 제목 작성 규칙
 1. **후킹(Hooking)이 핵심** - 첫 5글자 내에 호기심/감정 유발
 2. **형식**: "메인 제목 [{category_tags}]" (대괄호 태그 필수)
 3. **예시** (한국어):
    - "어머니를 버린 아들과 아들을 살린 어머니 [옛날이야기/민담/설화/야화]"
    - "잔인한 운명을 뒤엎은 마지막 한 수 [옛날이야기/민담/설화/야화]"
    - "고요한 새벽 내 방에 든 낯선 여인 [옛날이야기/민담/설화/야화]"
-4. **클릭 유도 패턴**:
-   - 반전형: 의외의 결말 암시
-   - 감정형: 호기심/궁금증 유발
-   - 긴장형: 무슨 일이 벌어질까?
+4. **클릭 유도 패턴**: 반전형, 감정형, 긴장형
 5. **금지어**: 치료, 완치, 100%, 기적, 무조건
 
-## 썸네일 문구 작성 규칙 (가장 중요!)
-유튜브 썸네일에 적을 텍스트입니다. 눈길을 확 끌어야 합니다.
-제목과는 별도로 **궁금증을 유발**해야 합니다.
+## 2. 썸네일 문구 작성 규칙 (가장 중요!)
+유튜브 썸네일에 큰 글씨로 적을 텍스트입니다. **강렬하고 충격적**이어야 합니다!
 
 ### 상단 텍스트 (thumbnail_top_text)
-- 3~8자 정도의 짧은 문구
-- 관심을 끄는 도입부
-- 예: "그날 밤", "결국", "진짜 이유", "아무도 모르는"
+- 2~6자의 **임팩트 있는** 짧은 문구
+- 감정/상황을 압축
+- 예: "충격", "결국", "그날 밤", "진실", "눈물", "반전"
 
-### 메인 텍스트 (thumbnail_main_text)
-- 8~20자 정도
-- 핵심 내용 + 궁금증 유발
-- 줄바꿈 가능 (\\n 사용)
-- 예: "아들이 어머니를\\n버린 진짜 이유", "운명을 바꾼\\n마지막 선택"
+### 메인 텍스트 (thumbnail_main_text) ⭐ 핵심!
+- 10~18자 정도
+- **호기심 폭발** + **클릭 유도**
+- 줄바꿈 1회 권장 (\\n 사용)
+- 질문형/반전형/충격형 사용
+- 예시:
+  - "아들이 어머니를\\n버린 진짜 이유"
+  - "그녀가 숨긴\\n충격적 비밀"
+  - "모두가 울었던\\n마지막 한마디"
+  - "죽기 직전\\n깨달은 것"
+
+## 3. 유튜브 태그 작성 규칙 (SEO 최적화)
+- **정확히 7개** 태그 생성
+- 검색 노출을 위한 키워드
+- 콘텐츠 주제와 관련된 인기 검색어
+- 예시: "옛날이야기", "민담", "전래동화", "잠잘때듣는", "불교설화", "감동실화", "인생교훈"
 
 ## 출력 형식 (JSON)
 ```json
 {{
   "title": "유튜브 제목 [{category_tags}]",
-  "thumbnail_top_text": "상단 텍스트",
-  "thumbnail_main_text": "메인 텍스트 (줄바꿈은 \\n으로)",
+  "thumbnail_top_text": "상단 텍스트 (2~6자)",
+  "thumbnail_main_text": "메인 텍스트\\n(줄바꿈 포함)",
+  "tags": ["태그1", "태그2", "태그3", "태그4", "태그5", "태그6", "태그7"],
   "title_alternatives": ["대안 제목1", "대안 제목2"],
   "thumbnail_alternatives": ["대안 썸네일1", "대안 썸네일2"]
 }}
 ```
 
 **중요**: 모든 텍스트는 반드시 **{lang_name}**로 작성하세요!
-대본의 핵심 메시지와 감정을 정확히 담아 유튜브에서 클릭을 유도하는 제목과 썸네일을 만들어주세요."""
+썸네일은 스크롤하다 멈추게 만들 정도로 **강렬해야** 합니다!"""
 
         response = self.client.messages.create(
             model=self.model,
@@ -434,21 +443,27 @@ JSON 형식으로 응답:
                 result["thumbnail_text"] = main
             else:
                 result["thumbnail_text"] = result.get("thumbnail_text", f"오늘 밤\\n{duration_min}분")
+
+            # 태그 기본값 보장
+            if "tags" not in result or not result["tags"]:
+                result["tags"] = ["옛날이야기", "민담", "설화", "잠잘때듣는", "감동실화"]
+
         except json.JSONDecodeError:
             # 파싱 실패 시 기본값 반환
             result = {
                 "title": f"{script.title}",
-                "thumbnail_top_text": "오늘 밤",
-                "thumbnail_main_text": f"꼭 들으세요",
-                "thumbnail_text": f"오늘 밤\\n꼭 들으세요",
+                "thumbnail_top_text": "충격",
+                "thumbnail_main_text": f"아무도 몰랐던\\n진실",
+                "thumbnail_text": f"충격\\n아무도 몰랐던 진실",
+                "tags": ["옛날이야기", "민담", "설화", "잠잘때듣는", "감동실화"],
                 "title_alternatives": [],
                 "thumbnail_alternatives": []
             }
 
         print(f"[ScriptEngine] 유튜브 메타데이터 생성 완료 ({lang_name})")
         print(f"  - 제목: {result.get('title', '')[:50]}...")
-        print(f"  - 상단: {result.get('thumbnail_top_text', '')}")
-        print(f"  - 메인: {result.get('thumbnail_main_text', '')}")
+        print(f"  - 썸네일: {result.get('thumbnail_top_text', '')} / {result.get('thumbnail_main_text', '')}")
+        print(f"  - 태그: {', '.join(result.get('tags', []))}")
 
         return result
 
