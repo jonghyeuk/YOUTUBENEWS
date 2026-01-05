@@ -1287,8 +1287,18 @@ def prepare_youtube_upload(language: str = "ko"):
         tags_dict = YOUTUBE_DEFAULT_TAGS
         lang_name = "🇰🇷 한국어"
 
+    # 스타일 → 템플릿 키 매핑 (스토리텔링 스타일도 불교종교로 매핑)
+    style_to_template_key = {
+        "스토리텔링:한국불교": "불교종교",
+        "스토리텔링:중국불교": "불교종교",
+        "스토리텔링:인도불교": "불교종교",
+        "불교명상": "불교종교",
+        "불교종교": "불교종교",
+    }
+    template_key = style_to_template_key.get(style, style)
+
     # 설명 생성 - 언어별 템플릿 사용
-    desc_template = desc_templates.get(style, desc_templates.get("default", ""))
+    desc_template = desc_templates.get(template_key, desc_templates.get("default", ""))
     description = desc_template.format(
         title=title,
         scene_summaries=scene_summaries
