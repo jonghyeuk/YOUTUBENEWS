@@ -81,8 +81,8 @@ INTEGRATED_OUTPUT_FORMAT = """
 - 영어로 작성
 - 400자 이내
 - 구체적인 시각적 묘사 (조명, 색감, 구도)
-- 씬당 1~4개 (중요도에 따라)
-- 전체 이미지 총합: {duration}분 영상 기준 약 {total_images}장"""
+- **씬당 정확히 1개** (중요!)
+- 전체 이미지: 씬 개수와 동일하게 {num_scenes}장"""
 
 # 스타일별 이미지 스타일 가이드
 STYLE_IMAGE_GUIDES = {
@@ -242,9 +242,6 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         project = pipeline.create_project(topic, duration)
         project.style = style  # 스타일 저장
 
-        # 분량에 따른 이미지 수 계산
-        total_images = duration * 2  # 분당 약 2장
-
         # 분량에 따른 글자 수 계산 (TTS 속도 0.9 기준, 분당 약 180자)
         from config import DURATION_SPECS
         spec = DURATION_SPECS.get(duration, DURATION_SPECS[10])
@@ -259,7 +256,6 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         prompt = base_prompt.format(topic=topic, duration=duration)
         prompt += INTEGRATED_OUTPUT_FORMAT.format(
             duration=duration,
-            total_images=total_images,
             total_chars=total_chars,
             num_scenes=num_scenes,
             chars_per_scene=chars_per_scene
