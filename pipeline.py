@@ -342,10 +342,33 @@ class Pipeline:
 
         clips_dir = self._get_path("clips")
 
-        # 씬 이미지 매핑 (각 씬당 1개 이미지)
+        # 씬 이미지 매핑 (기존 이미지 재사용 지원)
         scene_images = {}
-        for scene in self.project.script.scenes:
-            scene_images[scene.scene_id] = scene.image_paths
+        scenes = self.project.script.scenes
+
+        # 방법 1: scene.image_paths 사용 (정상 케이스)
+        has_scene_images = any(getattr(s, 'image_paths', []) for s in scenes)
+
+        if has_scene_images:
+            for scene in scenes:
+                scene_images[scene.scene_id] = getattr(scene, 'image_paths', [])
+        else:
+            # 방법 2: project.cut_paths에서 씬별로 분배 (다국어 TTS 재생성 시)
+            # 이미지가 씬 개수와 같으면 1:1 매핑, 아니면 균등 분배
+            cut_paths = self.project.cut_paths or []
+            if cut_paths:
+                self._log(f"이미지 재사용 모드: {len(cut_paths)}장 → {len(scenes)}개 씬")
+                if len(cut_paths) == len(scenes):
+                    # 1:1 매핑 (씬당 1개 이미지)
+                    for i, scene in enumerate(scenes):
+                        scene_images[scene.scene_id] = [cut_paths[i]]
+                else:
+                    # 균등 분배
+                    images_per_scene = max(1, len(cut_paths) // len(scenes))
+                    idx = 0
+                    for scene in scenes:
+                        scene_images[scene.scene_id] = cut_paths[idx:idx + images_per_scene]
+                        idx += images_per_scene
 
         # 씬별 클립 생성 (줌 효과 옵션)
         clip_paths = self.video_engine.render_scene_clips(
