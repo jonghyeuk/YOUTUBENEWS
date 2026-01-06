@@ -228,6 +228,94 @@ SCENE_TEXT_1: [번역된 나레이션]
     return translated_data
 
 
+def _translate_existing_script(language: str):
+    """기존 원본 스크립트를 새 언어로 번역 (새로 생성하지 않음)"""
+    import copy
+
+    if not pipeline.project or not hasattr(pipeline.project, 'original_script_data'):
+        return "❌ 원본 스크립트가 없습니다. 한국어로 먼저 생성하세요.", "", "", "", ""
+
+    original_data = pipeline.project.original_script_data
+
+    # 이미지 프롬프트 추출 (원본에서)
+    all_image_prompts = []
+    for s in original_data["scenes"]:
+        image_prompts = s.get("image_prompts", [])
+        all_image_prompts.extend(image_prompts)
+
+    # 언어 설정
+    lang_info = LANGUAGE_CONFIG.get(language, {})
+    lang_name = lang_info.get("name", language)
+
+    # 번역 수행 (항상 원본에서)
+    print(f"[번역] 원본 한국어 → {lang_name}로 현지화 중...")
+    data = translate_script_to_language(copy.deepcopy(original_data), language)
+
+    # 언어 설정 저장
+    pipeline.project.language = language
+
+    # Script 객체 생성
+    from models.types import Script, Scene
+    scenes = []
+
+    for i, s in enumerate(data["scenes"]):
+        original_prompts = original_data["scenes"][i].get("image_prompts", []) if i < len(original_data["scenes"]) else []
+
+        scenes.append(Scene(
+            scene_id=s["scene_id"],
+            title=s["title"],
+            text=s["text"],
+            image_count=len(original_prompts) if original_prompts else 0,
+            importance=s.get("importance", 3)
+        ))
+
+    duration = pipeline.project.duration if hasattr(pipeline.project, 'duration') else 10
+
+    script = Script(
+        title=data["title"],
+        scenes=scenes,
+        duration_min=duration,
+        total_panels=len(all_image_prompts)
+    )
+    pipeline.project.script = script
+
+    # 스크립트 미리보기
+    preview = f"# {script.title}\n\n"
+    preview += f"**{lang_name} | {len(scenes)}개 씬 | 이미지 {len(all_image_prompts)}장**\n\n"
+
+    for i, scene in enumerate(script.scenes):
+        preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
+        preview += f"🖼️ {scene.image_count}장\n\n"
+        preview += f"{scene.text}\n\n---\n\n"
+
+    # 이미지 프롬프트 포맷팅
+    prompts_text = ""
+    for i, prompt in enumerate(all_image_prompts, 1):
+        prompts_text += f"이미지 {i}: {prompt}\n\n"
+
+    # AI 기반 유튜브 제목/썸네일 생성 (새 언어로)
+    try:
+        yt_metadata = pipeline.generate_youtube_metadata(language=language)
+        yt_title = yt_metadata.get("title", script.title)
+        yt_thumbnail = yt_metadata.get("thumbnail_text", "")
+
+        title_info = f"**AI 추천 제목**: {yt_title}"
+        thumb_info = f"**AI 추천 썸네일**: {yt_thumbnail}"
+    except Exception as e:
+        print(f"[YouTube 메타데이터] 생성 실패: {e}")
+        yt_title = script.title
+        title_info = f"**기본 제목**: {yt_title}"
+        thumb_info = ""
+
+    return (
+        f"✅ {lang_name} 번역 완료! (원본에서 번역)",
+        preview,
+        prompts_text,
+        yt_title,
+        thumb_info
+    )
+
+
 # ═══════════════════════════════════════════════════════════════
 # 통합 스크립트 + 이미지 프롬프트 생성
 # ═══════════════════════════════════════════════════════════════
@@ -238,6 +326,15 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         return "❌ 주제를 입력해주세요", "", ""
 
     try:
+        # 기존 프로젝트가 있고 원본 스크립트가 있으면 번역만 수행
+        if (pipeline.project and
+            hasattr(pipeline.project, 'original_script_data') and
+            pipeline.project.original_script_data and
+            language != "ko"):
+
+            print(f"[스크립트] 기존 원본 발견 - 번역만 수행 ({language})")
+            return _translate_existing_script(language)
+
         # 프로젝트 생성 (스타일 저장)
         project = pipeline.create_project(topic, duration)
         project.style = style  # 스타일 저장
@@ -302,19 +399,25 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
             data = json.loads(json_str)
 
+            # 원본 한국어 스크립트 저장 (다국어 번역용)
+            # 항상 원본에서 번역해야 일본어→영어 같은 문제 방지
+            import copy
+            pipeline.project.original_script_data = copy.deepcopy(data)
+            print(f"[스크립트] 원본 한국어 스크립트 저장 완료")
+
             # 이미지 프롬프트 먼저 추출 (번역 전에)
             all_image_prompts = []
             for s in data["scenes"]:
                 image_prompts = s.get("image_prompts", [])
                 all_image_prompts.extend(image_prompts)
 
-            # 번역 (한국어가 아닌 경우)
+            # 번역 (한국어가 아닌 경우) - 항상 원본에서 번역
             lang_info = LANGUAGE_CONFIG.get(language, {})
             lang_name = lang_info.get("name", "🇰🇷 한국어")
 
             if language != "ko":
-                print(f"[번역] {lang_name}로 현지화 중...")
-                data = translate_script_to_language(data, language)
+                print(f"[번역] 원본 한국어 → {lang_name}로 현지화 중...")
+                data = translate_script_to_language(pipeline.project.original_script_data, language)
 
             # 언어 설정 저장
             pipeline.project.language = language
