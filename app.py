@@ -228,6 +228,94 @@ SCENE_TEXT_1: [번역된 나레이션]
     return translated_data
 
 
+def _translate_existing_script(language: str):
+    """기존 원본 스크립트를 새 언어로 번역 (새로 생성하지 않음)"""
+    import copy
+
+    if not pipeline.project or not hasattr(pipeline.project, 'original_script_data'):
+        return "❌ 원본 스크립트가 없습니다. 한국어로 먼저 생성하세요.", "", "", "", ""
+
+    original_data = pipeline.project.original_script_data
+
+    # 이미지 프롬프트 추출 (원본에서)
+    all_image_prompts = []
+    for s in original_data["scenes"]:
+        image_prompts = s.get("image_prompts", [])
+        all_image_prompts.extend(image_prompts)
+
+    # 언어 설정
+    lang_info = LANGUAGE_CONFIG.get(language, {})
+    lang_name = lang_info.get("name", language)
+
+    # 번역 수행 (항상 원본에서)
+    print(f"[번역] 원본 한국어 → {lang_name}로 현지화 중...")
+    data = translate_script_to_language(copy.deepcopy(original_data), language)
+
+    # 언어 설정 저장
+    pipeline.project.language = language
+
+    # Script 객체 생성
+    from models.types import Script, Scene
+    scenes = []
+
+    for i, s in enumerate(data["scenes"]):
+        original_prompts = original_data["scenes"][i].get("image_prompts", []) if i < len(original_data["scenes"]) else []
+
+        scenes.append(Scene(
+            scene_id=s["scene_id"],
+            title=s["title"],
+            text=s["text"],
+            image_count=len(original_prompts) if original_prompts else 0,
+            importance=s.get("importance", 3)
+        ))
+
+    duration = pipeline.project.duration if hasattr(pipeline.project, 'duration') else 10
+
+    script = Script(
+        title=data["title"],
+        scenes=scenes,
+        duration_min=duration,
+        total_panels=len(all_image_prompts)
+    )
+    pipeline.project.script = script
+
+    # 스크립트 미리보기
+    preview = f"# {script.title}\n\n"
+    preview += f"**{lang_name} | {len(scenes)}개 씬 | 이미지 {len(all_image_prompts)}장**\n\n"
+
+    for i, scene in enumerate(script.scenes):
+        preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
+        preview += f"🖼️ {scene.image_count}장\n\n"
+        preview += f"{scene.text}\n\n---\n\n"
+
+    # 이미지 프롬프트 포맷팅
+    prompts_text = ""
+    for i, prompt in enumerate(all_image_prompts, 1):
+        prompts_text += f"이미지 {i}: {prompt}\n\n"
+
+    # AI 기반 유튜브 제목/썸네일 생성 (새 언어로)
+    try:
+        yt_metadata = pipeline.generate_youtube_metadata(language=language)
+        yt_title = yt_metadata.get("title", script.title)
+        yt_thumbnail = yt_metadata.get("thumbnail_text", "")
+
+        title_info = f"**AI 추천 제목**: {yt_title}"
+        thumb_info = f"**AI 추천 썸네일**: {yt_thumbnail}"
+    except Exception as e:
+        print(f"[YouTube 메타데이터] 생성 실패: {e}")
+        yt_title = script.title
+        title_info = f"**기본 제목**: {yt_title}"
+        thumb_info = ""
+
+    return (
+        f"✅ {lang_name} 번역 완료! (원본에서 번역)",
+        preview,
+        prompts_text,
+        yt_title,
+        thumb_info
+    )
+
+
 # ═══════════════════════════════════════════════════════════════
 # 통합 스크립트 + 이미지 프롬프트 생성
 # ═══════════════════════════════════════════════════════════════
@@ -238,6 +326,15 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         return "❌ 주제를 입력해주세요", "", ""
 
     try:
+        # 기존 프로젝트가 있고 원본 스크립트가 있으면 번역만 수행
+        if (pipeline.project and
+            hasattr(pipeline.project, 'original_script_data') and
+            pipeline.project.original_script_data and
+            language != "ko"):
+
+            print(f"[스크립트] 기존 원본 발견 - 번역만 수행 ({language})")
+            return _translate_existing_script(language)
+
         # 프로젝트 생성 (스타일 저장)
         project = pipeline.create_project(topic, duration)
         project.style = style  # 스타일 저장
@@ -302,19 +399,25 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
             data = json.loads(json_str)
 
+            # 원본 한국어 스크립트 저장 (다국어 번역용)
+            # 항상 원본에서 번역해야 일본어→영어 같은 문제 방지
+            import copy
+            pipeline.project.original_script_data = copy.deepcopy(data)
+            print(f"[스크립트] 원본 한국어 스크립트 저장 완료")
+
             # 이미지 프롬프트 먼저 추출 (번역 전에)
             all_image_prompts = []
             for s in data["scenes"]:
                 image_prompts = s.get("image_prompts", [])
                 all_image_prompts.extend(image_prompts)
 
-            # 번역 (한국어가 아닌 경우)
+            # 번역 (한국어가 아닌 경우) - 항상 원본에서 번역
             lang_info = LANGUAGE_CONFIG.get(language, {})
             lang_name = lang_info.get("name", "🇰🇷 한국어")
 
             if language != "ko":
-                print(f"[번역] {lang_name}로 현지화 중...")
-                data = translate_script_to_language(data, language)
+                print(f"[번역] 원본 한국어 → {lang_name}로 현지화 중...")
+                data = translate_script_to_language(pipeline.project.original_script_data, language)
 
             # 언어 설정 저장
             pipeline.project.language = language
@@ -1288,6 +1391,22 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str, lan
 def prepare_youtube_upload(language: str = "ko"):
     """YouTube 업로드용 정보 생성 - 언어별 템플릿 사용"""
     import random
+    import re
+
+    def contains_korean(text: str) -> bool:
+        """텍스트에 한글이 포함되어 있는지 확인"""
+        if not text:
+            return False
+        return bool(re.search(r'[가-힣]', text))
+
+    def tags_to_hashtags(tags_str: str) -> str:
+        """쉼표 구분 태그를 해시태그 형식으로 변환"""
+        if not tags_str:
+            return ""
+        tags = [t.strip() for t in tags_str.split(",") if t.strip()]
+        # 공백 제거하고 해시태그 형식으로
+        hashtags = ["#" + t.replace(" ", "") for t in tags[:10]]  # 최대 10개
+        return " ".join(hashtags)
 
     if not pipeline.project:
         return "❌ 프로젝트 없음", "", "", "", "", None, None
@@ -1299,31 +1418,7 @@ def prepare_youtube_upload(language: str = "ko"):
     # 영상 길이 계산 (분)
     duration = getattr(project, 'duration', 10)
 
-    # AI 생성 메타데이터 우선 사용
-    youtube_metadata = getattr(project, 'youtube_metadata', None)
-    if youtube_metadata and youtube_metadata.get("title"):
-        title = youtube_metadata["title"]
-    else:
-        # 폴백: 템플릿 기반 제목 생성
-        title_templates = YOUTUBE_TITLE_TEMPLATES.get(style, YOUTUBE_TITLE_TEMPLATES.get("정보", []))
-        if title_templates:
-            title_template = random.choice(title_templates)
-            title = title_template.format(duration=duration)
-        else:
-            title = script.title if script else project.title
-
-    # 금지어 체크 및 제거
-    for forbidden in YOUTUBE_FORBIDDEN_WORDS:
-        if forbidden in title:
-            title = title.replace(forbidden, "")
-
-    # 씬 요약 생성
-    scene_summaries = ""
-    if script:
-        for i, scene in enumerate(script.scenes[:5], 1):
-            scene_summaries += f"📌 {scene.title}\n"
-
-    # 언어별 설명 템플릿 선택
+    # 언어별 설정 먼저 로드
     if language == "ja":
         desc_templates = YOUTUBE_DESCRIPTION_TEMPLATE_JA
         tags_dict = YOUTUBE_DEFAULT_TAGS_JA
@@ -1337,6 +1432,54 @@ def prepare_youtube_upload(language: str = "ko"):
         tags_dict = YOUTUBE_DEFAULT_TAGS
         lang_name = "🇰🇷 한국어"
 
+    # AI 생성 메타데이터 확인
+    youtube_metadata = getattr(project, 'youtube_metadata', None)
+
+    # 제목 결정 - 언어에 맞는지 확인
+    title = None
+    if youtube_metadata and youtube_metadata.get("title"):
+        ai_title = youtube_metadata["title"]
+        # 한국어가 아닌 언어인데 한국어가 포함되면 사용 안 함
+        if language != "ko" and contains_korean(ai_title):
+            print(f"[YouTube] AI 제목에 한국어 포함 - 기본 제목 사용 (언어: {language})")
+            title = None
+        else:
+            title = ai_title
+
+    if not title:
+        # 폴백: 대본 제목 사용 (번역된 대본이면 해당 언어)
+        if script and script.title:
+            if language != "ko" and contains_korean(script.title):
+                # 한국어 제목이면 기본 템플릿 사용
+                title_templates = YOUTUBE_TITLE_TEMPLATES.get(style, YOUTUBE_TITLE_TEMPLATES.get("정보", []))
+                if title_templates:
+                    title = random.choice(title_templates).format(duration=duration)
+                else:
+                    title = f"Buddhist Story {duration}min" if language == "en" else f"仏教物語 {duration}分"
+            else:
+                title = script.title
+        else:
+            title = f"Buddhist Story {duration}min" if language == "en" else (f"仏教物語 {duration}分" if language == "ja" else f"불교 이야기 {duration}분")
+
+    # 금지어 체크 및 제거
+    for forbidden in YOUTUBE_FORBIDDEN_WORDS:
+        if forbidden in title:
+            title = title.replace(forbidden, "")
+
+    # 씬 요약 생성 - 언어 확인
+    scene_summaries = ""
+    if script:
+        for i, scene in enumerate(script.scenes[:5], 1):
+            scene_title = scene.title
+            # 한국어가 아닌 언어인데 씬 제목에 한글이 있으면 번호만 표시
+            if language != "ko" and contains_korean(scene_title):
+                if language == "ja":
+                    scene_summaries += f"📌 パート{i}\n"
+                else:
+                    scene_summaries += f"📌 Part {i}\n"
+            else:
+                scene_summaries += f"📌 {scene_title}\n"
+
     # 설명 생성 - 언어별 템플릿 사용
     desc_template = desc_templates.get(style, desc_templates.get("default", ""))
     description = desc_template.format(
@@ -1344,16 +1487,30 @@ def prepare_youtube_upload(language: str = "ko"):
         scene_summaries=scene_summaries
     )
 
-    # 태그 - AI 생성 태그 우선 사용
+    # 태그 결정 - 언어에 맞는지 확인
+    tags = None
     if youtube_metadata and youtube_metadata.get("tags"):
         ai_tags = youtube_metadata["tags"]
         if isinstance(ai_tags, list):
-            tags = ", ".join(ai_tags)
+            ai_tags_str = ", ".join(ai_tags)
         else:
-            tags = ai_tags
-    else:
+            ai_tags_str = ai_tags
+
+        # 한국어가 아닌 언어인데 한국어 태그가 포함되면 기본 태그 사용
+        if language != "ko" and contains_korean(ai_tags_str):
+            print(f"[YouTube] AI 태그에 한국어 포함 - 기본 태그 사용 (언어: {language})")
+            tags = None
+        else:
+            tags = ai_tags_str
+
+    if not tags:
         # 폴백: 언어별 기본 태그
-        tags = tags_dict.get(style, "")
+        tags = tags_dict.get(style, tags_dict.get("불교종교", ""))
+
+    # 해시태그 형식으로 설명에 추가
+    hashtags = tags_to_hashtags(tags)
+    if hashtags and hashtags not in description:
+        description = description.rstrip() + f"\n\n{hashtags}"
 
     # 파일 경로
     video_path = getattr(project, 'final_video_path', None) or getattr(project, 'video_path', None)
