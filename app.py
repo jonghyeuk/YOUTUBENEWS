@@ -600,6 +600,56 @@ def generate_images_from_text(prompts_text: str, engine: str, model: str, style:
         return f"❌ 오류: {e}", []
 
 
+def apply_existing_images():
+    """현재 프로젝트의 기존 이미지를 그대로 적용 (다국어 버전용)"""
+    if not pipeline.project:
+        return "❌ 프로젝트가 없습니다", []
+
+    try:
+        project_dir = os.path.join("projects", pipeline.project.project_id)
+        images_dir = os.path.join(project_dir, "images")
+
+        if not os.path.exists(images_dir):
+            return "❌ images 폴더가 없습니다. 먼저 이미지를 생성하세요.", []
+
+        # 이미지 파일 찾기 (정렬해서 순서 유지)
+        image_files = sorted([
+            f for f in os.listdir(images_dir)
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))
+        ])
+
+        if not image_files:
+            return "❌ 이미지 파일이 없습니다", []
+
+        # 전체 경로로 변환
+        image_paths = [os.path.join(images_dir, f) for f in image_files]
+
+        # pipeline에 이미지 경로 설정
+        pipeline.project.cut_paths = image_paths
+
+        # 씬별 이미지 할당 (씬 수에 맞게 분배)
+        if pipeline.project.script and pipeline.project.script.scenes:
+            scenes = pipeline.project.script.scenes
+            if len(image_paths) == len(scenes):
+                # 1:1 매핑
+                for i, scene in enumerate(scenes):
+                    scene.image_paths = [image_paths[i]]
+            else:
+                # 균등 분배
+                images_per_scene = max(1, len(image_paths) // len(scenes))
+                for i, scene in enumerate(scenes):
+                    start_idx = i * images_per_scene
+                    scene.image_paths = image_paths[start_idx:start_idx + images_per_scene]
+
+        # 갤러리 표시용 이미지 로드
+        images = [Image.open(p) for p in image_paths]
+
+        return f"✅ 기존 이미지 적용 완료 ({len(images)}장)", images
+
+    except Exception as e:
+        return f"❌ 오류: {e}", []
+
+
 # 엔진별 모델 옵션
 IMAGE_MODEL_OPTIONS = {
     "fal": [
@@ -1486,7 +1536,10 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         lines=8,
                         info="Tab 1에서 생성된 프롬프트가 자동으로 복사됩니다"
                     )
-                    gen_images_btn = gr.Button("🎨 이미지 생성", variant="primary")
+                    with gr.Row():
+                        gen_images_btn = gr.Button("🎨 이미지 생성", variant="primary")
+                        apply_images_btn = gr.Button("📂 현재 그림 적용", variant="secondary")
+                    gr.Markdown("*💡 다국어 버전: '현재 그림 적용' 클릭 → 기존 이미지 재사용*", elem_classes="info-text")
                 with gr.Column():
                     images_gallery = gr.Gallery(label="생성된 이미지", columns=3)
 
@@ -1764,6 +1817,11 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     gen_images_btn.click(
         generate_images_from_text,
         [final_prompts, image_engine, image_model, style_input],
+        [status, images_gallery]
+    )
+    apply_images_btn.click(
+        apply_existing_images,
+        [],
         [status, images_gallery]
     )
 
