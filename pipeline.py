@@ -145,13 +145,15 @@ class Pipeline:
 
         self._log("유튜브 제목/썸네일 생성 중... (AI)")
 
-        style = getattr(self.project, 'style', '정보')
+        style = getattr(self.project, 'style', '뉴스')
         duration = self.project.duration_min
         language = getattr(self.project, 'language', 'ko')
 
-        # 일본텔링은 항상 일본어로 메타데이터 생성
+        # 언어별 전용 스타일은 해당 언어로 메타데이터 생성
         if style == "일본텔링":
             language = "ja"
+        elif style == "영어Saying전용":
+            language = "en"
 
         metadata = self.script_engine.generate_youtube_metadata(
             script=self.project.script,
