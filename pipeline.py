@@ -149,6 +149,10 @@ class Pipeline:
         duration = self.project.duration_min
         language = getattr(self.project, 'language', 'ko')
 
+        # 일본텔링은 항상 일본어로 메타데이터 생성
+        if style == "일본텔링":
+            language = "ja"
+
         metadata = self.script_engine.generate_youtube_metadata(
             script=self.project.script,
             style=style,
