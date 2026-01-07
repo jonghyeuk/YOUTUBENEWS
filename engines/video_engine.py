@@ -447,8 +447,12 @@ class VideoEngine:
             f"Alignment={style.get('alignment', 2)}"
         )
 
-        # Windows 경로 호환: forward slash + 콜론 이스케이프
-        subtitle_path_escaped = subtitle_path.replace("\\", "/").replace(":", "\\:")
+        # Windows 경로 호환: FFmpeg subtitles 필터용 이스케이프
+        # 콤마, 콜론, 대괄호, 세미콜론, 작은따옴표 등 이스케이프 필요
+        subtitle_path_escaped = subtitle_path.replace("\\", "/")
+        # FFmpeg 필터 특수문자 이스케이프 (순서 중요: 백슬래시 먼저)
+        for char in ["'", ",", ";", "[", "]", ":"]:
+            subtitle_path_escaped = subtitle_path_escaped.replace(char, f"\\{char}")
 
         cmd = [
             "ffmpeg", "-y",
