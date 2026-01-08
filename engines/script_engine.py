@@ -365,11 +365,53 @@ JSON 형식으로 응답:
             # 불교 철학/경전: | 출처 형식 (경전 이름은 대본에서 추출)
             "불교종교": {"format": "pipe", "tag": ""},  # 대본에서 경전명 추출
             "불교명상": {"format": "none", "tag": ""},  # 태그 없음
-            # 일반 정보: 태그 없음 또는 간단히
-            "정보": {"format": "none", "tag": ""},
+            # 뉴스
             "뉴스": {"format": "bracket", "tag": "뉴스"},
+            # 일본텔링 (일본어 전용) - 리스트 앵커 포함
+            "일본텔링": {"format": "japanese", "tag": "心の処方箋"},
+            # 영어Saying전용 (English Only) - Christian Devotional
+            "영어Saying전용": {"format": "english", "tag": "Morning Prayer"},
         }
         title_format_info = style_title_format.get(style, {"format": "none", "tag": ""})
+
+        # 언어별 스타일 예시 추가
+        language_specific_examples = ""
+        if style == "일본텔링":
+            language_specific_examples = """
+
+**일본텔링 콘텐츠 (日本語):**
+- "優しすぎる人が壊れる本当の理由【心の処方箋】"
+- "嘘をつく自分が嫌いなあなたへ｜仏教的視点"
+- "人間関係で疲れた時に効く3つの考え方"
+
+### 일본어 제목 규칙
+1. **リスト앵커 권장**: "3つの〜", "5つの〜" 등 숫자 포함
+2. **감정 후킹**: "〜なあなたへ", "〜の本当の理由"
+3. **태그 형식**: "제목【心の処方箋】" 또는 "제목｜仏教的視点"
+
+### 일본어 썸네일 예시
+- 상단: "本音" / 메인: "言えない人ほど\\n傷ついている"
+- 상단: "執着" / 메인: "手放した瞬間\\n楽になれる"
+- 상단: "3つ" / 메인: "心を守る\\n簡単な習慣"
+"""
+        elif style == "영어Saying전용":
+            language_specific_examples = """
+
+**영어Saying전용 콘텐츠 (English):**
+- "The Prayer That Changes Everything | Morning Blessing"
+- "God's Message For You Today [Daily Devotional]"
+- "3 Ways to Find Peace When Life Gets Hard"
+
+### English Title Rules
+1. **Emotional Hook**: "The truth about...", "Why you need...", "What God wants you to know"
+2. **Promise of Value**: "That changes everything", "You need to hear today"
+3. **Tag Format**: "Title | Morning Prayer" or "Title [Daily Devotional]"
+
+### English Thumbnail Examples
+- Top: "PRAY THIS" / Main: "The Morning Prayer\\nThat Changes Everything"
+- Top: "GOD SAYS" / Main: "This Message\\nIs For You Today"
+- Top: "3 KEYS" / Main: "To Finding Peace\\nIn Difficult Times"
+"""
 
         prompt = f"""당신은 유튜브 SEO 전문가이자 썸네일 카피라이터입니다.
 아래 대본을 **정독**하고, 유튜브용 후킹 제목과 썸네일에 넣을 문구를 만들어주세요.
@@ -417,7 +459,7 @@ JSON 형식으로 응답:
 **스토리텔링/야담 콘텐츠:**
 - "어머니를 버린 아들과 아들을 살린 어머니 [불교설화]"
 - "고요한 새벽 내 방에 든 낯선 여인 [야담]"
-
+{language_specific_examples}
 ---
 
 ## 🎨 3단계: 썸네일 문구 작성 (가장 중요!)

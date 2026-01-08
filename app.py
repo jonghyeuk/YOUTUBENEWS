@@ -1,6 +1,6 @@
 """
 Gradio UI - AI 콘텐츠 생성기
-스타일: 뉴스/정보/스토리텔링/불교명상
+스타일: 불교강의/불교명상/스토리텔링(한국/중국/인도)/일본텔링/영어Saying전용
 """
 import os
 from dotenv import load_dotenv
@@ -86,8 +86,8 @@ INTEGRATED_OUTPUT_FORMAT = """
 
 # 스타일별 이미지 스타일 가이드
 STYLE_IMAGE_GUIDES = {
-    "뉴스": "Professional news broadcast style, clean composition, neutral lighting",
-    "정보": "Bright, friendly infographic style, clear visuals, warm colors",
+    "불교강의": "soft ink wash illustration, contemplative atmosphere, warm neutral tones, minimalist composition, meditative mood, wide negative space",
+    "영어Saying전용": "warm spiritual illustration, peaceful sunrise, golden hour lighting, serene landscape, hopeful atmosphere, pastoral scene, soft natural light, gentle colors, no text, no dark themes",
     "스토리텔링": "Dark mysterious atmosphere, dramatic lighting, suspenseful mood, shadows",
     "스토리텔링:한국불교": "classical Korean ink-wash narrative painting, Joseon dynasty landscape painting style, soft mineral colors, traditional hanok and village scenery, wide negative space, storytelling composition, gentle brush texture, hand-painted feeling, no anime, no modern illustration, no bright digital colors, no cartoon style",
     "스토리텔링:중국불교": "buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood, storytelling iconography, no anime, no modern illustration",
@@ -116,8 +116,14 @@ STYLE_TO_STORYMAKER = {
 
 # 스타일별 입력 가이드
 STYLE_GUIDES = {
-    "뉴스": "**💡 뉴스**: 사실 기반 내용을 입력하세요.",
-    "정보": "**💡 정보**: 설명할 주제를 입력하세요. (예: 항산화 물질 5가지)",
+    "불교강의": """**💡 불교강의 (동행형 스토리텔러)**: 경전/해설서/일화 텍스트를 입력하세요!
+
+예시: "일시(一時)… 여시아문(如是我聞)… 나는 들었다" / "왜 경전은 날짜 대신 '그때'로 시작할까?"
+
+🎯 **목표**: 가르치기 ❌ → 함께 읽고 함께 생각하기 ✅
+📝 **구조**: 오프닝 훅 → 장면 → 풀어읽기 → 생활 비유 → 질문 → 여운
+⚠️ **금지**: 훈계/단정/권위 세우기, "정답은", "반드시 ~해야"
+🎨 **톤**: 차분, 따뜻, 약한 위트, 질문으로 여운""",
     "스토리텔링:한국불교": """**💡 한국불교 스토리텔링**: 한국 불교/선종/경전/역사적 일화를 입력하세요.
 
 🎨 **스타일**: 조선 수묵채색 정본화 (Classical Korean Ink-Wash)
@@ -146,11 +152,20 @@ STYLE_GUIDES = {
 🎯 **대상**: 일본 40~70대, 인간관계에 지친 분들
 🎨 **스타일**: 부드러운 수채화, 차분한 분위기
 📝 **구조**: Hook → 共感 → 正体 → 仏教的視点 → 実践 → まとめ
-⚠️ **주의**: 일본어로 직접 생성됨 (번역 아님)"""
+⚠️ **주의**: 일본어로 직접 생성됨 (번역 아님)""",
+    "영어Saying전용": """**💡 영어Saying전용 (English Only)**: Theme/Topic을 입력하세요!
+
+예시: "Trusting God in difficult times" / "Finding peace in chaos"
+
+🎯 **대상**: 글로벌 영어권, 40~70대
+🎨 **스타일**: 따뜻한 영적 일러스트, 황금빛 일출/일몰
+📝 **구조**: Hook → Teaching 1,2,3 → Prayer → CTA & Blessing
+⚠️ **주의**: 영어로 직접 생성됨 (번역 아님)
+🙏 **특징**: "My dear friends" 호칭, Anchor phrase 반복, 성경 레퍼런스"""
 }
 
 def update_style_guide(style: str):
-    return STYLE_GUIDES.get(style, STYLE_GUIDES["정보"])
+    return STYLE_GUIDES.get(style, STYLE_GUIDES["불교강의"])
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -354,7 +369,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         chars_per_scene = total_chars // num_scenes
 
         # 스타일별 프롬프트 구성
-        base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["정보"])
+        base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["불교강의"])
         image_style = STYLE_IMAGE_GUIDES.get(style, "")
 
         prompt = base_prompt.format(topic=topic, duration=duration)
@@ -684,7 +699,7 @@ def parse_image_prompts(prompts_text: str):
     return parsed
 
 
-def generate_images_from_text(prompts_text: str, engine: str, model: str, style: str = "정보"):
+def generate_images_from_text(prompts_text: str, engine: str, model: str, style: str = "불교강의"):
     if not pipeline.project:
         return "❌ 스크립트 먼저 생성하세요", []
     try:
@@ -967,7 +982,7 @@ def generate_thumbnail(
         return "❌ 배경 이미지를 업로드하거나 이미지를 먼저 생성하세요", None
 
     try:
-        style = getattr(pipeline.project, 'style', '정보') if pipeline.project else '정보'
+        style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
 
         # 출력 경로
         if pipeline.project:
@@ -1039,7 +1054,7 @@ def generate_thumbnail_texts():
     # AI 메타데이터 없으면 기존 방식으로 생성
     script = pipeline.project.script
     title = script.title or ""
-    style = getattr(pipeline.project, 'style', '정보')
+    style = getattr(pipeline.project, 'style', '불교강의')
 
     # 스타일별 텍스트 생성
     if style == "불교명상":
@@ -1049,10 +1064,10 @@ def generate_thumbnail_texts():
         else:
             main_text = title
         bottom_text = "마음이 편안해지는 말씀"
-    elif style == "뉴스":
-        sub_text = "긴급 속보"
+    elif style == "불교강의":
+        sub_text = "함께 읽는"
         main_text = title[:25] if len(title) > 25 else title
-        bottom_text = "지금 바로 확인하세요"
+        bottom_text = "마음의 여운"
     elif "스토리텔링" in style:
         sub_text = "그날 밤"
         main_text = title[:25] if len(title) > 25 else title
@@ -1062,10 +1077,15 @@ def generate_thumbnail_texts():
         sub_text = "心の処方箋"
         main_text = title[:20] if len(title) > 20 else title
         bottom_text = ""
-    else:  # 정보
-        sub_text = "꼭 알아야 할"
+    elif style == "영어Saying전용":
+        # 영어 썸네일 텍스트
+        sub_text = "PRAY THIS"
         main_text = title[:25] if len(title) > 25 else title
-        bottom_text = "지금 확인하세요"
+        bottom_text = ""
+    else:  # 기본 스타일
+        sub_text = "함께 읽는"
+        main_text = title[:25] if len(title) > 25 else title
+        bottom_text = "마음의 여운"
 
     return "✅ 텍스트 생성 완료!", sub_text, main_text, bottom_text
 
@@ -1090,7 +1110,7 @@ def preview_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
         return "❌ 메인 텍스트를 입력하세요", None
 
     try:
-        style = getattr(pipeline.project, 'style', '정보') if pipeline.project else '정보'
+        style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
 
         # 미리보기 경로 (임시)
         if pipeline.project:
@@ -1121,7 +1141,7 @@ def confirm_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
         return "❌ 메인 텍스트를 입력하세요", None, None
 
     try:
-        style = getattr(pipeline.project, 'style', '정보') if pipeline.project else '정보'
+        style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
 
         # 최종 경로
         if pipeline.project:
@@ -1158,8 +1178,8 @@ def reset_project():
         "🔄 새 프로젝트 시작! 주제를 입력하세요.",  # status
         "",  # topic_input
         10,  # duration_input
-        "정보",  # style_input
-        STYLE_GUIDES["정보"],  # style_guide
+        "불교강의",  # style_input
+        STYLE_GUIDES["불교강의"],  # style_guide
         "ko",  # script_language (한국어 기본값)
         "*주제를 입력하고 생성 버튼을 누르세요*",  # script_preview
         "",  # image_prompts
@@ -1425,7 +1445,7 @@ def prepare_youtube_upload(language: str = "ko"):
 
     project = pipeline.project
     script = project.script
-    style = getattr(project, 'style', '정보')
+    style = getattr(project, 'style', '불교강의')
 
     # 영상 길이 계산 (분)
     duration = getattr(project, 'duration', 10)
@@ -1463,7 +1483,7 @@ def prepare_youtube_upload(language: str = "ko"):
         if script and script.title:
             if language != "ko" and contains_korean(script.title):
                 # 한국어 제목이면 기본 템플릿 사용
-                title_templates = YOUTUBE_TITLE_TEMPLATES.get(style, YOUTUBE_TITLE_TEMPLATES.get("정보", []))
+                title_templates = YOUTUBE_TITLE_TEMPLATES.get(style, YOUTUBE_TITLE_TEMPLATES.get("불교강의", []))
                 if title_templates:
                     title = random.choice(title_templates).format(duration=duration)
                 else:
@@ -1575,14 +1595,14 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         )
 
                     style_input = gr.Radio(
-                        ["뉴스", "정보",
+                        ["불교강의",
                          "스토리텔링:한국불교", "스토리텔링:중국불교", "스토리텔링:인도불교",
-                         "불교명상", "일본텔링"],
-                        value="정보",
+                         "불교명상", "일본텔링", "영어Saying전용"],
+                        value="불교강의",
                         label="스타일"
                     )
 
-                    style_guide = gr.Markdown(STYLE_GUIDES["정보"])
+                    style_guide = gr.Markdown(STYLE_GUIDES["불교강의"])
 
                     # 언어 선택 (스크립트 번역용)
                     gr.Markdown("### 🌍 출력 언어")
