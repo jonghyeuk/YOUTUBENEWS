@@ -95,32 +95,52 @@ class VideoEngine:
     def _add_key_sentence_overlay(self, video_path: str, text: str):
         """
         영상에 핵심 문장 오버레이 (영어Saying전용)
-        - 화면 중앙에 큰 글씨
+        - 화면 중앙에 큰 글씨 (더 크고 굵게)
         - 흰색 텍스트 + 검정 외곽선 (썸네일 스타일)
-        - 3초간 페이드인 → 유지 → 페이드아웃
+        - 부드러운 fade in/out 효과
+        - 3초 주기로 반복 (나타났다 사라졌다)
         """
         temp_output = video_path.replace(".mp4", "_keysent.mp4")
 
         # FFmpeg drawtext 필터로 텍스트 오버레이
-        # 폰트 설정 (시스템 폰트 사용)
-        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-        if not os.path.exists(font_path):
-            font_path = "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"
+        # 폰트 설정 (ExtraBold/Black 우선)
+        font_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-ExtraBold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Black.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+        ]
+        font_path = next((f for f in font_candidates if os.path.exists(f)), font_candidates[0])
 
         # 텍스트 이스케이프 (FFmpeg용)
         escaped_text = text.replace("'", "'\\''").replace(":", "\\:")
 
-        # drawtext 필터: 중앙 배치, 흰색, 검정 테두리
+        # 반복 fade in/out 효과 (3초 주기)
+        # 0.0-0.5초: fade in (0→1)
+        # 0.5-2.0초: 유지 (1)
+        # 2.0-2.5초: fade out (1→0)
+        # 2.5-3.0초: 사라짐 (0)
+        # mod(t,3)으로 3초마다 반복
+        fade_expr = (
+            "if(lt(mod(t,3),0.5),mod(t,3)*2,"
+            "if(lt(mod(t,3),2.0),1,"
+            "if(lt(mod(t,3),2.5),(2.5-mod(t,3))*2,"
+            "0)))"
+        )
+
+        # drawtext 필터: 중앙 배치, 더 크고 굵게, fade 효과
         drawtext_filter = (
             f"drawtext=text='{escaped_text}'"
             f":fontfile={font_path}"
-            f":fontsize=72"
+            f":fontsize=100"              # 72→100 (더 크게)
             f":fontcolor=white"
-            f":borderw=4"
+            f":borderw=8"                 # 4→8 (더 굵은 외곽선)
             f":bordercolor=black"
+            f":shadowcolor=black@0.5"     # 그림자 추가
+            f":shadowx=3:shadowy=3"
             f":x=(w-text_w)/2"
             f":y=(h-text_h)/2"
-            f":enable='between(t,1,100)'"  # 1초 후부터 표시
+            f":alpha='{fade_expr}'"       # 부드러운 fade in/out 반복
         )
 
         cmd = [
@@ -135,7 +155,7 @@ class VideoEngine:
         if result.returncode == 0:
             # 원본 교체
             os.replace(temp_output, video_path)
-            print(f"[VideoEngine] Key sentence overlay applied")
+            print(f"[VideoEngine] Key sentence overlay applied (fade in/out, 3s cycle)")
         else:
             print(f"[VideoEngine] Key sentence overlay failed: {result.stderr[:200]}")
             # 실패해도 원본 유지 (오류 무시)
