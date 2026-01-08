@@ -35,7 +35,8 @@ class VideoEngine:
         scene_images: Dict[int, List[str]],
         audio_segments: List[AudioSegment],
         output_dir: str,
-        use_ken_burns: bool = True  # 하위 호환용 파라미터명 유지
+        use_ken_burns: bool = True,  # 하위 호환용 파라미터명 유지
+        key_sentences: Optional[Dict[int, str]] = None  # 영어Saying전용: 씬별 핵심 문장
     ) -> List[str]:
         """
         씬별 영상 클립 생성 (부드러운 줌 효과 적용)
@@ -45,6 +46,7 @@ class VideoEngine:
             audio_segments: 씬별 오디오 세그먼트
             output_dir: 출력 디렉토리
             use_ken_burns: 이미지 효과 사용 여부
+            key_sentences: 씬별 핵심 문장 (영어Saying전용) {scene_id: "text"}
 
         Returns:
             씬 클립 경로 리스트
@@ -78,10 +80,85 @@ class VideoEngine:
                     output_path=clip_path
                 )
 
+            # 영어Saying전용: key_sentence 오버레이 적용
+            if key_sentences and scene_id in key_sentences:
+                key_text = key_sentences[scene_id]
+                if key_text:
+                    self._add_key_sentence_overlay(clip_path, key_text)
+                    print(f"[VideoEngine] Scene {scene_id} key_sentence: '{key_text}'")
+
             clip_paths.append(clip_path)
             print(f"[VideoEngine] Scene {scene_id} clip: {clip_path}")
 
         return clip_paths
+
+    def _add_key_sentence_overlay(self, video_path: str, text: str):
+        """
+        영상에 핵심 문장 오버레이 (영어Saying전용)
+        - 화면 중앙에 큰 글씨 (더 크고 굵게)
+        - 흰색 텍스트 + 검정 외곽선 (썸네일 스타일)
+        - 부드러운 fade in/out 효과
+        - 3초 주기로 반복 (나타났다 사라졌다)
+        """
+        temp_output = video_path.replace(".mp4", "_keysent.mp4")
+
+        # FFmpeg drawtext 필터로 텍스트 오버레이
+        # 폰트 설정 (ExtraBold/Black 우선)
+        font_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-ExtraBold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Black.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+        ]
+        font_path = next((f for f in font_candidates if os.path.exists(f)), font_candidates[0])
+
+        # 텍스트 이스케이프 (FFmpeg용)
+        escaped_text = text.replace("'", "'\\''").replace(":", "\\:")
+
+        # 반복 fade in/out 효과 (3초 주기)
+        # 0.0-0.5초: fade in (0→1)
+        # 0.5-2.0초: 유지 (1)
+        # 2.0-2.5초: fade out (1→0)
+        # 2.5-3.0초: 사라짐 (0)
+        # mod(t,3)으로 3초마다 반복
+        fade_expr = (
+            "if(lt(mod(t,3),0.5),mod(t,3)*2,"
+            "if(lt(mod(t,3),2.0),1,"
+            "if(lt(mod(t,3),2.5),(2.5-mod(t,3))*2,"
+            "0)))"
+        )
+
+        # drawtext 필터: 중앙 배치, 더 크고 굵게, fade 효과
+        drawtext_filter = (
+            f"drawtext=text='{escaped_text}'"
+            f":fontfile={font_path}"
+            f":fontsize=100"              # 72→100 (더 크게)
+            f":fontcolor=white"
+            f":borderw=8"                 # 4→8 (더 굵은 외곽선)
+            f":bordercolor=black"
+            f":shadowcolor=black@0.5"     # 그림자 추가
+            f":shadowx=3:shadowy=3"
+            f":x=(w-text_w)/2"
+            f":y=(h-text_h)/2"
+            f":alpha='{fade_expr}'"       # 부드러운 fade in/out 반복
+        )
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path.replace("\\", "/"),
+            "-vf", drawtext_filter,
+            "-c:a", "copy",
+            temp_output.replace("\\", "/")
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        if result.returncode == 0:
+            # 원본 교체
+            os.replace(temp_output, video_path)
+            print(f"[VideoEngine] Key sentence overlay applied (fade in/out, 3s cycle)")
+        else:
+            print(f"[VideoEngine] Key sentence overlay failed: {result.stderr[:200]}")
+            # 실패해도 원본 유지 (오류 무시)
 
     def _create_scene_clip_smooth_zoom(
         self,

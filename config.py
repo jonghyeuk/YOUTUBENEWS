@@ -62,6 +62,12 @@ ELEVENLABS_STYLE_VOICES = {
         "similarity_boost": 0.8,
         "speed": 0.85,  # 불교: 천천히 (명상적)
     },
+    "영어Saying전용": {
+        "voice_id": "87tjwokZlpNU7QL3HaLP",  # 영어 목회자 톤 전용
+        "stability": 0.4,  # 따뜻하고 자연스러운 톤
+        "similarity_boost": 0.7,
+        "speed": 0.85,  # 느리고 차분하게
+    },
 }
 
 # 스타일별 감정 태그 매핑 (ElevenLabs v3 Audio Tags - 영어만 인식)

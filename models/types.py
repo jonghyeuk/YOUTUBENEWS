@@ -42,6 +42,9 @@ class Scene:
     panel_ids: List[int] = field(default_factory=list)
     image_paths: List[str] = field(default_factory=list)
 
+    # 영어Saying전용: 화면 중앙 표시용 핵심 문장
+    key_sentence: str = ""
+
 
 @dataclass
 class Script:

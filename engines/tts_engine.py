@@ -332,14 +332,18 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 언어별 voice_id가 있으면 우선 사용, 없으면 스타일 voice_id 사용
-            self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+            # 영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style == "영어Saying전용":
+                self.voice_id = voice_config["voice_id"]
+            else:
+                # 다른 스타일: 언어별 voice_id 우선
+                self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
             self.stability = voice_config.get("stability", 0.5)
             self.similarity_boost = voice_config.get("similarity_boost", 0.75)
             # 속도: UI 지정값 > 스타일 값 > 전역 설정
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
-            print(f"[TTSEngine] ElevenLabs 초기화 완료 ({lang_name}, 스타일: {self.style}, 속도: {self.speed})")
+            print(f"[TTSEngine] ElevenLabs 초기화 완료 ({lang_name}, 스타일: {self.style}, voice: {self.voice_id[:8]}..., 속도: {self.speed})")
         else:
             self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.stability = 0.5
@@ -360,12 +364,16 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 언어별 voice_id가 있으면 우선 사용
-            self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+            # 영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style == "영어Saying전용":
+                self.voice_id = voice_config["voice_id"]
+            else:
+                # 다른 스타일: 언어별 voice_id 우선
+                self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
             # 속도: UI 지정값 > 스타일 값 > 전역 설정
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
-            print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 ({lang_name}, 스타일: {self.style}, 속도: {self.speed})")
+            print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 ({lang_name}, 스타일: {self.style}, voice: {self.voice_id[:8]}..., 속도: {self.speed})")
         else:
             self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
@@ -388,10 +396,15 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+            # 영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style == "영어Saying전용":
+                self.voice_id = voice_config["voice_id"]
+            else:
+                # 다른 스타일: 언어별 voice_id 우선
+                self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
-            print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 스타일: {self.style}, 속도: {self.speed})")
+            print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 스타일: {self.style}, voice: {self.voice_id[:8]}..., 속도: {self.speed})")
         else:
             self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
@@ -529,10 +542,17 @@ class TTSEngine:
             return self._synthesize_openai(text)
 
     def _synthesize_wavenet(self, text: str) -> bytes:
-        """Google WaveNet TTS"""
+        """Google WaveNet TTS (영어Saying전용: SSML prosody 적용)"""
         from google.cloud import texttospeech
 
-        input_text = texttospeech.SynthesisInput(text=text)
+        # 영어Saying전용 스타일: SSML prosody로 따뜻한 목회자 톤 적용
+        if self.style == "영어Saying전용" and self.language == "en":
+            # rate=0.85 (느리게), pitch=-5% (낮게) → 따뜻한 목회자 톤
+            ssml_text = f'<speak><prosody rate="0.85" pitch="-5%">{text}</prosody></speak>'
+            input_text = texttospeech.SynthesisInput(ssml=ssml_text)
+            print(f"[TTSEngine] WaveNet 영어Saying전용: SSML prosody 적용 (rate=0.85, pitch=-5%)")
+        else:
+            input_text = texttospeech.SynthesisInput(text=text)
 
         response = self.client.synthesize_speech(
             input=input_text,
