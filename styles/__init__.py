@@ -3,8 +3,11 @@
 각 스타일은 별도 파일로 관리됩니다.
 """
 
-from .news import PROMPT as NEWS_PROMPT
 from .buddhist import PROMPT as BUDDHIST_PROMPT
+
+# 불교강의 (동행형 스토리텔러)
+from .buddhist_lecture import PROMPT as BUDDHIST_LECTURE_PROMPT
+from .buddhist_lecture import WORLD_STYLE_GUIDE as BUDDHIST_LECTURE_WORLD_GUIDE
 
 # 스토리텔링 지역별 버전
 from .storytelling_korea import PROMPT as STORYTELLING_KOREA_PROMPT
@@ -24,7 +27,7 @@ from .english_saying import WORLD_STYLE_GUIDE as ENGLISH_SAYING_WORLD_GUIDE
 
 # 스타일 프롬프트 딕셔너리
 STYLE_PROMPTS = {
-    "뉴스": NEWS_PROMPT,
+    "불교강의": BUDDHIST_LECTURE_PROMPT,
     "불교명상": BUDDHIST_PROMPT,
     # 스토리텔링 지역별 버전
     "스토리텔링:한국불교": STORYTELLING_KOREA_PROMPT,
@@ -38,6 +41,7 @@ STYLE_PROMPTS = {
 
 # 스토리텔링 세계관 가이드 (StoryMaker AI용)
 WORLD_STYLE_GUIDES = {
+    "불교강의": BUDDHIST_LECTURE_WORLD_GUIDE,
     "스토리텔링:한국불교": KOREA_WORLD_GUIDE,
     "스토리텔링:중국불교": CHINA_WORLD_GUIDE,
     "스토리텔링:인도불교": INDIA_WORLD_GUIDE,
