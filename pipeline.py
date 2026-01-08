@@ -376,12 +376,29 @@ class Pipeline:
                         scene_images[scene.scene_id] = cut_paths[idx:idx + images_per_scene]
                         idx += images_per_scene
 
+        # 영어Saying전용: key_sentence 추출 (다른 스타일에는 영향 없음)
+        key_sentences = None
+        style = getattr(self.project, 'style', '')
+        if style == "영어Saying전용":
+            key_sentences = {}
+            for scene in scenes:
+                # scene 객체 또는 dict에서 key_sentence 추출
+                if hasattr(scene, 'key_sentence') and scene.key_sentence:
+                    key_sentences[scene.scene_id] = scene.key_sentence
+                elif hasattr(scene, '__dict__'):
+                    ks = getattr(scene, 'key_sentence', None)
+                    if ks:
+                        key_sentences[scene.scene_id] = ks
+            if key_sentences:
+                self._log(f"영어Saying전용: key_sentence {len(key_sentences)}개 적용")
+
         # 씬별 클립 생성 (줌 효과 옵션)
         clip_paths = self.video_engine.render_scene_clips(
             scene_images=scene_images,
             audio_segments=self.project.audio_segments,
             output_dir=clips_dir,
-            use_ken_burns=use_ken_burns
+            use_ken_burns=use_ken_burns,
+            key_sentences=key_sentences  # 영어Saying전용에만 전달됨
         )
 
         # BGM 경로 로깅

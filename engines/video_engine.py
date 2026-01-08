@@ -35,7 +35,8 @@ class VideoEngine:
         scene_images: Dict[int, List[str]],
         audio_segments: List[AudioSegment],
         output_dir: str,
-        use_ken_burns: bool = True  # 하위 호환용 파라미터명 유지
+        use_ken_burns: bool = True,  # 하위 호환용 파라미터명 유지
+        key_sentences: Optional[Dict[int, str]] = None  # 영어Saying전용: 씬별 핵심 문장
     ) -> List[str]:
         """
         씬별 영상 클립 생성 (부드러운 줌 효과 적용)
@@ -45,6 +46,7 @@ class VideoEngine:
             audio_segments: 씬별 오디오 세그먼트
             output_dir: 출력 디렉토리
             use_ken_burns: 이미지 효과 사용 여부
+            key_sentences: 씬별 핵심 문장 (영어Saying전용) {scene_id: "text"}
 
         Returns:
             씬 클립 경로 리스트
@@ -78,10 +80,65 @@ class VideoEngine:
                     output_path=clip_path
                 )
 
+            # 영어Saying전용: key_sentence 오버레이 적용
+            if key_sentences and scene_id in key_sentences:
+                key_text = key_sentences[scene_id]
+                if key_text:
+                    self._add_key_sentence_overlay(clip_path, key_text)
+                    print(f"[VideoEngine] Scene {scene_id} key_sentence: '{key_text}'")
+
             clip_paths.append(clip_path)
             print(f"[VideoEngine] Scene {scene_id} clip: {clip_path}")
 
         return clip_paths
+
+    def _add_key_sentence_overlay(self, video_path: str, text: str):
+        """
+        영상에 핵심 문장 오버레이 (영어Saying전용)
+        - 화면 중앙에 큰 글씨
+        - 흰색 텍스트 + 검정 외곽선 (썸네일 스타일)
+        - 3초간 페이드인 → 유지 → 페이드아웃
+        """
+        temp_output = video_path.replace(".mp4", "_keysent.mp4")
+
+        # FFmpeg drawtext 필터로 텍스트 오버레이
+        # 폰트 설정 (시스템 폰트 사용)
+        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if not os.path.exists(font_path):
+            font_path = "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"
+
+        # 텍스트 이스케이프 (FFmpeg용)
+        escaped_text = text.replace("'", "'\\''").replace(":", "\\:")
+
+        # drawtext 필터: 중앙 배치, 흰색, 검정 테두리
+        drawtext_filter = (
+            f"drawtext=text='{escaped_text}'"
+            f":fontfile={font_path}"
+            f":fontsize=72"
+            f":fontcolor=white"
+            f":borderw=4"
+            f":bordercolor=black"
+            f":x=(w-text_w)/2"
+            f":y=(h-text_h)/2"
+            f":enable='between(t,1,100)'"  # 1초 후부터 표시
+        )
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path.replace("\\", "/"),
+            "-vf", drawtext_filter,
+            "-c:a", "copy",
+            temp_output.replace("\\", "/")
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        if result.returncode == 0:
+            # 원본 교체
+            os.replace(temp_output, video_path)
+            print(f"[VideoEngine] Key sentence overlay applied")
+        else:
+            print(f"[VideoEngine] Key sentence overlay failed: {result.stderr[:200]}")
+            # 실패해도 원본 유지 (오류 무시)
 
     def _create_scene_clip_smooth_zoom(
         self,

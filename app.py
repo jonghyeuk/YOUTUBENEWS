@@ -451,12 +451,18 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             for i, s in enumerate(data["scenes"]):
                 original_prompts = data["scenes"][i].get("image_prompts", []) if i < len(data["scenes"]) else []
 
+                # 영어Saying전용: key_sentence 추출 (다른 스타일에는 영향 없음)
+                key_sentence = ""
+                if style == "영어Saying전용":
+                    key_sentence = s.get("key_sentence", "")
+
                 scenes.append(Scene(
                     scene_id=s["scene_id"],
                     title=s["title"],
                     text=s["text"],
                     image_count=len(original_prompts) if original_prompts else 0,
-                    importance=s.get("importance", 3)
+                    importance=s.get("importance", 3),
+                    key_sentence=key_sentence
                 ))
 
             script = Script(
@@ -474,6 +480,9 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             for i, scene in enumerate(script.scenes):
                 preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
                 preview += f"🖼️ {scene.image_count}장\n\n"
+                # 영어Saying전용: key_sentence 표시
+                if scene.key_sentence:
+                    preview += f"**📺 KEY: {scene.key_sentence}**\n\n"
                 preview += f"{scene.text}\n\n---\n\n"
 
             # 이미지 프롬프트 포맷팅
