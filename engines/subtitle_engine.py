@@ -243,10 +243,68 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         return output_path
 
     def _split_sentences(self, text: str) -> List[str]:
-        """텍스트를 문장 단위로 분할 (다국어 지원)"""
+        """텍스트를 문장 단위로 분할 (다국어 지원 + 긴 문장 추가 분할)"""
         # 다국어 문장 부호: 한국어/영어(.!?) + 일본어(。！？)
         sentences = re.split(r'(?<=[.!?。！？])\s*', text)
-        return [s for s in sentences if s.strip()]
+        sentences = [s for s in sentences if s.strip()]
+
+        # 긴 문장 추가 분할 (자막이 너무 길어지는 것 방지)
+        result = []
+        for sentence in sentences:
+            # 60자 이상이면 추가 분할 시도
+            if len(sentence) > 60:
+                sub_sentences = self._split_long_sentence(sentence)
+                result.extend(sub_sentences)
+            else:
+                result.append(sentence)
+
+        return result
+
+    def _split_long_sentence(self, text: str, max_len: int = 50) -> List[str]:
+        """긴 문장을 자연스러운 위치에서 분할 (쉼표, and, but 등)"""
+        if len(text) <= max_len:
+            return [text]
+
+        result = []
+        remaining = text
+
+        while len(remaining) > max_len:
+            # 분할 후보 위치 찾기 (우선순위: 쉼표 > and/but > 띄어쓰기)
+            split_pos = None
+
+            # 1. 쉼표 찾기 (중간~max_len 범위)
+            search_start = max_len // 2
+            search_end = min(max_len + 10, len(remaining))
+
+            comma_pos = remaining.find(', ', search_start, search_end)
+            if comma_pos != -1:
+                split_pos = comma_pos + 1
+
+            # 2. and/but/or 찾기
+            if split_pos is None:
+                for conj in [' and ', ' but ', ' or ', ' so ', ' yet ']:
+                    pos = remaining.find(conj, search_start, search_end)
+                    if pos != -1:
+                        split_pos = pos
+                        break
+
+            # 3. 띄어쓰기 찾기
+            if split_pos is None:
+                space_pos = remaining.rfind(' ', search_start, search_end)
+                if space_pos != -1:
+                    split_pos = space_pos
+
+            # 4. 그래도 없으면 max_len에서 자름
+            if split_pos is None:
+                split_pos = max_len
+
+            result.append(remaining[:split_pos].strip())
+            remaining = remaining[split_pos:].strip()
+
+        if remaining:
+            result.append(remaining)
+
+        return result
 
     def _escape_ass_special_chars(self, text: str) -> str:
         """ASS 특수문자 이스케이프 - 자막 깨짐 방지"""
