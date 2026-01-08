@@ -882,6 +882,11 @@ def finalize_video():
     if not pipeline.project or not pipeline.project.video_path:
         return "❌ 렌더링 필요", None
     try:
+        # 자막이 없으면 자동 생성
+        if not pipeline.project.subtitle_path:
+            print("[finalize_video] 자막 없음 - 자동 생성 중...")
+            pipeline.step5_generate_subtitles(use_whisper=False)
+
         final_path = pipeline.step7_burn_subtitles()
         # 프로젝트 자동 저장
         pipeline.save_project()
