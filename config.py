@@ -62,6 +62,13 @@ ELEVENLABS_STYLE_VOICES = {
         "similarity_boost": 0.8,
         "speed": 0.85,  # 불교: 천천히 (명상적)
     },
+    # === 영어Saying전용: 미국 남성 성직자 톤 ===
+    "영어Saying전용": {
+        "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam - 따뜻한 목사님 스타일
+        "stability": 0.45,  # 40-50% - 약간의 감정 변화 허용
+        "similarity_boost": 0.7,  # Clarity 70%
+        "speed": 0.9,  # 천천히, 명확하게
+    },
 }
 
 # 스타일별 감정 태그 매핑 (ElevenLabs v3 Audio Tags - 영어만 인식)
@@ -91,6 +98,14 @@ EMOTION_TAGS = {
         "body": "[clear, explanatory]",
         "climax": "[enthusiastic]",
         "ending": "[warm, encouraging]",
+    },
+    # === 영어Saying전용: 미국 성직자 스타일 감정 태그 ===
+    "영어Saying전용": {
+        "intro": "[warm, pastoral, inviting]",
+        "teaching": "[gentle, reassuring, confident]",
+        "prayer": "[reverent, emotional, heartfelt]",
+        "climax": "[powerful, uplifting, hopeful]",
+        "ending": "[peaceful, blessing, comforting]",
     },
 }
 
