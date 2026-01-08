@@ -529,10 +529,17 @@ class TTSEngine:
             return self._synthesize_openai(text)
 
     def _synthesize_wavenet(self, text: str) -> bytes:
-        """Google WaveNet TTS"""
+        """Google WaveNet TTS (영어Saying전용: SSML prosody 적용)"""
         from google.cloud import texttospeech
 
-        input_text = texttospeech.SynthesisInput(text=text)
+        # 영어Saying전용 스타일: SSML prosody로 따뜻한 목회자 톤 적용
+        if self.style == "영어Saying전용" and self.language == "en":
+            # rate=0.85 (느리게), pitch=-5% (낮게) → 따뜻한 목회자 톤
+            ssml_text = f'<speak><prosody rate="0.85" pitch="-5%">{text}</prosody></speak>'
+            input_text = texttospeech.SynthesisInput(ssml=ssml_text)
+            print(f"[TTSEngine] WaveNet 영어Saying전용: SSML prosody 적용 (rate=0.85, pitch=-5%)")
+        else:
+            input_text = texttospeech.SynthesisInput(text=text)
 
         response = self.client.synthesize_speech(
             input=input_text,
