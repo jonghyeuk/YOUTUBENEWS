@@ -23,21 +23,21 @@ class ThumbnailEngine:
 
     # 스타일별 색상 프리셋
     COLOR_PRESETS = {
+        "불교강의": {
+            "primary": "#FFFFFF",    # 흰색 (참고 이미지 스타일)
+            "secondary": "#FFD700",  # 금색
+            "outline": "#000000",    # 검정 외곽선
+            "shadow": "#000000",     # 그림자
+        },
         "불교종교": {
             "primary": "#FFD700",    # 금색
             "secondary": "#FFFFFF",  # 흰색
             "outline": "#000000",    # 검정 외곽선
             "shadow": "#000000",     # 그림자
         },
-        "뉴스": {
-            "primary": "#FF0000",    # 빨강
-            "secondary": "#FFFFFF",
-            "outline": "#000000",
-            "shadow": "#000000",
-        },
-        "정보": {
-            "primary": "#00BFFF",    # 하늘색
-            "secondary": "#FFFFFF",
+        "불교명상": {
+            "primary": "#FFFFFF",    # 흰색
+            "secondary": "#FFD700",  # 금색
             "outline": "#000000",
             "shadow": "#000000",
         },
@@ -56,12 +56,17 @@ class ThumbnailEngine:
         """시스템에서 한글 폰트 찾기"""
         font_paths = {
             "bold": None,
+            "extrabold": None,  # 더 두꺼운 폰트
             "regular": None,
         }
 
-        # 가능한 폰트 경로들
+        # 가능한 폰트 경로들 (우선순위: ExtraBold > Bold > Regular)
         possible_paths = [
-            # Linux
+            # Linux - ExtraBold/Black
+            "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansCJK-Black.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Black.ttc",
+            # Linux - Bold
             "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
             "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
             "/usr/share/fonts/truetype/noto/NotoSansCJK-Bold.ttc",
@@ -73,18 +78,23 @@ class ThumbnailEngine:
             "/Library/Fonts/AppleGothic.ttf",
             "/System/Library/Fonts/AppleSDGothicNeo.ttc",
             # 프로젝트 폴더
+            "assets/fonts/NanumGothicExtraBold.ttf",
             "assets/fonts/NanumGothicBold.ttf",
             "assets/fonts/NanumGothic.ttf",
         ]
 
         for path in possible_paths:
             if os.path.exists(path):
-                if "Bold" in path or "bd" in path.lower():
+                if "ExtraBold" in path or "Black" in path:
+                    font_paths["extrabold"] = font_paths["extrabold"] or path
+                elif "Bold" in path or "bd" in path.lower():
                     font_paths["bold"] = font_paths["bold"] or path
                 else:
                     font_paths["regular"] = font_paths["regular"] or path
 
-        # 폴백
+        # 폴백 체인: extrabold → bold → regular
+        if not font_paths["extrabold"]:
+            font_paths["extrabold"] = font_paths["bold"]
         if not font_paths["bold"]:
             font_paths["bold"] = font_paths["regular"]
 
@@ -125,16 +135,17 @@ class ThumbnailEngine:
             bg = enhancer.enhance(1 - darken)
 
         # 색상 가져오기
-        colors = self.COLOR_PRESETS.get(style, self.COLOR_PRESETS["불교종교"])
+        colors = self.COLOR_PRESETS.get(style, self.COLOR_PRESETS["불교강의"])
 
         # 텍스트 오버레이
         draw = ImageDraw.Draw(bg)
 
-        # 폰트 로드
+        # 폰트 로드 (ExtraBold 우선 사용으로 더 두꺼운 글씨)
         try:
-            main_font = ImageFont.truetype(self.font_paths["bold"] or "arial.ttf", 90)
-            sub_font = ImageFont.truetype(self.font_paths["bold"] or "arial.ttf", 50)
-            bottom_font = ImageFont.truetype(self.font_paths["regular"] or "arial.ttf", 36)
+            # 메인 텍스트: ExtraBold + 큰 사이즈 + 두꺼운 외곽선
+            main_font = ImageFont.truetype(self.font_paths["extrabold"] or self.font_paths["bold"] or "arial.ttf", 100)
+            sub_font = ImageFont.truetype(self.font_paths["extrabold"] or self.font_paths["bold"] or "arial.ttf", 56)
+            bottom_font = ImageFont.truetype(self.font_paths["bold"] or "arial.ttf", 40)
         except Exception:
             main_font = ImageFont.load_default()
             sub_font = ImageFont.load_default()
@@ -150,14 +161,14 @@ class ThumbnailEngine:
                 position=(width // 2, height // 3 - 50),
                 fill=colors["secondary"],
                 outline=colors["outline"],
-                outline_width=3
+                outline_width=6  # 두꺼운 외곽선
             )
 
         # 메인 텍스트 (중앙) - 멀티라인 지원
         if "\n" in main_text:
             # 2줄 텍스트: 같은 크기로 각 줄 렌더링
             lines = main_text.split("\n")
-            line_height = 100  # 줄 간격
+            line_height = 110  # 줄 간격 (폰트 크기 증가로 조정)
             total_height = len(lines) * line_height
             start_y = height // 2 - total_height // 2 + line_height // 2
 
@@ -167,7 +178,7 @@ class ThumbnailEngine:
                     position=(width // 2, start_y + i * line_height),
                     fill=colors["primary"],
                     outline=colors["outline"],
-                    outline_width=4
+                    outline_width=8  # 두꺼운 외곽선
                 )
         else:
             # 1줄 텍스트
@@ -176,7 +187,7 @@ class ThumbnailEngine:
                 position=(width // 2, height // 2),
                 fill=colors["primary"],
                 outline=colors["outline"],
-                outline_width=4
+                outline_width=8  # 두꺼운 외곽선
             )
 
         # 하단 텍스트
@@ -186,7 +197,7 @@ class ThumbnailEngine:
                 position=(width // 2, height - 80),
                 fill=colors["secondary"],
                 outline=colors["outline"],
-                outline_width=2
+                outline_width=4  # 두꺼운 외곽선
             )
 
         # RGB로 변환 (저장용)
