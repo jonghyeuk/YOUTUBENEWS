@@ -21,19 +21,14 @@ class ThumbnailEngine:
     # 기본 설정
     THUMBNAIL_SIZE = (1280, 720)  # YouTube 권장 크기
 
-    # 스타일별 색상 프리셋
+    # 스타일별 색상 프리셋 (모든 스타일에 두꺼운 외곽선 적용)
     COLOR_PRESETS = {
+        # === 불교 스타일 ===
         "불교강의": {
-            "primary": "#FFFFFF",    # 흰색 (참고 이미지 스타일)
-            "secondary": "#FFD700",  # 금색
+            "primary": "#FFFFFF",    # 흰색 메인
+            "secondary": "#FFD700",  # 금색 서브
             "outline": "#000000",    # 검정 외곽선
-            "shadow": "#000000",     # 그림자
-        },
-        "불교종교": {
-            "primary": "#FFD700",    # 금색
-            "secondary": "#FFFFFF",  # 흰색
-            "outline": "#000000",    # 검정 외곽선
-            "shadow": "#000000",     # 그림자
+            "shadow": "#000000",
         },
         "불교명상": {
             "primary": "#FFFFFF",    # 흰색
@@ -41,6 +36,45 @@ class ThumbnailEngine:
             "outline": "#000000",
             "shadow": "#000000",
         },
+        "불교종교": {
+            "primary": "#FFD700",    # 금색
+            "secondary": "#FFFFFF",  # 흰색
+            "outline": "#000000",
+            "shadow": "#000000",
+        },
+        # === 스토리텔링 (지역별) ===
+        "스토리텔링:한국불교": {
+            "primary": "#FFFFFF",    # 흰색
+            "secondary": "#C9A96E",  # 전통 황토색
+            "outline": "#1A1A1A",    # 진한 먹색
+            "shadow": "#000000",
+        },
+        "스토리텔링:중국불교": {
+            "primary": "#FFD700",    # 금색
+            "secondary": "#FF4444",  # 붉은색
+            "outline": "#000000",
+            "shadow": "#000000",
+        },
+        "스토리텔링:인도불교": {
+            "primary": "#FFFFFF",    # 흰색
+            "secondary": "#FF9933",  # 사프란 오렌지
+            "outline": "#4A2C2A",    # 갈색
+            "shadow": "#000000",
+        },
+        # === 언어별 전용 ===
+        "일본텔링": {
+            "primary": "#FFFFFF",    # 흰색
+            "secondary": "#E8B4B8",  # 벚꽃 핑크
+            "outline": "#2D2D2D",    # 진한 회색
+            "shadow": "#000000",
+        },
+        "영어Saying전용": {
+            "primary": "#FFFFFF",    # 흰색
+            "secondary": "#FFD700",  # 금색
+            "outline": "#000000",
+            "shadow": "#000000",
+        },
+        # === 기타 ===
         "믿거나말거나": {
             "primary": "#FF6600",    # 주황
             "secondary": "#FFFF00",  # 노랑
