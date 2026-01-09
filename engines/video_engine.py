@@ -97,8 +97,7 @@ class VideoEngine:
         영상에 핵심 문장 오버레이 (영어Saying전용)
         - 화면 중앙에 큰 글씨 (더 크고 굵게)
         - 흰색 텍스트 + 검정 외곽선 (썸네일 스타일)
-        - 부드러운 fade in/out 효과
-        - 3초 주기로 반복 (나타났다 사라졌다)
+        - 천천히 부드럽게 나타났다 사라짐 (1회만, 반복 없음)
         """
         temp_output = video_path.replace(".mp4", "_keysent.mp4")
 
@@ -115,32 +114,31 @@ class VideoEngine:
         # 텍스트 이스케이프 (FFmpeg용)
         escaped_text = text.replace("'", "'\\''").replace(":", "\\:")
 
-        # 반복 fade in/out 효과 (3초 주기)
-        # 0.0-0.5초: fade in (0→1)
-        # 0.5-2.0초: 유지 (1)
-        # 2.0-2.5초: fade out (1→0)
-        # 2.5-3.0초: 사라짐 (0)
-        # mod(t,3)으로 3초마다 반복
+        # 천천히 나타났다 사라지는 효과 (1회만, 반복 없음)
+        # 1.0-3.0초: fade in (2초간 천천히 나타남)
+        # 3.0-7.0초: 유지 (4초간 완전히 보임)
+        # 7.0-9.0초: fade out (2초간 천천히 사라짐)
         fade_expr = (
-            "if(lt(mod(t,3),0.5),mod(t,3)*2,"
-            "if(lt(mod(t,3),2.0),1,"
-            "if(lt(mod(t,3),2.5),(2.5-mod(t,3))*2,"
-            "0)))"
+            "if(lt(t,1),0,"                           # 0-1초: 안 보임
+            "if(lt(t,3),(t-1)/2,"                     # 1-3초: fade in (0→1, 2초간)
+            "if(lt(t,7),1,"                           # 3-7초: 유지 (4초간)
+            "if(lt(t,9),(9-t)/2,"                     # 7-9초: fade out (1→0, 2초간)
+            "0))))"                                    # 9초 이후: 안 보임
         )
 
-        # drawtext 필터: 중앙 배치, 더 크고 굵게, fade 효과
+        # drawtext 필터: 중앙 배치, 더 크고 굵게, 천천히 fade
         drawtext_filter = (
             f"drawtext=text='{escaped_text}'"
             f":fontfile={font_path}"
-            f":fontsize=100"              # 72→100 (더 크게)
+            f":fontsize=100"
             f":fontcolor=white"
-            f":borderw=8"                 # 4→8 (더 굵은 외곽선)
+            f":borderw=8"
             f":bordercolor=black"
-            f":shadowcolor=black@0.5"     # 그림자 추가
+            f":shadowcolor=black@0.5"
             f":shadowx=3:shadowy=3"
             f":x=(w-text_w)/2"
             f":y=(h-text_h)/2"
-            f":alpha='{fade_expr}'"       # 부드러운 fade in/out 반복
+            f":alpha='{fade_expr}'"
         )
 
         cmd = [
@@ -155,7 +153,7 @@ class VideoEngine:
         if result.returncode == 0:
             # 원본 교체
             os.replace(temp_output, video_path)
-            print(f"[VideoEngine] Key sentence overlay applied (fade in/out, 3s cycle)")
+            print(f"[VideoEngine] Key sentence overlay applied (slow fade, once)")
         else:
             print(f"[VideoEngine] Key sentence overlay failed: {result.stderr[:200]}")
             # 실패해도 원본 유지 (오류 무시)
