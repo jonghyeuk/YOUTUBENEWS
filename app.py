@@ -997,6 +997,7 @@ def generate_thumbnail(
 
     try:
         style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
+        language = getattr(pipeline.project, 'language', 'ko') if pipeline.project else 'ko'
 
         # 출력 경로
         if pipeline.project:
@@ -1011,7 +1012,8 @@ def generate_thumbnail(
             bottom_text=bottom_text,
             style=style,
             darken=darken,
-            output_path=output_path
+            output_path=output_path,
+            language=language
         )
 
         return f"✅ 썸네일 생성 완료!", thumbnail_path
@@ -1125,6 +1127,7 @@ def preview_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
 
     try:
         style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
+        language = getattr(pipeline.project, 'language', 'ko') if pipeline.project else 'ko'
 
         # 미리보기 경로 (임시)
         if pipeline.project:
@@ -1139,7 +1142,8 @@ def preview_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
             bottom_text=bottom_text,
             style=style,
             darken=darken,
-            output_path=preview_path
+            output_path=preview_path,
+            language=language
         )
 
         return "👁️ 미리보기 생성됨 (확정하려면 '✅ 확정' 버튼 클릭)", thumbnail_path
@@ -1156,6 +1160,7 @@ def confirm_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
 
     try:
         style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
+        language = getattr(pipeline.project, 'language', 'ko') if pipeline.project else 'ko'
 
         # 최종 경로
         if pipeline.project:
@@ -1170,7 +1175,8 @@ def confirm_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
             bottom_text=bottom_text,
             style=style,
             darken=darken,
-            output_path=output_path
+            output_path=output_path,
+            language=language
         )
 
         return f"✅ 썸네일 확정 저장: {output_path}", thumbnail_path, thumbnail_path
