@@ -3,9 +3,12 @@
 한글 텍스트 오버레이 + 그림자/외곽선 효과
 """
 import os
+import re
+import json
 import random
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 from typing import List, Tuple, Optional
+from anthropic import Anthropic
 
 from config import (
     YOUTUBE_THUMBNAIL_TEXT_TEMPLATES,
@@ -13,6 +16,49 @@ from config import (
     YOUTUBE_THUMBNAIL_FORBIDDEN_WORDS,
     YOUTUBE_THUMBNAIL_RULES,
 )
+
+# ═══════════════════════════════════════════════════════════════
+# LLM 프롬프트: 후킹 썸네일 메시지 생성
+# ═══════════════════════════════════════════════════════════════
+THUMBNAIL_HOOK_PROMPT = """당신은 유튜브 썸네일 카피라이터입니다.
+주어진 유튜브 콘텐츠를 분석하여 **클릭을 유발하는 썸네일 문구**를 생성합니다.
+
+## 출력 형식 (JSON)
+```json
+{
+  "sub_text": "상단 메시지 (5-8자)",
+  "main_text": "메인 메시지 (4-7자)"
+}
+```
+
+## 핵심 규칙
+1. **상단(sub_text) + 메인(main_text)이 연결되어 하나의 메시지**가 되어야 함
+   - 예: "이 승려의 정체" + "충격적 비밀"
+   - 예: "1500년 전" + "왕자의 선택"
+   - 예: "마음이 힘들 때" + "이 한마디"
+
+2. **궁금증 유발 필수**
+   - 핵심 정보는 숨기고 힌트만 제공
+   - "뭐지?" "왜?" 궁금하게 만들기
+   - 결론을 말하지 말 것
+
+3. **글자 수 제한 (필수)**
+   - sub_text: 5~8자
+   - main_text: 4~7자
+   - 합쳐서 최대 15자 이내
+
+4. **후킹 패턴** (하나 선택)
+   - 미스터리형: "아무도 몰랐던" + "숨겨진 진실"
+   - 경고형: "이것만은" + "하지 마세요"
+   - 질문형: "왜 마음이" + "불안한가"
+   - 역사형: "1500년 전" + "그날의 선택"
+   - 공감형: "잠 못 드는 밤" + "들어야 할 말"
+
+5. **금지사항**
+   - 구두점 사용 금지 (!, ?, . 등)
+   - 숫자는 최소화
+   - 과장 금지 (충격, 경악, 대박 등 남발 금지)
+"""
 
 # ═══════════════════════════════════════════════════════════════
 # 후킹 썸네일 메시지 템플릿 (상단 + 메인 연결형)
@@ -406,50 +452,92 @@ class ThumbnailEngine:
         self,
         title: str = None,
         description: str = None,
-        script_text: str = None,
         style: str = "불교종교"
     ) -> Tuple[str, str]:
         """
-        유튜브 업로드 내용을 분석하여 후킹 썸네일 메시지 생성
+        LLM을 사용하여 유튜브 제목/설명 분석 후 후킹 썸네일 메시지 생성
 
         Args:
             title: 유튜브 제목
             description: 유튜브 설명
-            script_text: 스크립트 전문 (선택)
             style: 콘텐츠 스타일
 
         Returns:
             (sub_text, main_text) - 상단 메시지, 메인 메시지
         """
-        # 분석용 텍스트 결합
-        content = f"{title or ''} {description or ''} {script_text or ''}"
-        content_lower = content.lower()
+        # LLM에 보낼 콘텐츠 구성 (제목 + 설명만)
+        content_parts = []
+        if title:
+            content_parts.append(f"[유튜브 제목]\n{title}")
+        if description:
+            # 설명은 처음 500자만
+            desc_preview = description[:500] + ("..." if len(description) > 500 else "")
+            content_parts.append(f"[유튜브 설명]\n{desc_preview}")
 
-        # 키워드 기반 카테고리 분류
-        category = self._detect_content_category(content)
+        if not content_parts:
+            # 콘텐츠가 없으면 폴백
+            print("[ThumbnailEngine] ⚠️ 콘텐츠 없음, 기본 템플릿 사용")
+            return self._fallback_hook_message(style)
 
-        # 스타일별 템플릿 가져오기
+        user_content = "\n\n".join(content_parts)
+        user_content += f"\n\n[콘텐츠 스타일: {style}]"
+
+        try:
+            # Anthropic API 호출
+            client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=200,
+                system=THUMBNAIL_HOOK_PROMPT,
+                messages=[
+                    {"role": "user", "content": f"다음 유튜브 콘텐츠를 분석하여 후킹 썸네일 문구를 생성해주세요:\n\n{user_content}"}
+                ]
+            )
+
+            # 응답 파싱
+            response_text = response.content[0].text
+            sub_text, main_text = self._parse_hook_response(response_text)
+
+            print(f"[ThumbnailEngine] 🎯 LLM 후킹 메시지 생성: '{sub_text}' + '{main_text}'")
+            return sub_text, main_text
+
+        except Exception as e:
+            print(f"[ThumbnailEngine] ❌ LLM 호출 실패: {e}, 폴백 사용")
+            return self._fallback_hook_message(style)
+
+    def _parse_hook_response(self, response_text: str) -> Tuple[str, str]:
+        """LLM 응답에서 sub_text, main_text 추출"""
+        try:
+            # JSON 블록 찾기
+            json_match = re.search(r'\{[^}]+\}', response_text, re.DOTALL)
+            if json_match:
+                data = json.loads(json_match.group())
+                sub_text = data.get("sub_text", "").strip()
+                main_text = data.get("main_text", "").strip()
+
+                # 구두점 제거
+                sub_text = sub_text.rstrip(".!?。！？")
+                main_text = main_text.rstrip(".!?。！？")
+
+                if sub_text and main_text:
+                    return sub_text, main_text
+        except json.JSONDecodeError:
+            pass
+
+        # JSON 파싱 실패 시 텍스트에서 직접 추출 시도
+        lines = [l.strip() for l in response_text.split('\n') if l.strip()]
+        if len(lines) >= 2:
+            return lines[0][:10], lines[1][:10]
+
+        return "오늘 밤", "이 이야기"
+
+    def _fallback_hook_message(self, style: str) -> Tuple[str, str]:
+        """LLM 실패 시 템플릿 기반 폴백"""
         templates = THUMBNAIL_HOOK_TEMPLATES.get(style, THUMBNAIL_HOOK_TEMPLATES.get("불교종교", []))
-
-        # 카테고리에 맞는 템플릿 필터링
-        filtered = self._filter_templates_by_category(templates, category, content)
-
-        if filtered:
-            chosen = random.choice(filtered)
-        elif templates:
+        if templates:
             chosen = random.choice(templates)
-        else:
-            # 폴백
-            chosen = {"sub": "오늘 밤", "main": "이 이야기"}
-
-        sub_text = chosen["sub"]
-        main_text = chosen["main"]
-
-        # 컨텐츠에서 추출한 키워드로 개인화 (옵션)
-        sub_text, main_text = self._personalize_hook(sub_text, main_text, content, style)
-
-        print(f"[ThumbnailEngine] 후킹 메시지 생성: '{sub_text}' + '{main_text}'")
-        return sub_text, main_text
+            return chosen["sub"], chosen["main"]
+        return "오늘 밤", "이 이야기"
 
     def _detect_content_category(self, content: str) -> str:
         """콘텐츠 카테고리 감지"""
@@ -529,7 +617,6 @@ class ThumbnailEngine:
         background_image: str,
         title: str = None,
         description: str = None,
-        script_text: str = None,
         style: str = "불교종교",
         darken: float = 0.5,
         output_path: str = None,
@@ -542,7 +629,6 @@ class ThumbnailEngine:
             background_image: 배경 이미지 경로
             title: 유튜브 제목
             description: 유튜브 설명
-            script_text: 스크립트 전문
             style: 콘텐츠 스타일
             darken: 배경 어둡게 (0.0~1.0)
             output_path: 출력 경로
@@ -555,7 +641,6 @@ class ThumbnailEngine:
         sub_text, main_text = self.generate_hook_message_from_content(
             title=title,
             description=description,
-            script_text=script_text,
             style=style
         )
 
@@ -607,12 +692,10 @@ class ThumbnailEngine:
         # 메인/서브 텍스트 자동 생성
         if not main_text and auto_generate:
             if use_hook and project.script:
-                # 후킹 메시지 생성 (상단 + 메인 연결형)
-                script_text = "\n".join([s.text for s in project.script.scenes]) if project.script.scenes else ""
+                # 후킹 메시지 생성 (제목 + 설명 기반)
                 sub_text, main_text = self.generate_hook_message_from_content(
                     title=project.script.title if project.script else None,
                     description=getattr(project, 'description', None),
-                    script_text=script_text,
                     style=style
                 )
             else:
