@@ -21,6 +21,9 @@ class ThumbnailEngine:
     # 기본 설정
     THUMBNAIL_SIZE = (1280, 720)  # YouTube 권장 크기
 
+    # 한국어 썸네일 전용 폰트 (영어/일본어는 기존 폰트 사용)
+    KOREAN_THUMBNAIL_FONT = "fonts/GapyeongHanseokbongB.ttf"
+
     # 스타일별 색상 프리셋 (모든 스타일에 두꺼운 외곽선 적용)
     COLOR_PRESETS = {
         # === 불교 스타일 ===
@@ -134,6 +137,14 @@ class ThumbnailEngine:
 
         return font_paths
 
+    def _get_font_for_language(self, language: str = "ko") -> str:
+        """언어별 폰트 경로 반환"""
+        # 한국어: 전용 폰트 사용 (있으면)
+        if language == "ko" and os.path.exists(self.KOREAN_THUMBNAIL_FONT):
+            return self.KOREAN_THUMBNAIL_FONT
+        # 영어/일본어 또는 한국어 폰트 없을 때: 기존 시스템 폰트
+        return self.font_paths["extrabold"] or self.font_paths["bold"] or "arial.ttf"
+
     def create_thumbnail(
         self,
         background_image: str,
@@ -142,7 +153,8 @@ class ThumbnailEngine:
         bottom_text: str = "",
         style: str = "불교종교",
         darken: float = 0.5,
-        output_path: str = None
+        output_path: str = None,
+        language: str = "ko"
     ) -> str:
         """
         썸네일 생성
@@ -155,6 +167,7 @@ class ThumbnailEngine:
             style: 색상 스타일 (불교종교/뉴스/정보/믿거나말거나)
             darken: 배경 어둡게 (0.0~1.0)
             output_path: 출력 경로
+            language: 언어 코드 (ko/en/ja) - 한국어만 전용 폰트 사용
 
         Returns:
             생성된 썸네일 경로
@@ -174,12 +187,12 @@ class ThumbnailEngine:
         # 텍스트 오버레이
         draw = ImageDraw.Draw(bg)
 
-        # 폰트 로드 (ExtraBold 우선 사용으로 더 두꺼운 글씨)
+        # 폰트 로드 (한국어: 전용 폰트 / 영어,일본어: 시스템 폰트)
         try:
-            # 메인 텍스트: ExtraBold + 큰 사이즈 + 두꺼운 외곽선
-            main_font = ImageFont.truetype(self.font_paths["extrabold"] or self.font_paths["bold"] or "arial.ttf", 100)
-            sub_font = ImageFont.truetype(self.font_paths["extrabold"] or self.font_paths["bold"] or "arial.ttf", 56)
-            bottom_font = ImageFont.truetype(self.font_paths["bold"] or "arial.ttf", 40)
+            font_path = self._get_font_for_language(language)
+            main_font = ImageFont.truetype(font_path, 100)
+            sub_font = ImageFont.truetype(font_path, 56)
+            bottom_font = ImageFont.truetype(font_path, 40)
         except Exception:
             main_font = ImageFont.load_default()
             sub_font = ImageFont.load_default()

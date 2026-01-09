@@ -13,7 +13,7 @@ import json
 from pipeline import Pipeline
 from engines import ScriptEngine, ImageEngine
 from engines.thumbnail_engine import ThumbnailEngine
-from styles import STYLE_PROMPTS  # 스타일별 프롬프트 (파일 분리됨)
+from styles import STYLE_PROMPTS, BUDDHIST_LECTURE_EPISODE_TYPES, get_buddhist_lecture_prompt  # 스타일별 프롬프트 (파일 분리됨)
 from config import (
     DURATION_SPECS, BGM_CONFIG,
     YOUTUBE_TITLE_TEMPLATES, YOUTUBE_DEFAULT_TAGS,
@@ -116,14 +116,19 @@ STYLE_TO_STORYMAKER = {
 
 # 스타일별 입력 가이드
 STYLE_GUIDES = {
-    "불교강의": """**💡 불교강의 (동행형 스토리텔러)**: 경전/해설서/일화 텍스트를 입력하세요!
+    "불교강의": """**💡 불교강의 v2 (역사 미스터리형)**: 경전/선사/논쟁/수행/유물 주제를 입력하세요!
 
-예시: "일시(一時)… 여시아문(如是我聞)… 나는 들었다" / "왜 경전은 날짜 대신 '그때'로 시작할까?"
+📚 **에피소드 타입 선택**:
+- 경전 성립/전승: 금강경 32분, 현장법사 번역
+- 선사 일화/공안: 조주 무, 달마 9년 벽관
+- 전승 논쟁/해석: 돈오점수, 남북종 갈등
+- 수행 이야기: 간화선 화두, 염불 수행
+- 유물/장소: 목탁의 비밀, 사리의 행방
 
-🎯 **목표**: 가르치기 ❌ → 함께 읽고 함께 생각하기 ✅
-📝 **구조**: 오프닝 훅 → 장면 → 풀어읽기 → 생활 비유 → 질문 → 여운
-⚠️ **금지**: 훈계/단정/권위 세우기, "정답은", "반드시 ~해야"
-🎨 **톤**: 차분, 따뜻, 약한 위트, 질문으로 여운""",
+🎯 **핵심 구조**: 콜드오픈(15초 훅) → 역사적 문제 → 인물/사건 → 짧은 가르침 → 여운 회수
+⚡ **초반 15초**: 구체 장면 + 미스터리 + 스테이크 + 약속
+📌 **역사 핀**: 사실/전승/논쟁 라벨 필수 (최소 3개)
+⚠️ **금지**: 반복 문장, 추상어 과다, 교리 30% 초과""",
     "스토리텔링:한국불교": """**💡 한국불교 스토리텔링**: 한국 불교/선종/경전/역사적 일화를 입력하세요.
 
 🎨 **스타일**: 조선 수묵채색 정본화 (Classical Korean Ink-Wash)
@@ -342,7 +347,7 @@ def _translate_existing_script(language: str):
 # 통합 스크립트 + 이미지 프롬프트 생성
 # ═══════════════════════════════════════════════════════════════
 
-def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko"):
+def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko", episode_type: str = "sutra_origin"):
     """주제 입력 → 스크립트 + 이미지 프롬프트 한번에 생성"""
     if not topic.strip():
         return "❌ 주제를 입력해주세요", "", ""
@@ -360,6 +365,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         # 프로젝트 생성 (스타일 저장)
         project = pipeline.create_project(topic, duration)
         project.style = style  # 스타일 저장
+        project.episode_type = episode_type  # 에피소드 타입 저장 (불교강의용)
 
         # 분량에 따른 글자 수 계산 (TTS 속도 0.9 기준, 분당 약 180자)
         from config import DURATION_SPECS
@@ -369,10 +375,17 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         chars_per_scene = total_chars // num_scenes
 
         # 스타일별 프롬프트 구성
-        base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["불교강의"])
+        # 불교강의: v2 역사 미스터리형 (에피소드 타입 적용)
+        if style == "불교강의":
+            base_prompt = get_buddhist_lecture_prompt(topic, duration, episode_type)
+            print(f"[스크립트] 불교강의 v2 사용 - 에피소드 타입: {episode_type}")
+        else:
+            base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["불교강의"])
+            base_prompt = base_prompt.format(topic=topic, duration=duration)
+
         image_style = STYLE_IMAGE_GUIDES.get(style, "")
 
-        prompt = base_prompt.format(topic=topic, duration=duration)
+        prompt = base_prompt
         prompt += INTEGRATED_OUTPUT_FORMAT.format(
             duration=duration,
             total_chars=total_chars,
@@ -997,6 +1010,7 @@ def generate_thumbnail(
 
     try:
         style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
+        language = getattr(pipeline.project, 'language', 'ko') if pipeline.project else 'ko'
 
         # 출력 경로
         if pipeline.project:
@@ -1011,7 +1025,8 @@ def generate_thumbnail(
             bottom_text=bottom_text,
             style=style,
             darken=darken,
-            output_path=output_path
+            output_path=output_path,
+            language=language
         )
 
         return f"✅ 썸네일 생성 완료!", thumbnail_path
@@ -1125,6 +1140,7 @@ def preview_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
 
     try:
         style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
+        language = getattr(pipeline.project, 'language', 'ko') if pipeline.project else 'ko'
 
         # 미리보기 경로 (임시)
         if pipeline.project:
@@ -1139,7 +1155,8 @@ def preview_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
             bottom_text=bottom_text,
             style=style,
             darken=darken,
-            output_path=preview_path
+            output_path=preview_path,
+            language=language
         )
 
         return "👁️ 미리보기 생성됨 (확정하려면 '✅ 확정' 버튼 클릭)", thumbnail_path
@@ -1156,6 +1173,7 @@ def confirm_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
 
     try:
         style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
+        language = getattr(pipeline.project, 'language', 'ko') if pipeline.project else 'ko'
 
         # 최종 경로
         if pipeline.project:
@@ -1170,7 +1188,8 @@ def confirm_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
             bottom_text=bottom_text,
             style=style,
             darken=darken,
-            output_path=output_path
+            output_path=output_path,
+            language=language
         )
 
         return f"✅ 썸네일 확정 저장: {output_path}", thumbnail_path, thumbnail_path
@@ -1621,6 +1640,21 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         label="스타일"
                     )
 
+                    # 불교강의 에피소드 타입 (불교강의 선택시만 표시)
+                    episode_type_choices = [
+                        (v["name"], k) for k, v in BUDDHIST_LECTURE_EPISODE_TYPES.items()
+                    ]
+                    episode_type_input = gr.Dropdown(
+                        choices=episode_type_choices,
+                        value="sutra_origin",
+                        label="📚 에피소드 타입 (불교강의 전용)",
+                        info="경전/선사일화/논쟁/수행/유물 중 선택",
+                        visible=True
+                    )
+
+                    def toggle_episode_type(style):
+                        return gr.update(visible=(style == "불교강의"))
+
                     style_guide = gr.Markdown(STYLE_GUIDES["불교강의"])
 
                     # 언어 선택 (스크립트 번역용)
@@ -2001,13 +2035,14 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         ]
     )
 
-    # 스타일 변경시 가이드 업데이트
+    # 스타일 변경시 가이드 업데이트 + 에피소드 타입 토글
     style_input.change(update_style_guide, [style_input], [style_guide])
+    style_input.change(toggle_episode_type, [style_input], [episode_type_input])
 
-    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 추가)
+    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 + 에피소드 타입 추가)
     generate_btn.click(
         generate_script_and_images,
-        [topic_input, duration_input, style_input, script_language],
+        [topic_input, duration_input, style_input, script_language, episode_type_input],
         [status, script_preview, image_prompts, yt_title_input, yt_thumbnail_input]
     )
 
