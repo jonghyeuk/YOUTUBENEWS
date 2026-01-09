@@ -14,6 +14,47 @@ from config import (
     YOUTUBE_THUMBNAIL_RULES,
 )
 
+# ═══════════════════════════════════════════════════════════════
+# 후킹 썸네일 메시지 템플릿 (상단 + 메인 연결형)
+# 패턴: 상단(호기심 유발) → 메인(핵심 메시지)
+# ═══════════════════════════════════════════════════════════════
+THUMBNAIL_HOOK_TEMPLATES = {
+    "불교종교": [
+        # 역사/인물 미스터리형
+        {"sub": "이 승려의 정체", "main": "충격적 비밀"},
+        {"sub": "1500년 전", "main": "왕자의 선택"},
+        {"sub": "황제가 숨긴", "main": "진짜 이유"},
+        {"sub": "아무도 몰랐던", "main": "숨겨진 역사"},
+        {"sub": "경전이 말하지 않은", "main": "그날의 진실"},
+        # 감정/공감형
+        {"sub": "마음이 힘들 때", "main": "이 한마디"},
+        {"sub": "잠 못 드는 밤", "main": "들어야 할 말"},
+        {"sub": "불안이 심할 때", "main": "부처님 답"},
+        {"sub": "생각이 많은 밤", "main": "마음 정리법"},
+        {"sub": "화가 치밀 때", "main": "하지 말 것"},
+        # 경고/조언형
+        {"sub": "이것만은", "main": "하지 마세요"},
+        {"sub": "50대 이후", "main": "꼭 알아야 할"},
+        {"sub": "인연 정리가", "main": "필요한 순간"},
+        {"sub": "놓아야", "main": "편해지는 것"},
+        # 질문/호기심형
+        {"sub": "왜 마음이", "main": "불안한가"},
+        {"sub": "부처님은 왜", "main": "이렇게 말했나"},
+        {"sub": "깨달음의", "main": "진짜 의미"},
+    ],
+    "믿거나말거나": [
+        {"sub": "충격 실화", "main": "믿기 어려운"},
+        {"sub": "소름 주의", "main": "실제 일어난 일"},
+        {"sub": "끝까지 보세요", "main": "반전 있음"},
+        {"sub": "아무도 모르는", "main": "숨겨진 진실"},
+    ],
+    "정보": [
+        {"sub": "모르면 손해", "main": "꼭 알아야 할"},
+        {"sub": "이것만 알면", "main": "인생이 편해짐"},
+        {"sub": "알면 유리한", "main": "핵심 정보"},
+    ],
+}
+
 
 class ThumbnailEngine:
     """YouTube 썸네일 생성 엔진"""
@@ -361,21 +402,193 @@ class ThumbnailEngine:
         print(f"[ThumbnailEngine] 썸네일 텍스트 생성: '{text}' ({len(text)}자)")
         return text
 
+    def generate_hook_message_from_content(
+        self,
+        title: str = None,
+        description: str = None,
+        script_text: str = None,
+        style: str = "불교종교"
+    ) -> Tuple[str, str]:
+        """
+        유튜브 업로드 내용을 분석하여 후킹 썸네일 메시지 생성
+
+        Args:
+            title: 유튜브 제목
+            description: 유튜브 설명
+            script_text: 스크립트 전문 (선택)
+            style: 콘텐츠 스타일
+
+        Returns:
+            (sub_text, main_text) - 상단 메시지, 메인 메시지
+        """
+        # 분석용 텍스트 결합
+        content = f"{title or ''} {description or ''} {script_text or ''}"
+        content_lower = content.lower()
+
+        # 키워드 기반 카테고리 분류
+        category = self._detect_content_category(content)
+
+        # 스타일별 템플릿 가져오기
+        templates = THUMBNAIL_HOOK_TEMPLATES.get(style, THUMBNAIL_HOOK_TEMPLATES.get("불교종교", []))
+
+        # 카테고리에 맞는 템플릿 필터링
+        filtered = self._filter_templates_by_category(templates, category, content)
+
+        if filtered:
+            chosen = random.choice(filtered)
+        elif templates:
+            chosen = random.choice(templates)
+        else:
+            # 폴백
+            chosen = {"sub": "오늘 밤", "main": "이 이야기"}
+
+        sub_text = chosen["sub"]
+        main_text = chosen["main"]
+
+        # 컨텐츠에서 추출한 키워드로 개인화 (옵션)
+        sub_text, main_text = self._personalize_hook(sub_text, main_text, content, style)
+
+        print(f"[ThumbnailEngine] 후킹 메시지 생성: '{sub_text}' + '{main_text}'")
+        return sub_text, main_text
+
+    def _detect_content_category(self, content: str) -> str:
+        """콘텐츠 카테고리 감지"""
+        content_lower = content.lower()
+
+        # 역사/인물 키워드
+        history_keywords = ["왕", "황제", "태자", "승려", "스님", "대사", "년전", "시대", "역사", "경전", "부처님"]
+        # 감정/공감 키워드
+        emotion_keywords = ["불안", "걱정", "힘들", "외로", "슬픔", "화", "분노", "마음", "잠", "밤"]
+        # 조언/경고 키워드
+        advice_keywords = ["하지마", "조심", "끊어", "놓아", "정리", "이후", "나이"]
+        # 질문/호기심 키워드
+        question_keywords = ["왜", "어떻게", "무엇", "진짜", "비밀", "숨겨", "몰랐"]
+
+        scores = {
+            "history": sum(1 for k in history_keywords if k in content),
+            "emotion": sum(1 for k in emotion_keywords if k in content),
+            "advice": sum(1 for k in advice_keywords if k in content),
+            "question": sum(1 for k in question_keywords if k in content),
+        }
+
+        # 가장 높은 점수의 카테고리 반환
+        max_category = max(scores, key=scores.get)
+        if scores[max_category] > 0:
+            return max_category
+        return "general"
+
+    def _filter_templates_by_category(
+        self,
+        templates: List[dict],
+        category: str,
+        content: str
+    ) -> List[dict]:
+        """카테고리에 맞는 템플릿 필터링"""
+        category_keywords = {
+            "history": ["승려", "왕", "년 전", "황제", "경전", "역사", "숨긴", "비밀"],
+            "emotion": ["마음", "밤", "불안", "힘들", "생각", "화"],
+            "advice": ["하지", "꼭", "정리", "놓아", "이후"],
+            "question": ["왜", "진짜", "의미", "깨달음"],
+        }
+
+        keywords = category_keywords.get(category, [])
+        if not keywords:
+            return templates
+
+        filtered = []
+        for t in templates:
+            combined = f"{t['sub']} {t['main']}"
+            if any(k in combined for k in keywords):
+                filtered.append(t)
+
+        return filtered if filtered else templates
+
+    def _personalize_hook(
+        self,
+        sub_text: str,
+        main_text: str,
+        content: str,
+        style: str
+    ) -> Tuple[str, str]:
+        """콘텐츠 키워드로 메시지 개인화"""
+        # 인물명 추출 시도
+        import re
+        person_match = re.search(r'([가-힣]{2,4})(태자|대사|스님|왕|황제)', content)
+
+        if person_match and "승려" in sub_text:
+            person_name = person_match.group(0)
+            sub_text = sub_text.replace("이 승려", person_name)
+        elif person_match and "왕자" in sub_text:
+            person_name = person_match.group(0)
+            sub_text = sub_text.replace("왕자", person_name)
+
+        return sub_text, main_text
+
+    def create_thumbnail_with_hook(
+        self,
+        background_image: str,
+        title: str = None,
+        description: str = None,
+        script_text: str = None,
+        style: str = "불교종교",
+        darken: float = 0.5,
+        output_path: str = None,
+        language: str = "ko"
+    ) -> str:
+        """
+        유튜브 업로드 내용 기반 후킹 썸네일 생성
+
+        Args:
+            background_image: 배경 이미지 경로
+            title: 유튜브 제목
+            description: 유튜브 설명
+            script_text: 스크립트 전문
+            style: 콘텐츠 스타일
+            darken: 배경 어둡게 (0.0~1.0)
+            output_path: 출력 경로
+            language: 언어 코드
+
+        Returns:
+            생성된 썸네일 경로
+        """
+        # 후킹 메시지 자동 생성
+        sub_text, main_text = self.generate_hook_message_from_content(
+            title=title,
+            description=description,
+            script_text=script_text,
+            style=style
+        )
+
+        # 썸네일 생성
+        return self.create_thumbnail(
+            background_image=background_image,
+            main_text=main_text,
+            sub_text=sub_text,
+            style=style,
+            darken=darken,
+            output_path=output_path,
+            language=language
+        )
+
     def create_from_project(
         self,
         project,
         main_text: str = None,
+        sub_text: str = None,
         output_path: str = None,
-        auto_generate: bool = True
+        auto_generate: bool = True,
+        use_hook: bool = True
     ) -> str:
         """
-        프로젝트에서 썸네일 생성 (메인 텍스트만 자동 생성)
+        프로젝트에서 썸네일 생성 (후킹 메시지 자동 생성)
 
         Args:
             project: Project 객체
             main_text: 메인 텍스트 (None이면 자동 생성)
+            sub_text: 상단 텍스트 (None이면 자동 생성)
             output_path: 출력 경로
             auto_generate: main_text 없을 때 자동 생성 여부
+            use_hook: 후킹 메시지 사용 여부 (True면 상단+메인 연결형)
 
         Returns:
             썸네일 이미지 경로
@@ -389,17 +602,25 @@ class ThumbnailEngine:
         # 스타일
         style = getattr(project, 'style', '정보')
         duration = getattr(project, 'duration_min', 10)
+        language = getattr(project, 'language', 'ko')
 
-        # 메인 텍스트 자동 생성 (초단문 템플릿 사용)
-        if not main_text:
-            if auto_generate:
+        # 메인/서브 텍스트 자동 생성
+        if not main_text and auto_generate:
+            if use_hook and project.script:
+                # 후킹 메시지 생성 (상단 + 메인 연결형)
+                script_text = "\n".join([s.text for s in project.script.scenes]) if project.script.scenes else ""
+                sub_text, main_text = self.generate_hook_message_from_content(
+                    title=project.script.title if project.script else None,
+                    description=getattr(project, 'description', None),
+                    script_text=script_text,
+                    style=style
+                )
+            else:
+                # 기존 방식 (단순 템플릿)
                 main_text = self.generate_thumbnail_text(
                     style=style,
                     duration=duration
                 )
-            elif project.script:
-                # 폴백: 스크립트 제목 사용 (권장하지 않음)
-                main_text = project.script.title
 
         # 출력 경로
         if not output_path:
@@ -408,6 +629,8 @@ class ThumbnailEngine:
         return self.create_thumbnail(
             background_image=background,
             main_text=main_text,
+            sub_text=sub_text or "",
             style=style,
-            output_path=output_path
+            output_path=output_path,
+            language=language
         )

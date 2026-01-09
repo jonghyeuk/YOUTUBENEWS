@@ -45,6 +45,51 @@ class SubtitleSegment:
     duration: float      # 길이 (초)
 
 
+def convert_lifespan_to_speech(text: str) -> str:
+    """
+    생몰년 정보를 TTS가 자연스럽게 읽을 수 있도록 변환
+
+    예시:
+    - "소명태자(501-531)" → "소명태자, 서기 501년부터 531년,"
+    - "석가모니(기원전 563-기원전 483)" → "석가모니, 기원전 563년부터 기원전 483년,"
+    - "혜초(704~787)" → "혜초, 서기 704년부터 787년,"
+    """
+    # 패턴 1: 기원전 포함 (기원전 563-기원전 483)
+    text = re.sub(
+        r'\(기원전\s*(\d+)\s*[-~]\s*기원전\s*(\d+)\)',
+        r', 기원전 \1년부터 기원전 \2년,',
+        text
+    )
+
+    # 패턴 2: 시작만 기원전 (기원전 563-483)
+    text = re.sub(
+        r'\(기원전\s*(\d+)\s*[-~]\s*(\d+)\)',
+        r', 기원전 \1년부터 \2년,',
+        text
+    )
+
+    # 패턴 3: 일반 연도 (501-531) 또는 (501~531)
+    text = re.sub(
+        r'\((\d{2,4})\s*[-~]\s*(\d{2,4})\)',
+        r', 서기 \1년부터 \2년,',
+        text
+    )
+
+    # 패턴 4: 단일 연도 (531년) - 그대로 두되 괄호만 자연스럽게
+    text = re.sub(
+        r'\((\d{2,4})년\)',
+        r', \1년,',
+        text
+    )
+
+    # 연속된 쉼표 정리
+    text = re.sub(r',\s*,', ',', text)
+    # 문장 끝 쉼표 정리
+    text = re.sub(r',\s*([.!?])', r'\1', text)
+
+    return text
+
+
 def clean_text_for_subtitle(text: str) -> str:
     """
     TTS용 텍스트에서 자막용 클린 텍스트 생성
@@ -134,6 +179,9 @@ def shape_text_for_turbo(text: str, emotion: str) -> str:
     Turbo v2.5는 태그 대신 문장 형태에 반응
     """
     t = text.strip()
+
+    # (필수) 생몰년 정보를 자연어로 변환 — TTS가 숫자를 자연스럽게 읽도록
+    t = convert_lifespan_to_speech(t)
 
     # (필수) 남아있는 모든 [ ... ] 제거 — Turbo가 읽어버리는 사고 방지
     t = re.sub(r"\[[^\]]+\]", "", t)
