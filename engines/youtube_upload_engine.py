@@ -227,15 +227,34 @@ class YouTubeUploadEngine:
             "status": response["status"]["privacyStatus"],
         }
 
-        # 썸네일 업로드 (있는 경우)
-        if thumbnail_path and os.path.exists(thumbnail_path):
-            try:
-                self._upload_thumbnail(video_id, thumbnail_path)
-                result["thumbnail_uploaded"] = True
-            except Exception as e:
-                print(f"[YouTube] 썸네일 업로드 실패: {e}")
+        # 썸네일 업로드
+        if thumbnail_path:
+            if os.path.exists(thumbnail_path):
+                try:
+                    self._upload_thumbnail(video_id, thumbnail_path)
+                    result["thumbnail_uploaded"] = True
+                except HttpError as e:
+                    # YouTube API 에러 (권한 부족 등)
+                    error_reason = e.error_details[0].get("reason", "") if e.error_details else ""
+                    error_msg = str(e)
+                    if "forbidden" in error_msg.lower() or error_reason == "forbidden":
+                        result["thumbnail_error"] = "forbidden - 채널 전화번호 인증 필요"
+                    else:
+                        result["thumbnail_error"] = error_msg
+                    print(f"[YouTube] 썸네일 업로드 실패 (API): {result['thumbnail_error']}")
+                    result["thumbnail_uploaded"] = False
+                except Exception as e:
+                    print(f"[YouTube] 썸네일 업로드 실패: {e}")
+                    result["thumbnail_uploaded"] = False
+                    result["thumbnail_error"] = str(e)
+            else:
+                print(f"[YouTube] 썸네일 파일 없음: {thumbnail_path}")
                 result["thumbnail_uploaded"] = False
-                result["thumbnail_error"] = str(e)
+                result["thumbnail_error"] = f"썸네일 파일이 존재하지 않음: {thumbnail_path}"
+        else:
+            # 썸네일 경로가 제공되지 않음
+            result["thumbnail_uploaded"] = False
+            result["thumbnail_error"] = "썸네일이 생성되지 않음 (thumbnail.jpg 없음)"
 
         return result
 

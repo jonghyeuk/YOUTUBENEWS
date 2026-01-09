@@ -1415,10 +1415,15 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str, lan
         thumb_note = ""
         if not result.get("thumbnail_uploaded"):
             thumb_status = "⚠️"
-            if "forbidden" in str(result.get("thumbnail_error", "")).lower():
+            thumb_error = result.get("thumbnail_error", "")
+            if "forbidden" in str(thumb_error).lower():
                 thumb_note = "\n\n⚠️ **썸네일 업로드 실패**: YouTube 채널 전화번호 인증이 필요합니다.\n[YouTube 스튜디오 → 설정 → 채널 → 기능 사용 자격 요건](https://studio.youtube.com)"
+            elif "존재하지 않음" in str(thumb_error) or "생성되지 않음" in str(thumb_error):
+                thumb_note = f"\n\n⚠️ **썸네일 업로드 실패**: 썸네일 이미지가 없습니다.\n업로드 전에 '썸네일 생성' 탭에서 썸네일을 먼저 생성하세요."
+            elif thumb_error:
+                thumb_note = f"\n\n⚠️ 썸네일 업로드 실패: {thumb_error}"
             else:
-                thumb_note = f"\n\n⚠️ 썸네일 업로드 실패: {result.get('thumbnail_error', '알 수 없음')}"
+                thumb_note = "\n\n⚠️ 썸네일 업로드 실패: 원인을 확인할 수 없습니다."
 
         yield (
             f"🎉 **{lang_name} 채널에 업로드 완료!**",
