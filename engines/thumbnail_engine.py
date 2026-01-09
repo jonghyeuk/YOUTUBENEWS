@@ -452,22 +452,20 @@ class ThumbnailEngine:
         self,
         title: str = None,
         description: str = None,
-        script_text: str = None,
         style: str = "불교종교"
     ) -> Tuple[str, str]:
         """
-        LLM을 사용하여 유튜브 업로드 내용 분석 후 후킹 썸네일 메시지 생성
+        LLM을 사용하여 유튜브 제목/설명 분석 후 후킹 썸네일 메시지 생성
 
         Args:
             title: 유튜브 제목
             description: 유튜브 설명
-            script_text: 스크립트 전문 (선택)
             style: 콘텐츠 스타일
 
         Returns:
             (sub_text, main_text) - 상단 메시지, 메인 메시지
         """
-        # LLM에 보낼 콘텐츠 구성
+        # LLM에 보낼 콘텐츠 구성 (제목 + 설명만)
         content_parts = []
         if title:
             content_parts.append(f"[유튜브 제목]\n{title}")
@@ -475,10 +473,6 @@ class ThumbnailEngine:
             # 설명은 처음 500자만
             desc_preview = description[:500] + ("..." if len(description) > 500 else "")
             content_parts.append(f"[유튜브 설명]\n{desc_preview}")
-        if script_text:
-            # 스크립트는 처음 1000자만
-            script_preview = script_text[:1000] + ("..." if len(script_text) > 1000 else "")
-            content_parts.append(f"[스크립트 내용]\n{script_preview}")
 
         if not content_parts:
             # 콘텐츠가 없으면 폴백
@@ -623,7 +617,6 @@ class ThumbnailEngine:
         background_image: str,
         title: str = None,
         description: str = None,
-        script_text: str = None,
         style: str = "불교종교",
         darken: float = 0.5,
         output_path: str = None,
@@ -636,7 +629,6 @@ class ThumbnailEngine:
             background_image: 배경 이미지 경로
             title: 유튜브 제목
             description: 유튜브 설명
-            script_text: 스크립트 전문
             style: 콘텐츠 스타일
             darken: 배경 어둡게 (0.0~1.0)
             output_path: 출력 경로
@@ -649,7 +641,6 @@ class ThumbnailEngine:
         sub_text, main_text = self.generate_hook_message_from_content(
             title=title,
             description=description,
-            script_text=script_text,
             style=style
         )
 
@@ -701,12 +692,10 @@ class ThumbnailEngine:
         # 메인/서브 텍스트 자동 생성
         if not main_text and auto_generate:
             if use_hook and project.script:
-                # 후킹 메시지 생성 (상단 + 메인 연결형)
-                script_text = "\n".join([s.text for s in project.script.scenes]) if project.script.scenes else ""
+                # 후킹 메시지 생성 (제목 + 설명 기반)
                 sub_text, main_text = self.generate_hook_message_from_content(
                     title=project.script.title if project.script else None,
                     description=getattr(project, 'description', None),
-                    script_text=script_text,
                     style=style
                 )
             else:
