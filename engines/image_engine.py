@@ -175,10 +175,17 @@ class ImageEngine:
     def generator(self):
         """지연 초기화된 생성기"""
         if self._generator is None:
-            # StoryMaker는 별도 엔진 사용
+            # StoryMaker는 별도 엔진 사용 (OpenAI 모델만 지원)
             if self.engine_name == "storymaker":
                 from storymaker import StoryMakerEngine
-                model = self.model or "gpt-image-1.5"
+                # flux 모델은 OpenAI에서 지원하지 않으므로 gpt-image-1.5로 대체
+                openai_models = ["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5", "dall-e-2", "dall-e-3"]
+                if self.model and self.model in openai_models:
+                    model = self.model
+                else:
+                    model = "gpt-image-1.5"
+                    if self.model:
+                        print(f"[ImageEngine] ⚠️ StoryMaker는 OpenAI 모델만 지원 - {self.model} → {model}")
                 self._generator = StoryMakerEngine(model=model)
                 return self._generator
 
