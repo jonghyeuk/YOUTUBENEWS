@@ -28,11 +28,19 @@ Audience is global English speakers. No politics, no controversy.
 - Focus on "What YOU can do RIGHT NOW" - concrete, actionable comfort
 - Each teaching point: Problem → Promise → Practical Step (3P formula)
 
-### Key Sentence System (IMPORTANT)
-- Each scene MUST include a "key_sentence" field
+### Key Sentence System (CRITICAL - READ CAREFULLY)
+- Each scene MUST include a UNIQUE "key_sentence" field
 - This sentence will be displayed CENTER SCREEN in large bold text
+- **EVERY SCENE MUST HAVE A DIFFERENT key_sentence** - NO REPETITION!
 - Keep it SHORT (5-10 words max), IMPACTFUL, MEMORABLE
-- Examples: "God is with you NOW", "His grace is ENOUGH", "You are NOT alone"
+- Examples for DIFFERENT scenes:
+  - Scene 1: "God SEES your struggle"
+  - Scene 2: "His grace is ENOUGH"
+  - Scene 3: "You are NEVER alone"
+  - Scene 4: "He will make a WAY"
+  - Scene 5: "Trust His perfect TIMING"
+- ❌ FORBIDDEN: Using the same key_sentence twice
+- ❌ FORBIDDEN: Generic phrases like "God loves you" for every scene
 
 ### Anchor Phrase
 - Use ONE anchor phrase throughout (repeat 6-8 times across the script)
@@ -44,32 +52,32 @@ Audience is global English speakers. No politics, no controversy.
 - Big truth + empathy + what the listener is facing
 - Promise of what will change today
 - "Stay until the end" line
-- key_sentence: Power phrase that hooks
+- key_sentence: "God SEES your struggle" (example - make it UNIQUE)
 
 ### Scene 2-3: TEACHING 1 (1:30–5:00)
 - Problem → Scripture (reference only, 1-line paraphrase) → What you can do NOW
-- key_sentence: Core truth of this teaching
+- key_sentence: "His grace is ENOUGH" (example - must be DIFFERENT from Scene 1)
 
 ### Scene 4-5: TEACHING 2 (5:00–9:00)
 - Problem → Bible example (brief!) → What you can do NOW
-- key_sentence: Core truth of this teaching
+- key_sentence: "He will make a WAY" (example - must be DIFFERENT)
 
 ### Scene 6-7: TEACHING 3 (9:00–13:00)
 - Problem → Everyday analogy → What you can do NOW
-- key_sentence: Core truth of this teaching
+- key_sentence: "Trust His perfect TIMING" (example - must be DIFFERENT)
 
 ### Scene 8-9: PRAYER (13:00–17:00)
 - Praise/thanks → confession/forgiveness → surrender
 - Rebuke fear/heaviness → requests (3 items max)
 - Agreement with listeners → Amen
-- key_sentence: Prayer declaration
+- key_sentence: "I surrender ALL to You" (example - prayer declaration)
 
 ### Scene 10: CTA & BLESSING (17:00–{duration}:00)
 - "Type AMEN in the comments"
 - Share/like/subscribe
 - Prayer requests in comments
 - Blessing + closing line
-- key_sentence: Final blessing
+- key_sentence: "Your best days are AHEAD" (example - final blessing)
 
 ## WRITING RULES
 1. Warm, pastoral, encouraging tone
