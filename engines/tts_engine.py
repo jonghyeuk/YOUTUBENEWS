@@ -8,6 +8,7 @@ import re
 from typing import List, Tuple, Optional, Dict
 from dataclasses import dataclass
 from pydub import AudioSegment as PydubSegment
+from pydub.effects import normalize as pydub_normalize
 
 from models.types import Script, Scene, AudioSegment
 from config import TTS_CONFIG, ELEVENLABS_STYLE_VOICES, EMOTION_TAGS, LANGUAGE_CONFIG
@@ -483,6 +484,9 @@ class TTSEngine:
             # 씬별 TTS 생성 (elevenlabs2.5는 scene 정보 필요)
             audio_data = self._synthesize(text_with_emotion, scene_idx=i, total_scenes=total_scenes)
             scene_audio = PydubSegment.from_mp3(io.BytesIO(audio_data))
+
+            # 씬별 볼륨 정규화 (TTS 엔진의 볼륨 변동 보정)
+            scene_audio = pydub_normalize(scene_audio)
 
             duration = len(scene_audio) / 1000.0  # ms → sec
 
