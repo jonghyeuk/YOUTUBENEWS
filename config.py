@@ -57,8 +57,7 @@ ELEVENLABS_STYLE_VOICES = {
         "speed": 0.9,  # 미스터리: 느리게 (긴장감)
     },
     "불교종교": {
-        "voice_id": "4p0HBzAAGyju0nYfNntV",  # 기본 불교 음성
-        "voice_id_limkony": "zgDzx5jLLCqEp6Fl7Kl7",  # limkony 계정 전용 (불교강의)
+        "voice_id": "zgDzx5jLLCqEp6Fl7Kl7",  # 불교강의 전용 (여성 음성)
         "stability": 0.0,  # Creative - 감정적이고 따뜻한 톤
         "similarity_boost": 0.8,
         "speed": 0.85,  # 불교: 천천히 (명상적)
