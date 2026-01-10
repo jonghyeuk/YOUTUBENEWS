@@ -160,9 +160,6 @@ def shape_text_for_turbo(text: str, emotion: str) -> str:
     """
     t = text.strip()
 
-    # (필수) 생몰년 정보를 자연어로 변환 — TTS가 숫자를 자연스럽게 읽도록
-    t = convert_lifespan_to_speech(t)
-
     # (필수) 남아있는 모든 [ ... ] 제거 — Turbo가 읽어버리는 사고 방지
     t = re.sub(r"\[[^\]]+\]", "", t)
 
