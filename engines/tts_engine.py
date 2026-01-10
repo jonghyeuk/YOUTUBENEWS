@@ -489,8 +489,11 @@ class TTSEngine:
             audio_data = self._synthesize(text_with_emotion, scene_idx=i, total_scenes=total_scenes)
             scene_audio = PydubSegment.from_mp3(io.BytesIO(audio_data))
 
-            # 씬별 볼륨 정규화 (TTS 엔진의 볼륨 변동 보정)
-            scene_audio = pydub_normalize(scene_audio)
+            # 씬별 볼륨 평준화 (목표 dBFS로 강제 맞춤)
+            target_dBFS = -18.0  # 목표 볼륨 (BGM 믹싱 여유 확보)
+            change_in_dBFS = target_dBFS - scene_audio.dBFS
+            scene_audio = scene_audio.apply_gain(change_in_dBFS)
+            print(f"[TTSEngine] 🔊 볼륨 조정: {scene_audio.dBFS:.1f}dBFS → {target_dBFS}dBFS (gain: {change_in_dBFS:+.1f}dB)")
 
             duration = len(scene_audio) / 1000.0  # ms → sec
 

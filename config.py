@@ -58,13 +58,13 @@ ELEVENLABS_STYLE_VOICES = {
     },
     "불교종교": {
         "voice_id": "zgDzx5jLLCqEp6Fl7Kl7",  # 불교강의 전용 (여성 음성)
-        "stability": 0.5,  # 볼륨 안정화 (0.0은 씬간 변동 심함)
+        "stability": 0.3,  # 자연스러움 + 적당한 안정 (0.5는 딱딱함)
         "similarity_boost": 0.8,
         "speed": 0.85,  # 불교: 천천히 (명상적)
     },
     "불교강의": {
         "voice_id": "zgDzx5jLLCqEp6Fl7Kl7",  # 불교강의 전용 (여성 음성)
-        "stability": 0.5,  # 볼륨 안정화 (0.0은 씬간 변동 심함)
+        "stability": 0.3,  # 자연스러움 + 적당한 안정 (0.5는 딱딱함)
         "similarity_boost": 0.8,
         "speed": 0.85,  # 불교: 천천히 (명상적)
     },
