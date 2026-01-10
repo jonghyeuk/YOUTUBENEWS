@@ -45,31 +45,6 @@ class SubtitleSegment:
     duration: float      # 길이 (초)
 
 
-def convert_lifespan_to_speech(text: str) -> str:
-    """
-    TTS가 읽기 어려운 특수 표기 정리
-
-    처리 대상:
-    - 생몰년 괄호 (501-531) → 제거
-    - 꺾쇠 괄호 《금강경》 → 금강경 (내용만 유지)
-    - 홑꺾쇠 〈법화경〉 → 법화경
-    """
-    # 1. 생몰년 괄호 완전 제거: (501-531), (기원전 563-483) 등
-    text = re.sub(r'\(기원전\s*\d+\s*[-~]\s*기원전\s*\d+\)', '', text)
-    text = re.sub(r'\(기원전\s*\d+\s*[-~]\s*\d+\)', '', text)
-    text = re.sub(r'\(\d{2,4}\s*[-~]\s*\d{2,4}\)', '', text)
-    text = re.sub(r'\(\d{2,4}년\)', '', text)
-
-    # 2. 꺾쇠 괄호 제거 (내용은 유지): 《금강경》 → 금강경
-    text = re.sub(r'《([^》]+)》', r'\1', text)
-    text = re.sub(r'〈([^〉]+)〉', r'\1', text)
-
-    # 3. 연속 공백 정리
-    text = re.sub(r'\s{2,}', ' ', text)
-
-    return text.strip()
-
-
 def clean_text_for_subtitle(text: str) -> str:
     """
     TTS용 텍스트에서 자막용 클린 텍스트 생성
@@ -160,15 +135,25 @@ def shape_text_for_turbo(text: str, emotion: str) -> str:
     """
     t = text.strip()
 
-    # 꺾쇠 괄호 제거 (내용은 유지): 《금강경》 → 금강경, 〈법화경〉 → 법화경
-    t = re.sub(r'《([^》]+)》', r'\1', t)
-    t = re.sub(r'〈([^〉]+)〉', r'\1', t)
+    # ═══════════════════════════════════════════════════════════════
+    # ElevenLabs 한국어 TTS용 유니코드 특수문자 정규화
+    # 쌍 매칭이 아닌 개별 문자 치환 방식 (Silent Fail 방지)
+    # ═══════════════════════════════════════════════════════════════
 
-    # 한국어 특수 따옴표 제거 (내용은 유지): '반야바라밀' → 반야바라밀
-    # TTS가 특수 따옴표를 잘못 해석해서 무음/볼륨 변화를 일으킬 수 있음
-    # U+2018 ('), U+2019 ('), U+201C ("), U+201D (")
-    t = re.sub(r'\u2018([^\u2019]+)\u2019', r'\1', t)
-    t = re.sub(r'\u201c([^\u201d]+)\u201d', r'\1', t)
+    # 1. 꺾쇠 괄호 제거 (내용은 유지): 《금강경》 → 금강경
+    t = re.sub(r'[《》〈〉]', '', t)
+
+    # 2. 유니코드 특수 따옴표 → 표준 따옴표로 치환
+    # U+2018 ('), U+2019 ('), U+201A (‚), U+201B (‛) → '
+    t = re.sub(r'[\u2018\u2019\u201a\u201b]', "'", t)
+    # U+201C ("), U+201D ("), U+201E („), U+201F (‟) → "
+    t = re.sub(r'[\u201c\u201d\u201e\u201f]', '"', t)
+
+    # 3. 연속된 점을 표준 생략표로
+    t = re.sub(r'\.{2,}', '...', t)
+
+    # 4. 연속 공백 단일화
+    t = re.sub(r'\s+', ' ', t)
 
     # (필수) 남아있는 모든 [ ... ] 제거 — Turbo가 읽어버리는 사고 방지
     t = re.sub(r"\[[^\]]+\]", "", t)
@@ -621,7 +606,7 @@ class TTSEngine:
                 "use_speaker_boost": True,
                 "speed": getattr(self, 'speed', 1.0)  # 속도 설정 (0.5 ~ 2.0)
             },
-            apply_text_normalization="on"  # 숫자/기호 자동 변환
+            apply_text_normalization="off"  # 한국어: 직접 정규화가 안전
         )
 
         # generator를 bytes로 변환
@@ -666,13 +651,12 @@ class TTSEngine:
             print(f"[TTSEngine] Turbo v2.5 감정: {seg.emotion}, settings: stability={vs['stability']:.2f}, style={vs['style']:.2f}")
 
             # Turbo v2.5 API 호출
-            # apply_text_normalization: 숫자/날짜를 자동으로 자연스럽게 발음
             audio_generator = self.client.text_to_speech.convert(
                 text=shaped_text,
                 voice_id=self.voice_id,
                 model_id="eleven_turbo_v2_5",  # Turbo v2.5: SSML 지원, 빠름
                 voice_settings=vs,
-                apply_text_normalization="on"  # 숫자/기호 자동 변환
+                apply_text_normalization="off"  # 한국어: 직접 정규화가 안전
             )
 
             audio_bytes = b"".join(audio_generator)
