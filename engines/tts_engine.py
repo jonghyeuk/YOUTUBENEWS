@@ -160,8 +160,14 @@ def shape_text_for_turbo(text: str, emotion: str) -> str:
     """
     t = text.strip()
 
-    # (필수) 생몰년 정보를 자연어로 변환 — TTS가 숫자를 자연스럽게 읽도록
-    t = convert_lifespan_to_speech(t)
+    # 꺾쇠 괄호 제거 (내용은 유지): 《금강경》 → 금강경, 〈법화경〉 → 법화경
+    t = re.sub(r'《([^》]+)》', r'\1', t)
+    t = re.sub(r'〈([^〉]+)〉', r'\1', t)
+
+    # 한국어 특수 따옴표 제거 (내용은 유지): '반야바라밀' → 반야바라밀
+    # TTS가 특수 따옴표를 잘못 해석해서 무음/볼륨 변화를 일으킬 수 있음
+    t = re.sub(r''([^']+)'', r'\1', t)
+    t = re.sub(r'"([^"]+)"', r'\1', t)
 
     # (필수) 남아있는 모든 [ ... ] 제거 — Turbo가 읽어버리는 사고 방지
     t = re.sub(r"\[[^\]]+\]", "", t)
@@ -613,7 +619,8 @@ class TTSEngine:
                 "style": 0.5,
                 "use_speaker_boost": True,
                 "speed": getattr(self, 'speed', 1.0)  # 속도 설정 (0.5 ~ 2.0)
-            }
+            },
+            apply_text_normalization="on"  # 숫자/기호 자동 변환
         )
 
         # generator를 bytes로 변환
@@ -658,11 +665,13 @@ class TTSEngine:
             print(f"[TTSEngine] Turbo v2.5 감정: {seg.emotion}, settings: stability={vs['stability']:.2f}, style={vs['style']:.2f}")
 
             # Turbo v2.5 API 호출
+            # apply_text_normalization: 숫자/날짜를 자동으로 자연스럽게 발음
             audio_generator = self.client.text_to_speech.convert(
                 text=shaped_text,
                 voice_id=self.voice_id,
                 model_id="eleven_turbo_v2_5",  # Turbo v2.5: SSML 지원, 빠름
-                voice_settings=vs
+                voice_settings=vs,
+                apply_text_normalization="on"  # 숫자/기호 자동 변환
             )
 
             audio_bytes = b"".join(audio_generator)
