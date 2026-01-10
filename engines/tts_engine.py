@@ -160,6 +160,10 @@ def shape_text_for_turbo(text: str, emotion: str) -> str:
     """
     t = text.strip()
 
+    # 꺾쇠 괄호 제거 (내용은 유지): 《금강경》 → 금강경, 〈법화경〉 → 법화경
+    t = re.sub(r'《([^》]+)》', r'\1', t)
+    t = re.sub(r'〈([^〉]+)〉', r'\1', t)
+
     # (필수) 남아있는 모든 [ ... ] 제거 — Turbo가 읽어버리는 사고 방지
     t = re.sub(r"\[[^\]]+\]", "", t)
 
