@@ -156,6 +156,10 @@ def shape_text_for_turbo(text: str, emotion: str) -> str:
     # 4. 연속 공백 단일화
     t = re.sub(r'\s+', ' ', t)
 
+    # 5. 한자 주석 제거: 공(攻) → 공, 색(色) → 색
+    # TTS가 "공공", "색색"으로 읽는 문제 방지
+    t = re.sub(r'\([\u4e00-\u9fff]+\)', '', t)
+
     # (필수) 남아있는 모든 [ ... ] 제거 — Turbo가 읽어버리는 사고 방지
     t = re.sub(r"\[[^\]]+\]", "", t)
 
