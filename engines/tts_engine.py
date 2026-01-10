@@ -619,7 +619,8 @@ class TTSEngine:
                 "style": 0.5,
                 "use_speaker_boost": True,
                 "speed": getattr(self, 'speed', 1.0)  # 속도 설정 (0.5 ~ 2.0)
-            }
+            },
+            apply_text_normalization="on"  # 숫자/기호 자동 변환
         )
 
         # generator를 bytes로 변환
@@ -664,11 +665,13 @@ class TTSEngine:
             print(f"[TTSEngine] Turbo v2.5 감정: {seg.emotion}, settings: stability={vs['stability']:.2f}, style={vs['style']:.2f}")
 
             # Turbo v2.5 API 호출
+            # apply_text_normalization: 숫자/날짜를 자동으로 자연스럽게 발음
             audio_generator = self.client.text_to_speech.convert(
                 text=shaped_text,
                 voice_id=self.voice_id,
                 model_id="eleven_turbo_v2_5",  # Turbo v2.5: SSML 지원, 빠름
-                voice_settings=vs
+                voice_settings=vs,
+                apply_text_normalization="on"  # 숫자/기호 자동 변환
             )
 
             audio_bytes = b"".join(audio_generator)
