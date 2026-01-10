@@ -57,7 +57,7 @@ ELEVENLABS_STYLE_VOICES = {
         "speed": 0.9,  # 미스터리: 느리게 (긴장감)
     },
     "불교종교": {
-        "voice_id": "4p0HBzAAGyju0nYfNntV",  # 사용자 지정 - 명상/위로 스타일
+        "voice_id": "zgDzx5jLLCqEp6Fl7Kl7",  # 불교강의 전용 음성
         "stability": 0.0,  # Creative - 감정적이고 따뜻한 톤
         "similarity_boost": 0.8,
         "speed": 0.85,  # 불교: 천천히 (명상적)
@@ -383,7 +383,7 @@ LANGUAGE_CONFIG = {
     "ko": {
         "name": "🇰🇷 한국어",
         "code": "ko",
-        "tts_voice_id": "4p0HBzAAGyju0nYfNntV",  # 한국어 불교 voice
+        "tts_voice_id": "zgDzx5jLLCqEp6Fl7Kl7",  # 한국어 불교강의 전용 voice
         "youtube_channel": "@부처님의한마디낭독",
     },
     "ja": {
