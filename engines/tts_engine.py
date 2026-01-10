@@ -479,10 +479,11 @@ class TTSEngine:
         print(f"[TTSEngine] {total_scenes}개 씬 TTS 생성 시작...")
 
         for i, scene in enumerate(script.scenes):
-            print(f"[TTSEngine] 씬 {scene.scene_id}/{total_scenes} 처리 중...")
-
             # 원본 텍스트 저장 (자막용)
             original_text = scene.text
+            text_len = len(original_text)
+
+            print(f"[TTSEngine] 씬 {scene.scene_id}/{total_scenes} 처리 중... (텍스트: {text_len}자)")
 
             # 감정 태그 추가 (ElevenLabs v3 + 스타일 설정 시)
             text_with_emotion = self._add_emotion_tag(scene.text, i, total_scenes)
@@ -492,6 +493,13 @@ class TTSEngine:
             scene_audio = PydubSegment.from_mp3(io.BytesIO(audio_data))
 
             duration = len(scene_audio) / 1000.0  # ms → sec
+
+            # 디버그: 텍스트 길이 대비 오디오 길이 체크
+            chars_per_sec = text_len / duration if duration > 0 else 0
+            if chars_per_sec > 10:  # 초당 10자 이상이면 너무 빠름 (의심)
+                print(f"[TTSEngine] ⚠️ 씬 {scene.scene_id}: {text_len}자 → {duration:.1f}초 (초당 {chars_per_sec:.1f}자, 너무 빠름?)")
+            else:
+                print(f"[TTSEngine] ✓ 씬 {scene.scene_id}: {text_len}자 → {duration:.1f}초")
 
             segment = AudioSegment(
                 scene_id=scene.scene_id,
@@ -633,7 +641,14 @@ class TTSEngine:
             # 감정에 맞게 텍스트 변형 (구두점, SSML break 등)
             shaped_text = shape_text_for_turbo(seg.text, seg.emotion)
 
+            # 디버그: 원본 vs 변형 텍스트 비교
+            if len(seg.text) != len(shaped_text):
+                print(f"[TTSEngine] ⚠️ 텍스트 변형: {len(seg.text)}자 → {len(shaped_text)}자")
+                if len(shaped_text) < 10:
+                    print(f"[TTSEngine] ⚠️ 변형 후 텍스트가 너무 짧음: '{shaped_text}'")
+
             if not shaped_text.strip():
+                print(f"[TTSEngine] ⚠️ 빈 텍스트 건너뜀 (원본: {len(seg.text)}자)")
                 continue
 
             # 감정별 voice_settings 적용
