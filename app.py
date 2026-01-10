@@ -603,13 +603,20 @@ def preview_tts_script(engine: str):
 
     # EMOTION_TAGS 가져오기
     from config import EMOTION_TAGS
-    from engines.tts_engine import STYLE_DEFAULT_EMOTIONS_V25
+    from engines.tts_engine import STYLE_DEFAULT_EMOTIONS_V25, convert_to_tts_text
 
     preview = f"## 🎙️ TTS 입력 대사 미리보기\n"
     preview += f"**엔진**: {engine} | **스타일**: {style or '없음'} | **씬**: {total_scenes}개\n"
     if usage_info:
         preview += usage_info
     preview += "\n---\n\n"
+
+    # TTS 변환 규칙 안내
+    preview += "### 📝 TTS 전처리 규칙\n"
+    preview += "- 한자 병기 제거: `임(林)` → `임`\n"
+    preview += "- 년도 변환: `501년` → `오백일년`\n"
+    preview += "- 특수 괄호 제거: `<<금강경>>` → `금강경`\n"
+    preview += "- 특수 따옴표 정규화\n\n---\n\n"
 
     for i, scene in enumerate(script.scenes):
         position = i / total_scenes
@@ -643,15 +650,23 @@ def preview_tts_script(engine: str):
             else:
                 emotion_info = emotions.get("ending", "calm")
 
+        # TTS 전처리 적용
+        original_text = scene.text
+        tts_text = convert_to_tts_text(original_text)
+        has_changes = original_text.strip() != tts_text.strip()
+
         preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
         if tag:
             preview += f"🎭 **감정태그 (v3)**: `{tag}`\n\n"
-            preview += f"```\n{tag} {scene.text}\n```\n\n"
         elif emotion_info:
             preview += f"🎭 **감정흉내 (v2.5)**: `{emotion_info}` → voice_settings 자동 조정\n\n"
-            preview += f"```\n{scene.text}\n```\n\n"
+
+        # 변환 전/후 비교 표시
+        if has_changes:
+            preview += f"**📄 원본:**\n```\n{original_text}\n```\n\n"
+            preview += f"**🔊 TTS용 (변환됨):**\n```\n{tts_text}\n```\n\n"
         else:
-            preview += f"```\n{scene.text}\n```\n\n"
+            preview += f"**🔊 TTS 입력:**\n```\n{tts_text}\n```\n\n"
 
     return preview
 

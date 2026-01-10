@@ -78,6 +78,114 @@ def clean_text_for_subtitle(text: str) -> str:
     return clean
 
 
+# ========== TTS 텍스트 전처리 (스크립트 → TTS용 변환) ==========
+
+def _number_to_korean(num: int) -> str:
+    """
+    숫자를 한글 읽기로 변환 (년도용)
+    예: 501 → 오백일, 1234 → 천이백삼십사, 2024 → 이천이십사
+    """
+    if num == 0:
+        return "영"
+
+    units = ["", "일", "이", "삼", "사", "오", "육", "칠", "팔", "구"]
+
+    result = []
+
+    # 천 단위
+    if num >= 1000:
+        thousands = num // 1000
+        if thousands == 1:
+            result.append("천")
+        else:
+            result.append(units[thousands] + "천")
+        num %= 1000
+
+    # 백 단위
+    if num >= 100:
+        hundreds = num // 100
+        if hundreds == 1:
+            result.append("백")
+        else:
+            result.append(units[hundreds] + "백")
+        num %= 100
+
+    # 십 단위
+    if num >= 10:
+        tens = num // 10
+        if tens == 1:
+            result.append("십")
+        else:
+            result.append(units[tens] + "십")
+        num %= 10
+
+    # 일 단위
+    if num > 0:
+        result.append(units[num])
+
+    return "".join(result)
+
+
+def convert_to_tts_text(text: str) -> str:
+    """
+    스크립트 원문을 TTS 최적화 텍스트로 변환
+    - 한자 병기 제거: 임(林) → 임
+    - 년도 변환: 501년 → 오백일년
+    - 특수 괄호 제거: <<금강경>>, 《》, 〈〉 → 내용만
+    - 특수 따옴표 정규화
+    - 기타 TTS가 어색하게 읽는 패턴 수정
+    """
+    t = text.strip()
+
+    # 1. 한자 병기 제거: 임(林) → 임, 색(色) → 색
+    t = re.sub(r'\([\u4e00-\u9fff]+\)', '', t)
+
+    # 2. 년도 변환: 3자리 이상 숫자 + 년 → 한글로
+    # 501년 → 오백일년, 1234년 → 천이백삼십사년
+    def year_replace(m):
+        year_num = int(m.group(1))
+        return _number_to_korean(year_num) + "년"
+
+    t = re.sub(r'(\d{3,4})년', year_replace, t)
+
+    # 3. 서기/기원전 + 숫자도 처리
+    def era_year_replace(m):
+        era = m.group(1)  # 서기 or 기원전
+        year_num = int(m.group(2))
+        return era + " " + _number_to_korean(year_num) + "년"
+
+    t = re.sub(r'(서기|기원전)\s*(\d{3,4})년', era_year_replace, t)
+
+    # 4. 특수 괄호 제거 (내용은 유지)
+    # <<금강경>> → 금강경
+    t = re.sub(r'<<([^>]+)>>', r'\1', t)
+    t = re.sub(r'《([^》]+)》', r'\1', t)
+    t = re.sub(r'〈([^〉]+)〉', r'\1', t)
+    # 이미 없는 경우 개별 문자 제거
+    t = re.sub(r'[《》〈〉<<>>]', '', t)
+
+    # 5. 유니코드 특수 따옴표 → 표준 따옴표
+    t = re.sub(r'[\u2018\u2019\u201a\u201b]', "'", t)  # ' ' ‚ ‛ → '
+    t = re.sub(r'[\u201c\u201d\u201e\u201f]', '"', t)  # " " „ ‟ → "
+
+    # 6. 큰따옴표 안 내용이 TTS에서 어색하지 않도록
+    # "마음이 곧 부처다"라고 → 마음이 곧 부처다 라고
+    t = re.sub(r'"([^"]+)"라고', r'\1 라고', t)
+    t = re.sub(r'"([^"]+)"라며', r'\1 라며', t)
+    t = re.sub(r'"([^"]+)"라는', r'\1 라는', t)
+    t = re.sub(r"'([^']+)'라고", r'\1 라고', t)
+    t = re.sub(r"'([^']+)'라며", r'\1 라며', t)
+    t = re.sub(r"'([^']+)'라는", r'\1 라는', t)
+
+    # 7. 연속된 점 정리
+    t = re.sub(r'\.{2,}', '...', t)
+
+    # 8. 연속 공백 단일화
+    t = re.sub(r'\s+', ' ', t)
+
+    return t.strip()
+
+
 def extract_break_duration(text: str) -> float:
     """텍스트에서 <break> 태그들의 총 시간 추출 (초)"""
     total = 0.0
@@ -133,32 +241,12 @@ def shape_text_for_turbo(text: str, emotion: str) -> str:
     """
     감정 흉내를 강화하는 텍스트 변형 (구두점/호흡/SSML break)
     Turbo v2.5는 태그 대신 문장 형태에 반응
+
+    1단계: convert_to_tts_text()로 기본 TTS 전처리 (년도 변환, 한자 제거 등)
+    2단계: 감정별 미세 튜닝 (구두점, break 태그 등)
     """
-    t = text.strip()
-
-    # ═══════════════════════════════════════════════════════════════
-    # ElevenLabs 한국어 TTS용 유니코드 특수문자 정규화
-    # 쌍 매칭이 아닌 개별 문자 치환 방식 (Silent Fail 방지)
-    # ═══════════════════════════════════════════════════════════════
-
-    # 1. 꺾쇠 괄호 제거 (내용은 유지): 《금강경》 → 금강경
-    t = re.sub(r'[《》〈〉]', '', t)
-
-    # 2. 유니코드 특수 따옴표 → 표준 따옴표로 치환
-    # U+2018 ('), U+2019 ('), U+201A (‚), U+201B (‛) → '
-    t = re.sub(r'[\u2018\u2019\u201a\u201b]', "'", t)
-    # U+201C ("), U+201D ("), U+201E („), U+201F (‟) → "
-    t = re.sub(r'[\u201c\u201d\u201e\u201f]', '"', t)
-
-    # 3. 연속된 점을 표준 생략표로
-    t = re.sub(r'\.{2,}', '...', t)
-
-    # 4. 연속 공백 단일화
-    t = re.sub(r'\s+', ' ', t)
-
-    # 5. 한자 주석 제거: 공(攻) → 공, 색(色) → 색
-    # TTS가 "공공", "색색"으로 읽는 문제 방지
-    t = re.sub(r'\([\u4e00-\u9fff]+\)', '', t)
+    # 1단계: TTS 기본 전처리 적용
+    t = convert_to_tts_text(text)
 
     # (필수) 남아있는 모든 [ ... ] 제거 — Turbo가 읽어버리는 사고 방지
     t = re.sub(r"\[[^\]]+\]", "", t)
