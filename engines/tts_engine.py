@@ -416,25 +416,25 @@ class TTSEngine:
             raise ValueError("ELEVENLABS_API_KEY_LIMKONY 환경변수가 설정되지 않았습니다")
         self.client = ElevenLabs(api_key=api_key)
 
-        # 언어별 voice_id 우선 적용
+        # 언어별 voice_id
         lang_config = LANGUAGE_CONFIG.get(self.language, {})
-        lang_voice_id = lang_config.get("tts_voice_id")
         lang_name = lang_config.get("name", "🇰🇷 한국어")
 
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
-            if self.style == "영어Saying전용":
+            # limkony 전용 voice_id가 있으면 우선 사용 (불교강의 등)
+            if voice_config.get("voice_id_limkony"):
+                self.voice_id = voice_config["voice_id_limkony"]
+            elif self.style == "영어Saying전용":
                 self.voice_id = voice_config["voice_id"]
             else:
-                # 다른 스타일: 언어별 voice_id 우선
-                self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+                self.voice_id = voice_config["voice_id"]
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
             print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 스타일: {self.style}, voice: {self.voice_id[:8]}..., 속도: {self.speed})")
         else:
-            self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
+            self.voice_id = TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
             print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 기본 음성, 속도: {self.speed})")
 
