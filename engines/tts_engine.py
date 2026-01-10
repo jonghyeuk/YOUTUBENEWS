@@ -47,47 +47,27 @@ class SubtitleSegment:
 
 def convert_lifespan_to_speech(text: str) -> str:
     """
-    생몰년 정보를 TTS가 자연스럽게 읽을 수 있도록 변환
+    TTS가 읽기 어려운 특수 표기 정리
 
-    예시:
-    - "소명태자(501-531)" → "소명태자, 서기 501년부터 531년,"
-    - "석가모니(기원전 563-기원전 483)" → "석가모니, 기원전 563년부터 기원전 483년,"
-    - "혜초(704~787)" → "혜초, 서기 704년부터 787년,"
+    처리 대상:
+    - 생몰년 괄호 (501-531) → 제거
+    - 꺾쇠 괄호 《금강경》 → 금강경 (내용만 유지)
+    - 홑꺾쇠 〈법화경〉 → 법화경
     """
-    # 패턴 1: 기원전 포함 (기원전 563-기원전 483)
-    text = re.sub(
-        r'\(기원전\s*(\d+)\s*[-~]\s*기원전\s*(\d+)\)',
-        r', 기원전 \1년부터 기원전 \2년,',
-        text
-    )
+    # 1. 생몰년 괄호 완전 제거: (501-531), (기원전 563-483) 등
+    text = re.sub(r'\(기원전\s*\d+\s*[-~]\s*기원전\s*\d+\)', '', text)
+    text = re.sub(r'\(기원전\s*\d+\s*[-~]\s*\d+\)', '', text)
+    text = re.sub(r'\(\d{2,4}\s*[-~]\s*\d{2,4}\)', '', text)
+    text = re.sub(r'\(\d{2,4}년\)', '', text)
 
-    # 패턴 2: 시작만 기원전 (기원전 563-483)
-    text = re.sub(
-        r'\(기원전\s*(\d+)\s*[-~]\s*(\d+)\)',
-        r', 기원전 \1년부터 \2년,',
-        text
-    )
+    # 2. 꺾쇠 괄호 제거 (내용은 유지): 《금강경》 → 금강경
+    text = re.sub(r'《([^》]+)》', r'\1', text)
+    text = re.sub(r'〈([^〉]+)〉', r'\1', text)
 
-    # 패턴 3: 일반 연도 (501-531) 또는 (501~531)
-    text = re.sub(
-        r'\((\d{2,4})\s*[-~]\s*(\d{2,4})\)',
-        r', 서기 \1년부터 \2년,',
-        text
-    )
+    # 3. 연속 공백 정리
+    text = re.sub(r'\s{2,}', ' ', text)
 
-    # 패턴 4: 단일 연도 (531년) - 그대로 두되 괄호만 자연스럽게
-    text = re.sub(
-        r'\((\d{2,4})년\)',
-        r', \1년,',
-        text
-    )
-
-    # 연속된 쉼표 정리
-    text = re.sub(r',\s*,', ',', text)
-    # 문장 끝 쉼표 정리
-    text = re.sub(r',\s*([.!?])', r'\1', text)
-
-    return text
+    return text.strip()
 
 
 def clean_text_for_subtitle(text: str) -> str:
@@ -436,25 +416,25 @@ class TTSEngine:
             raise ValueError("ELEVENLABS_API_KEY_LIMKONY 환경변수가 설정되지 않았습니다")
         self.client = ElevenLabs(api_key=api_key)
 
-        # 언어별 voice_id 우선 적용
+        # 언어별 voice_id
         lang_config = LANGUAGE_CONFIG.get(self.language, {})
-        lang_voice_id = lang_config.get("tts_voice_id")
         lang_name = lang_config.get("name", "🇰🇷 한국어")
 
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
-            if self.style == "영어Saying전용":
+            # limkony 전용 voice_id가 있으면 우선 사용 (불교강의 등)
+            if voice_config.get("voice_id_limkony"):
+                self.voice_id = voice_config["voice_id_limkony"]
+            elif self.style == "영어Saying전용":
                 self.voice_id = voice_config["voice_id"]
             else:
-                # 다른 스타일: 언어별 voice_id 우선
-                self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+                self.voice_id = voice_config["voice_id"]
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
             print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 스타일: {self.style}, voice: {self.voice_id[:8]}..., 속도: {self.speed})")
         else:
-            self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
+            self.voice_id = TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
             print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 기본 음성, 속도: {self.speed})")
 
