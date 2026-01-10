@@ -360,8 +360,8 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 불교종교/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
-            if self.style in ("영어Saying전용", "불교종교"):
+            # 불교종교/불교강의/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style in ("영어Saying전용", "불교종교", "불교강의"):
                 self.voice_id = voice_config["voice_id"]
             else:
                 # 다른 스타일: 언어별 voice_id 우선
@@ -392,8 +392,8 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 불교종교/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
-            if self.style in ("영어Saying전용", "불교종교"):
+            # 불교종교/불교강의/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style in ("영어Saying전용", "불교종교", "불교강의"):
                 self.voice_id = voice_config["voice_id"]
             else:
                 # 다른 스타일: 언어별 voice_id 우선
@@ -408,7 +408,7 @@ class TTSEngine:
             print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 ({lang_name}, 기본 음성, 속도: {self.speed})")
 
     def _init_elevenlabs_v25_limkony(self):
-        """ElevenLabs Turbo v2.5 (limkony 계정) 초기화 - 별도 API 키 사용"""
+        """ElevenLabs Turbo v2.5 (limkony 계정) 초기화 - 별도 API 키 사용, elevenlabs2.5와 동일 로직"""
         from elevenlabs.client import ElevenLabs
         # limkony 전용 API 키 사용
         api_key = os.getenv("ELEVENLABS_API_KEY_LIMKONY")
@@ -416,20 +416,26 @@ class TTSEngine:
             raise ValueError("ELEVENLABS_API_KEY_LIMKONY 환경변수가 설정되지 않았습니다")
         self.client = ElevenLabs(api_key=api_key)
 
-        # 언어별 voice_id
+        # 언어별 voice_id 우선 적용 (elevenlabs2.5와 동일)
         lang_config = LANGUAGE_CONFIG.get(self.language, {})
+        lang_voice_id = lang_config.get("tts_voice_id")
         lang_name = lang_config.get("name", "🇰🇷 한국어")
 
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 스타일 voice_id 사용
-            self.voice_id = voice_config["voice_id"]
+            # 불교종교/불교강의/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style in ("영어Saying전용", "불교종교", "불교강의"):
+                self.voice_id = voice_config["voice_id"]
+            else:
+                # 다른 스타일: 언어별 voice_id 우선
+                self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+            # 속도: UI 지정값 > 스타일 값 > 전역 설정
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
             print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 스타일: {self.style}, voice: {self.voice_id[:8]}..., 속도: {self.speed})")
         else:
-            self.voice_id = TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
+            self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
             print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 기본 음성, 속도: {self.speed})")
 
@@ -473,10 +479,11 @@ class TTSEngine:
         print(f"[TTSEngine] {total_scenes}개 씬 TTS 생성 시작...")
 
         for i, scene in enumerate(script.scenes):
-            print(f"[TTSEngine] 씬 {scene.scene_id}/{total_scenes} 처리 중...")
-
             # 원본 텍스트 저장 (자막용)
             original_text = scene.text
+            text_len = len(original_text)
+
+            print(f"[TTSEngine] 씬 {scene.scene_id}/{total_scenes} 처리 중... (텍스트: {text_len}자)")
 
             # 감정 태그 추가 (ElevenLabs v3 + 스타일 설정 시)
             text_with_emotion = self._add_emotion_tag(scene.text, i, total_scenes)
@@ -486,6 +493,13 @@ class TTSEngine:
             scene_audio = PydubSegment.from_mp3(io.BytesIO(audio_data))
 
             duration = len(scene_audio) / 1000.0  # ms → sec
+
+            # 디버그: 텍스트 길이 대비 오디오 길이 체크
+            chars_per_sec = text_len / duration if duration > 0 else 0
+            if chars_per_sec > 10:  # 초당 10자 이상이면 너무 빠름 (의심)
+                print(f"[TTSEngine] ⚠️ 씬 {scene.scene_id}: {text_len}자 → {duration:.1f}초 (초당 {chars_per_sec:.1f}자, 너무 빠름?)")
+            else:
+                print(f"[TTSEngine] ✓ 씬 {scene.scene_id}: {text_len}자 → {duration:.1f}초")
 
             segment = AudioSegment(
                 scene_id=scene.scene_id,
@@ -627,7 +641,14 @@ class TTSEngine:
             # 감정에 맞게 텍스트 변형 (구두점, SSML break 등)
             shaped_text = shape_text_for_turbo(seg.text, seg.emotion)
 
+            # 디버그: 원본 vs 변형 텍스트 비교
+            if len(seg.text) != len(shaped_text):
+                print(f"[TTSEngine] ⚠️ 텍스트 변형: {len(seg.text)}자 → {len(shaped_text)}자")
+                if len(shaped_text) < 10:
+                    print(f"[TTSEngine] ⚠️ 변형 후 텍스트가 너무 짧음: '{shaped_text}'")
+
             if not shaped_text.strip():
+                print(f"[TTSEngine] ⚠️ 빈 텍스트 건너뜀 (원본: {len(seg.text)}자)")
                 continue
 
             # 감정별 voice_settings 적용
