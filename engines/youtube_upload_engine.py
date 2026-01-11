@@ -199,7 +199,9 @@ class YouTubeUploadEngine:
             },
             "status": {
                 "privacyStatus": privacy_status,
-                "selfDeclaredMadeForKids": False,
+                "selfDeclaredMadeForKids": False,  # 아동용 콘텐츠 아님
+                "madeForKids": False,              # 아동용 콘텐츠 아님 (명시적)
+                "license": "youtube",              # 표준 YouTube 라이선스
             },
         }
 
