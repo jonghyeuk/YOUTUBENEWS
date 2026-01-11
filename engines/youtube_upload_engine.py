@@ -41,6 +41,25 @@ LANGUAGE_NAMES = {
     "en": "🇺🇸 영어",
 }
 
+# 언어별 YouTube 업로드 기본 설정
+LANGUAGE_UPLOAD_DEFAULTS = {
+    "ko": {
+        "defaultLanguage": "ko",           # 제목/설명 언어
+        "defaultAudioLanguage": "ko",      # 동영상 언어
+        "categoryId": "27",                # Education
+    },
+    "ja": {
+        "defaultLanguage": "ja",           # 제목/설명 언어
+        "defaultAudioLanguage": "ja",      # 동영상 언어
+        "categoryId": "27",                # Education
+    },
+    "en": {
+        "defaultLanguage": "en-US",        # 제목/설명 언어 (영어-미국)
+        "defaultAudioLanguage": "en",      # 동영상 언어
+        "categoryId": "27",                # Education
+    },
+}
+
 # 업로드 재시도 설정
 MAX_RETRIES = 3
 RETRY_DELAY = 5  # seconds
@@ -135,7 +154,7 @@ class YouTubeUploadEngine:
         title: str,
         description: str,
         tags: str,
-        category_id: str = "22",  # 22 = People & Blogs
+        category_id: str = None,  # None이면 언어별 기본값 사용 (Education)
         privacy_status: str = "private",  # private, unlisted, public
         thumbnail_path: Optional[str] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
@@ -148,7 +167,7 @@ class YouTubeUploadEngine:
             title: 영상 제목
             description: 영상 설명
             tags: 태그 (쉼표 구분)
-            category_id: 카테고리 ID (기본: 22 = People & Blogs)
+            category_id: 카테고리 ID (기본: 언어별 설정, 없으면 27=Education)
             privacy_status: 공개 상태 (private/unlisted/public)
             thumbnail_path: 썸네일 이미지 경로 (선택)
             progress_callback: 진행률 콜백 함수 (uploaded_bytes, total_bytes)
@@ -166,19 +185,30 @@ class YouTubeUploadEngine:
         # 태그 처리
         tag_list = [t.strip() for t in tags.split(",") if t.strip()]
 
+        # 언어별 기본 설정 가져오기
+        lang_defaults = LANGUAGE_UPLOAD_DEFAULTS.get(self.language, {})
+        final_category = category_id or lang_defaults.get("categoryId", "27")
+
         # 영상 메타데이터
         body = {
             "snippet": {
                 "title": title[:100],  # YouTube 제목 제한
                 "description": description[:5000],  # 설명 제한
                 "tags": tag_list[:500],  # 태그 제한
-                "categoryId": category_id,
+                "categoryId": final_category,
             },
             "status": {
                 "privacyStatus": privacy_status,
                 "selfDeclaredMadeForKids": False,
             },
         }
+
+        # 언어 설정 적용 (동영상 언어, 제목/설명 언어)
+        if lang_defaults:
+            if "defaultLanguage" in lang_defaults:
+                body["snippet"]["defaultLanguage"] = lang_defaults["defaultLanguage"]
+            if "defaultAudioLanguage" in lang_defaults:
+                body["snippet"]["defaultAudioLanguage"] = lang_defaults["defaultAudioLanguage"]
 
         # 미디어 업로드 설정
         media = MediaFileUpload(
