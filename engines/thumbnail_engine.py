@@ -108,8 +108,9 @@ class ThumbnailEngine:
     # 기본 설정
     THUMBNAIL_SIZE = (1280, 720)  # YouTube 권장 크기
 
-    # 한국어 썸네일 전용 폰트 (영어/일본어는 기존 폰트 사용)
-    KOREAN_THUMBNAIL_FONT = "fonts/GapyeongHanseokbongB.ttf"
+    # 언어별 썸네일 전용 폰트
+    KOREAN_THUMBNAIL_FONT = "fonts/GapyeongHanseokbongB.ttf"      # 한국어: 가평한석봉체
+    ENGLISH_THUMBNAIL_FONT = "fonts/PlayfairDisplay-Italic.ttf"  # 영어: Playfair Display Italic
 
     # 스타일별 색상 프리셋 (모든 스타일에 두꺼운 외곽선 적용)
     COLOR_PRESETS = {
@@ -226,10 +227,13 @@ class ThumbnailEngine:
 
     def _get_font_for_language(self, language: str = "ko") -> str:
         """언어별 폰트 경로 반환"""
-        # 한국어: 전용 폰트 사용 (있으면)
+        # 한국어: 가평한석봉체
         if language == "ko" and os.path.exists(self.KOREAN_THUMBNAIL_FONT):
             return self.KOREAN_THUMBNAIL_FONT
-        # 영어/일본어 또는 한국어 폰트 없을 때: 기존 시스템 폰트
+        # 영어: Playfair Display Italic (우아한 세리프체)
+        if language == "en" and os.path.exists(self.ENGLISH_THUMBNAIL_FONT):
+            return self.ENGLISH_THUMBNAIL_FONT
+        # 일본어 또는 폰트 없을 때: 기존 시스템 폰트
         return self.font_paths["extrabold"] or self.font_paths["bold"] or "arial.ttf"
 
     def create_thumbnail(
