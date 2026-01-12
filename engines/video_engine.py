@@ -201,21 +201,50 @@ class VideoEngine:
         effect: str,
         output_path: str
     ):
-        """FFmpeg zoompan 필터로 단일 이미지 줌 클립 생성 (10배 이상 빠름)"""
+        """
+        FFmpeg zoompan 필터로 단일 이미지 줌 클립 생성
+        - Smoothstep(가감속) 적용으로 부드러운 시작/끝
+        - 사선 드리프트 + 미세 흔들림으로 "숨쉬는 카메라" 효과
+        """
         # 총 프레임 수
         total_frames = int(duration * self.fps)
 
-        # 줌 범위: 1.0 ~ 1.15 (15% 줌)
-        if effect == "zoom_in":
-            # 1.0 → 1.15 줌인
-            zoom_expr = f"min(1+0.15*on/{total_frames},1.15)"
-        else:
-            # 1.15 → 1.0 줌아웃
-            zoom_expr = f"max(1.15-0.15*on/{total_frames},1.0)"
+        # ========================================
+        # Smoothstep 계산식 (FFmpeg 표현식)
+        # u = on/total_frames (0→1)
+        # smoothstep = u*u*(3-2*u) → 가속→일정→감속
+        # ========================================
+        u = f"(on/{total_frames})"
+        smoothstep = f"({u})*({u})*(3-2*({u}))"
 
-        # 중앙 고정 (x, y 표현식)
-        x_expr = f"iw/2-(iw/zoom/2)"
-        y_expr = f"ih/2-(ih/zoom/2)"
+        # 줌 범위: 1.0 ~ 1.12 (12% 줌, 살짝 줄임)
+        if effect == "zoom_in":
+            # 1.0 → 1.12 줌인 (smoothstep 적용)
+            zoom_expr = f"1+0.12*({smoothstep})"
+        else:
+            # 1.12 → 1.0 줌아웃 (smoothstep 적용)
+            zoom_expr = f"1.12-0.12*({smoothstep})"
+
+        # ========================================
+        # 사선 드리프트 + 미세 흔들림
+        # - 드리프트: 전체 여유폭의 6~8%만 이동 (smoothstep)
+        # - 흔들림: 3~5px sin() 노이즈 (숨쉬는 카메라)
+        # ========================================
+        # 기본 중앙 위치
+        center_x = f"(iw/2-(iw/zoom/2))"
+        center_y = f"(ih/2-(ih/zoom/2))"
+
+        # 사선 드리프트 (smoothstep, 아주 작게)
+        drift_x = f"(iw-ow)*({smoothstep})*0.06"  # X 방향 6%
+        drift_y = f"(ih-oh)*({smoothstep})*0.04"  # Y 방향 4%
+
+        # 미세 흔들림 (sin 노이즈, 2~4px)
+        wobble_x = f"3*sin(2*PI*on/90)"   # X 흔들림 (90프레임 주기)
+        wobble_y = f"2*sin(2*PI*on/120)"  # Y 흔들림 (120프레임 주기, 비동기)
+
+        # 최종 좌표 = 중앙 + 드리프트 + 흔들림
+        x_expr = f"{center_x}+{drift_x}+{wobble_x}"
+        y_expr = f"{center_y}+{drift_y}+{wobble_y}"
 
         # zoompan 필터 (bicubic 보간, 부드러운 줌)
         filter_complex = (
