@@ -111,6 +111,7 @@ class ThumbnailEngine:
     # 언어별 썸네일 전용 폰트
     KOREAN_THUMBNAIL_FONT = "fonts/GapyeongHanseokbongB.ttf"      # 한국어: 가평한석봉체
     ENGLISH_THUMBNAIL_FONT = "fonts/PlayfairDisplay-Italic.ttf"  # 영어: Playfair Display Italic
+    JAPANESE_THUMBNAIL_FONT = "fonts/YujiSyuku-Regular.ttf"      # 일본어: 佑字肅 (서예체)
 
     # 스타일별 색상 프리셋 (모든 스타일에 두꺼운 외곽선 적용)
     COLOR_PRESETS = {
@@ -233,7 +234,10 @@ class ThumbnailEngine:
         # 영어: Playfair Display Italic (우아한 세리프체)
         if language == "en" and os.path.exists(self.ENGLISH_THUMBNAIL_FONT):
             return self.ENGLISH_THUMBNAIL_FONT
-        # 일본어 또는 폰트 없을 때: 기존 시스템 폰트
+        # 일본어: 佑字肅 (서예체)
+        if language == "ja" and os.path.exists(self.JAPANESE_THUMBNAIL_FONT):
+            return self.JAPANESE_THUMBNAIL_FONT
+        # 폰트 없을 때: 기존 시스템 폰트
         return self.font_paths["extrabold"] or self.font_paths["bold"] or "arial.ttf"
 
     def create_thumbnail(
