@@ -821,6 +821,20 @@ IMAGE_MODEL_OPTIONS = {
         ("flux-pro-v1.1 (최신/$0.05)", "flux-pro-v1.1"),
         ("flux-ultra (최고품질/$0.06)", "flux-ultra"),
     ],
+    "fal-anime": [
+        ("flux-schnell (빠름/$0.003)", "flux-schnell"),
+        ("flux-dev (균형/$0.025)", "flux-dev"),
+        ("flux-pro (고품질/$0.05)", "flux-pro"),
+        ("flux-pro-v1.1 (최신/$0.05)", "flux-pro-v1.1"),
+        ("flux-ultra (최고품질/$0.06)", "flux-ultra"),
+    ],
+    "fal-realistic": [
+        ("flux-schnell (빠름/$0.003)", "flux-schnell"),
+        ("flux-dev (균형/$0.025)", "flux-dev"),
+        ("flux-pro (고품질/$0.05)", "flux-pro"),
+        ("flux-pro-v1.1 (최신/$0.05)", "flux-pro-v1.1"),
+        ("flux-ultra (최고품질/$0.06)", "flux-ultra"),
+    ],
     "imagen": [
         ("imagen-3-fast (빠름/저렴)", "imagen-3-fast"),
         ("imagen-3 (고품질)", "imagen-3"),
@@ -1765,7 +1779,9 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                 with gr.Column():
                     image_engine = gr.Radio(
                         [
-                            ("fal.ai", "fal"),
+                            ("fal.ai (기본)", "fal"),
+                            ("fal.ai (애니)", "fal-anime"),
+                            ("fal.ai (실사)", "fal-realistic"),
                             ("DALL-E", "dalle"),
                             ("Imagen", "imagen"),
                             ("스토리텔링전용", "storymaker"),

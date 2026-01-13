@@ -36,18 +36,34 @@ class FalGenerator(ImageGenerator):
         "flux-ultra": "fal-ai/flux-pro/v1.1-ultra",  # 최고 품질
     }
 
-    def __init__(self, model: str = "flux-schnell"):
+    # 스타일별 프롬프트 프리픽스
+    STYLE_PREFIX = {
+        "anime": "anime style, Japanese animation, cel-shaded, vibrant colors, clean lineart, studio ghibli inspired",
+        "realistic": "photorealistic, ultra detailed, professional photography, cinematic lighting, 8k resolution, hyperrealistic",
+        "default": "",  # 스타일 없음
+    }
+
+    def __init__(self, model: str = "flux-schnell", style: str = "default"):
         import fal_client
         self.client = fal_client
         self.model = self.MODELS.get(model, self.MODELS["flux-schnell"])
-        print(f"[FalGenerator] 모델: {model} → {self.model}")
+        self.style = style
+        self.style_prefix = self.STYLE_PREFIX.get(style, "")
+        style_label = f" ({style})" if style != "default" else ""
+        print(f"[FalGenerator] 모델: {model} → {self.model}{style_label}")
 
     def generate(self, prompt: str, output_path: str) -> str:
         """fal.ai로 이미지 생성"""
+        # 스타일 프리픽스 적용
+        if self.style_prefix:
+            full_prompt = f"{self.style_prefix}. {prompt}"
+        else:
+            full_prompt = prompt
+
         result = self.client.subscribe(
             self.model,
             arguments={
-                "prompt": prompt,
+                "prompt": full_prompt,
                 "image_size": "landscape_16_9",
                 "num_images": 1,
                 "enable_safety_checker": False,
@@ -135,14 +151,37 @@ class ImageEngine:
 
     GENERATORS = {
         "fal": FalGenerator,
+        "fal-anime": FalGenerator,      # 애니 스타일
+        "fal-realistic": FalGenerator,  # 실사 스타일
         "dalle": DalleGenerator,
         "imagen": ImagenGenerator,
         "storymaker": None,  # 별도 처리 (StoryMakerEngine 사용)
     }
 
+    # 엔진별 스타일 매핑 (fal 계열)
+    ENGINE_STYLES = {
+        "fal": "default",
+        "fal-anime": "anime",
+        "fal-realistic": "realistic",
+    }
+
     # 엔진별 모델 옵션
     MODEL_OPTIONS = {
         "fal": {
+            "flux-schnell": "빠름/저렴 ($0.003)",
+            "flux-dev": "균형 ($0.025)",
+            "flux-pro": "고품질 ($0.05)",
+            "flux-pro-v1.1": "최신 프로 ($0.05)",
+            "flux-ultra": "최고 품질 ($0.06)",
+        },
+        "fal-anime": {
+            "flux-schnell": "빠름/저렴 ($0.003)",
+            "flux-dev": "균형 ($0.025)",
+            "flux-pro": "고품질 ($0.05)",
+            "flux-pro-v1.1": "최신 프로 ($0.05)",
+            "flux-ultra": "최고 품질 ($0.06)",
+        },
+        "fal-realistic": {
             "flux-schnell": "빠름/저렴 ($0.003)",
             "flux-dev": "균형 ($0.025)",
             "flux-pro": "고품질 ($0.05)",
@@ -193,8 +232,15 @@ class ImageEngine:
             if not generator_class:
                 raise ValueError(f"지원하지 않는 엔진: {self.engine_name}")
 
-            # 모델 파라미터가 있는 경우 전달
-            if self.model and self.engine_name in ["fal", "imagen"]:
+            # fal 계열 엔진: 모델 + 스타일 전달
+            if self.engine_name in ["fal", "fal-anime", "fal-realistic"]:
+                style = self.ENGINE_STYLES.get(self.engine_name, "default")
+                if self.model:
+                    self._generator = generator_class(model=self.model, style=style)
+                else:
+                    self._generator = generator_class(style=style)
+            # imagen 엔진: 모델만 전달
+            elif self.model and self.engine_name == "imagen":
                 self._generator = generator_class(model=self.model)
             else:
                 self._generator = generator_class()
