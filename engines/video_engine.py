@@ -203,40 +203,39 @@ class VideoEngine:
     ):
         """
         FFmpeg zoompan 필터로 단일 이미지 줌 클립 생성
-        - Cinematic Arc Path: 곡선 경로로 이동하며 입체적인 카메라 워킹
+        - Cinematic Pan: 한 방향으로 부드럽게 이동 (흔들림 제로)
         - 시작=끝 위치 일치로 씬 전환 시 끊김 없음
         """
         # 총 프레임 수
         total_frames = int(duration * self.fps)
 
         # ========================================
-        # Cinematic Arc Path 로직
-        # - 카메라가 곡선(Arc)을 그리며 이동
-        # - sin 함수로 시작/끝에서 가감속 내장
-        # - 영상 시작=끝 위치 일치로 루프 최적화
+        # Cinematic Pan 로직 (흔들림 제로)
+        # - 한 방향으로만 부드럽게 이동 (왕복 없음)
+        # - sin(PI/2 * progress): 0→1 가속 곡선
         # ========================================
 
-        # 줌: 1.05 ~ 1.12 (부드러운 확대/축소)
-        # sin(PI*on/total) = 0→1→0 이므로 1.05에서 시작해 1.12까지 갔다가 1.05로 복귀
-        zoom_expr = f"1.05+0.07*sin(PI*on/{total_frames})"
+        # 진행률: 0.0 → 1.0
+        progress = f"(on/{total_frames})"
+
+        # 줌: 1.0 → 1.10 (한 방향 확대만, 왕복 없음)
+        zoom_expr = f"1.0+0.10*{progress}"
 
         # 기본 중앙 위치
         center_x = f"(iw/2-(iw/zoom/2))"
         center_y = f"(ih/2-(ih/zoom/2))"
 
         # ========================================
-        # X축 (Pan): 좌우 이동 (0 → Max → 0)
-        # - sin(PI*on/total): 왼쪽→오른쪽→왼쪽 왕복
-        # - 계수 0.08 = 전체 여유폭의 8% 이동
+        # X축: 왼쪽→오른쪽 한 방향 이동 (sin으로 가감속)
+        # sin(PI/2 * progress) = 0에서 시작 → 1로 끝 (가속 곡선)
         # ========================================
-        pan_x = f"(iw-ow)*sin(PI*on/{total_frames})*0.08"
+        pan_x = f"(iw-ow)*sin(PI/2*{progress})*0.10"
 
         # ========================================
-        # Y축 (Tilt): 상하 곡선 (높낮이 변화로 곡선미 추가)
-        # - sin(2*PI*on/total): X의 2배 주기로 위아래 굴곡
-        # - 계수 0.04 = 전체 여유높이의 4%
+        # Y축: 위→아래 살짝 이동 (대각선 느낌)
+        # X와 동일한 방향, 절반 강도
         # ========================================
-        tilt_y = f"(ih-oh)*sin(2*PI*on/{total_frames})*0.04"
+        tilt_y = f"(ih-oh)*sin(PI/2*{progress})*0.05"
 
         # 최종 좌표 = 중앙 + Pan(좌우) + Tilt(상하)
         x_expr = f"{center_x}+{pan_x}"
