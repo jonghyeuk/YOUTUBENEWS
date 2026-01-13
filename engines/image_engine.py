@@ -146,11 +146,10 @@ class ImageEngine:
     """
     개별 이미지 생성 엔진
     - 씬별로 개별 이미지 생성
-    - fal.ai (기본), DALL-E, Imagen, StoryMaker 지원
+    - fal.ai (애니/실사), DALL-E, Imagen, StoryMaker 지원
     """
 
     GENERATORS = {
-        "fal": FalGenerator,
         "fal-anime": FalGenerator,      # 애니 스타일
         "fal-realistic": FalGenerator,  # 실사 스타일
         "dalle": DalleGenerator,
@@ -160,20 +159,12 @@ class ImageEngine:
 
     # 엔진별 스타일 매핑 (fal 계열)
     ENGINE_STYLES = {
-        "fal": "default",
         "fal-anime": "anime",
         "fal-realistic": "realistic",
     }
 
     # 엔진별 모델 옵션
     MODEL_OPTIONS = {
-        "fal": {
-            "flux-schnell": "빠름/저렴 ($0.003)",
-            "flux-dev": "균형 ($0.025)",
-            "flux-pro": "고품질 ($0.05)",
-            "flux-pro-v1.1": "최신 프로 ($0.05)",
-            "flux-ultra": "최고 품질 ($0.06)",
-        },
         "fal-anime": {
             "flux-schnell": "빠름/저렴 ($0.003)",
             "flux-dev": "균형 ($0.025)",
@@ -200,10 +191,10 @@ class ImageEngine:
         },
     }
 
-    def __init__(self, engine: str = "fal", model: str = None):
+    def __init__(self, engine: str = "fal-anime", model: str = None):
         """
         Args:
-            engine: 이미지 생성 엔진 (fal, dalle, imagen)
+            engine: 이미지 생성 엔진 (fal-anime, fal-realistic, dalle, imagen, storymaker)
             model: 사용할 모델 (엔진별 기본값 사용 가능)
         """
         self.engine_name = engine

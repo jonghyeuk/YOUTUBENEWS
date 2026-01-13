@@ -233,7 +233,7 @@ class Pipeline:
     def step4_generate_images_from_prompts(
         self,
         prompts: List[str],
-        engine: str = "fal",
+        engine: str = "fal-anime",
         model: str = None,
         storymaker_config: dict = None
     ) -> List[str]:
@@ -241,7 +241,7 @@ class Pipeline:
 
         Args:
             prompts: 이미지 프롬프트 리스트
-            engine: 이미지 엔진 (fal, dalle, imagen, storymaker)
+            engine: 이미지 엔진 (fal-anime, fal-realistic, dalle, imagen, storymaker)
             model: 모델명
             storymaker_config: StoryMaker 설정 (region, world_style, character_type)
         """
