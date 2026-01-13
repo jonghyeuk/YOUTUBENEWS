@@ -218,8 +218,8 @@ class VideoEngine:
         # 진행률: 0.0 → 1.0
         progress = f"(on/{total_frames})"
 
-        # 줌: 1.0 → 1.10 (한 방향 확대만, 왕복 없음)
-        zoom_expr = f"1.0+0.10*{progress}"
+        # 줌: 1.0 → 1.18 (한 방향 확대, 더 역동적)
+        zoom_expr = f"1.0+0.18*{progress}"
 
         # 기본 중앙 위치
         center_x = f"(iw/2-(iw/zoom/2))"
@@ -229,13 +229,13 @@ class VideoEngine:
         # X축: 왼쪽→오른쪽 한 방향 이동 (sin으로 가감속)
         # sin(PI/2 * progress) = 0에서 시작 → 1로 끝 (가속 곡선)
         # ========================================
-        pan_x = f"(iw-ow)*sin(PI/2*{progress})*0.10"
+        pan_x = f"(iw-ow)*sin(PI/2*{progress})*0.20"
 
         # ========================================
-        # Y축: 위→아래 살짝 이동 (대각선 느낌)
-        # X와 동일한 방향, 절반 강도
+        # Y축: 위→아래 이동 (대각선 느낌)
+        # X와 동일한 방향
         # ========================================
-        tilt_y = f"(ih-oh)*sin(PI/2*{progress})*0.05"
+        tilt_y = f"(ih-oh)*sin(PI/2*{progress})*0.12"
 
         # 최종 좌표 = 중앙 + Pan(좌우) + Tilt(상하)
         x_expr = f"{center_x}+{pan_x}"
