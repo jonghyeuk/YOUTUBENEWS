@@ -814,7 +814,14 @@ def apply_existing_images():
 
 # 엔진별 모델 옵션
 IMAGE_MODEL_OPTIONS = {
-    "fal": [
+    "fal-anime": [
+        ("flux-schnell (빠름/$0.003)", "flux-schnell"),
+        ("flux-dev (균형/$0.025)", "flux-dev"),
+        ("flux-pro (고품질/$0.05)", "flux-pro"),
+        ("flux-pro-v1.1 (최신/$0.05)", "flux-pro-v1.1"),
+        ("flux-ultra (최고품질/$0.06)", "flux-ultra"),
+    ],
+    "fal-realistic": [
         ("flux-schnell (빠름/$0.003)", "flux-schnell"),
         ("flux-dev (균형/$0.025)", "flux-dev"),
         ("flux-pro (고품질/$0.05)", "flux-pro"),
@@ -836,7 +843,7 @@ IMAGE_MODEL_OPTIONS = {
 
 def update_model_choices(engine: str):
     """엔진 변경시 모델 선택 옵션 업데이트"""
-    choices = IMAGE_MODEL_OPTIONS.get(engine, IMAGE_MODEL_OPTIONS["fal"])
+    choices = IMAGE_MODEL_OPTIONS.get(engine, IMAGE_MODEL_OPTIONS["fal-anime"])
     default_value = choices[0][1] if choices else None
     return gr.update(choices=choices, value=default_value)
 
@@ -1765,12 +1772,13 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                 with gr.Column():
                     image_engine = gr.Radio(
                         [
-                            ("fal.ai", "fal"),
+                            ("fal.ai (애니)", "fal-anime"),
+                            ("fal.ai (실사)", "fal-realistic"),
                             ("DALL-E", "dalle"),
                             ("Imagen", "imagen"),
                             ("스토리텔링전용", "storymaker"),
                         ],
-                        value="fal",
+                        value="fal-anime",
                         label="이미지 엔진"
                     )
 

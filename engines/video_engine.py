@@ -203,50 +203,44 @@ class VideoEngine:
     ):
         """
         FFmpeg zoompan 필터로 단일 이미지 줌 클립 생성
-        - Smoothstep(가감속) 적용으로 부드러운 시작/끝
-        - 사선 드리프트 + 미세 흔들림으로 "숨쉬는 카메라" 효과
+        - Cinematic Arc Path: 곡선 경로로 이동하며 입체적인 카메라 워킹
+        - 시작=끝 위치 일치로 씬 전환 시 끊김 없음
         """
         # 총 프레임 수
         total_frames = int(duration * self.fps)
 
         # ========================================
-        # Smoothstep 계산식 (FFmpeg 표현식)
-        # u = on/total_frames (0→1)
-        # smoothstep = u*u*(3-2*u) → 가속→일정→감속
+        # Cinematic Arc Path 로직
+        # - 카메라가 곡선(Arc)을 그리며 이동
+        # - sin 함수로 시작/끝에서 가감속 내장
+        # - 영상 시작=끝 위치 일치로 루프 최적화
         # ========================================
-        u = f"(on/{total_frames})"
-        smoothstep = f"({u})*({u})*(3-2*({u}))"
 
-        # 줌 범위: 1.0 ~ 1.12 (12% 줌, 살짝 줄임)
-        if effect == "zoom_in":
-            # 1.0 → 1.12 줌인 (smoothstep 적용)
-            zoom_expr = f"1+0.12*({smoothstep})"
-        else:
-            # 1.12 → 1.0 줌아웃 (smoothstep 적용)
-            zoom_expr = f"1.12-0.12*({smoothstep})"
+        # 줌: 1.05 ~ 1.12 (부드러운 확대/축소)
+        # sin(PI*on/total) = 0→1→0 이므로 1.05에서 시작해 1.12까지 갔다가 1.05로 복귀
+        zoom_expr = f"1.05+0.07*sin(PI*on/{total_frames})"
 
-        # ========================================
-        # 사선 드리프트 + 미세 흔들림 (Sine 기반 왕복)
-        # - 드리프트: Sine 왕복 (0→max→0), 씬 끝에서 제자리 복귀
-        # - 흔들림: 영상 길이 동기화, 시작=끝 위치 일치로 끊김 방지
-        # ========================================
         # 기본 중앙 위치
         center_x = f"(iw/2-(iw/zoom/2))"
         center_y = f"(ih/2-(ih/zoom/2))"
 
-        # 사선 드리프트 (Sine 왕복: 0→max→0, 씬 전환 시 점프 방지)
-        # sin(PI*on/total) = 0에서 시작 → 1(중간) → 0으로 복귀
-        drift_x = f"(iw-ow)*sin(PI*on/{total_frames})*0.03"  # X 방향 3% 왕복
-        drift_y = f"(ih-oh)*sin(PI*on/{total_frames})*0.02"  # Y 방향 2% 왕복
+        # ========================================
+        # X축 (Pan): 좌우 이동 (0 → Max → 0)
+        # - sin(PI*on/total): 왼쪽→오른쪽→왼쪽 왕복
+        # - 계수 0.08 = 전체 여유폭의 8% 이동
+        # ========================================
+        pan_x = f"(iw-ow)*sin(PI*on/{total_frames})*0.08"
 
-        # 미세 흔들림 (영상 길이에 동기화, 시작=끝 위치 일치)
-        # 2~3바퀴 왕복으로 자연스러운 호흡감
-        wobble_x = f"3*sin(4*PI*on/{total_frames})"   # X 흔들림 (2바퀴)
-        wobble_y = f"2*sin(6*PI*on/{total_frames})"   # Y 흔들림 (3바퀴, 비동기)
+        # ========================================
+        # Y축 (Tilt): 상하 곡선 (높낮이 변화로 곡선미 추가)
+        # - sin(2*PI*on/total): X의 2배 주기로 위아래 굴곡
+        # - 계수 0.04 = 전체 여유높이의 4%
+        # ========================================
+        tilt_y = f"(ih-oh)*sin(2*PI*on/{total_frames})*0.04"
 
-        # 최종 좌표 = 중앙 + 드리프트 + 흔들림
-        x_expr = f"{center_x}+{drift_x}+{wobble_x}"
-        y_expr = f"{center_y}+{drift_y}+{wobble_y}"
+        # 최종 좌표 = 중앙 + Pan(좌우) + Tilt(상하)
+        x_expr = f"{center_x}+{pan_x}"
+        y_expr = f"{center_y}+{tilt_y}"
 
         # zoompan 필터 (bicubic 보간, 부드러운 줌)
         filter_complex = (
