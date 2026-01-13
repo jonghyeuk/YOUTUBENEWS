@@ -226,21 +226,23 @@ class VideoEngine:
             zoom_expr = f"1.12-0.12*({smoothstep})"
 
         # ========================================
-        # 사선 드리프트 + 미세 흔들림
-        # - 드리프트: 전체 여유폭의 6~8%만 이동 (smoothstep)
-        # - 흔들림: 3~5px sin() 노이즈 (숨쉬는 카메라)
+        # 사선 드리프트 + 미세 흔들림 (Sine 기반 왕복)
+        # - 드리프트: Sine 왕복 (0→max→0), 씬 끝에서 제자리 복귀
+        # - 흔들림: 영상 길이 동기화, 시작=끝 위치 일치로 끊김 방지
         # ========================================
         # 기본 중앙 위치
         center_x = f"(iw/2-(iw/zoom/2))"
         center_y = f"(ih/2-(ih/zoom/2))"
 
-        # 사선 드리프트 (smoothstep, 아주 작게)
-        drift_x = f"(iw-ow)*({smoothstep})*0.06"  # X 방향 6%
-        drift_y = f"(ih-oh)*({smoothstep})*0.04"  # Y 방향 4%
+        # 사선 드리프트 (Sine 왕복: 0→max→0, 씬 전환 시 점프 방지)
+        # sin(PI*on/total) = 0에서 시작 → 1(중간) → 0으로 복귀
+        drift_x = f"(iw-ow)*sin(PI*on/{total_frames})*0.03"  # X 방향 3% 왕복
+        drift_y = f"(ih-oh)*sin(PI*on/{total_frames})*0.02"  # Y 방향 2% 왕복
 
-        # 미세 흔들림 (sin 노이즈, 2~4px)
-        wobble_x = f"3*sin(2*PI*on/90)"   # X 흔들림 (90프레임 주기)
-        wobble_y = f"2*sin(2*PI*on/120)"  # Y 흔들림 (120프레임 주기, 비동기)
+        # 미세 흔들림 (영상 길이에 동기화, 시작=끝 위치 일치)
+        # 2~3바퀴 왕복으로 자연스러운 호흡감
+        wobble_x = f"3*sin(4*PI*on/{total_frames})"   # X 흔들림 (2바퀴)
+        wobble_y = f"2*sin(6*PI*on/{total_frames})"   # Y 흔들림 (3바퀴, 비동기)
 
         # 최종 좌표 = 중앙 + 드리프트 + 흔들림
         x_expr = f"{center_x}+{drift_x}+{wobble_x}"
