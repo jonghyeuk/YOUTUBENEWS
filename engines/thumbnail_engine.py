@@ -111,7 +111,7 @@ class ThumbnailEngine:
     # 언어별 썸네일 전용 폰트 (절대 경로로 변환)
     _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     KOREAN_THUMBNAIL_FONT = os.path.join(_BASE_DIR, "fonts/GapyeongHanseokbongB.ttf")      # 한국어: 가평한석봉체
-    ENGLISH_THUMBNAIL_FONT = os.path.join(_BASE_DIR, "fonts/PlayfairDisplay-Italic.ttf")  # 영어: Playfair Display Italic
+    ENGLISH_THUMBNAIL_FONT = os.path.join(_BASE_DIR, "fonts/PlayfairDisplay-BoldItalic.ttf")  # 영어: Playfair Display Bold Italic
     JAPANESE_THUMBNAIL_FONT = os.path.join(_BASE_DIR, "fonts/YujiSyuku-Regular.ttf")      # 일본어: 佑字肅 (서예체)
 
     # 스타일별 색상 프리셋 (모든 스타일에 두꺼운 외곽선 적용)
