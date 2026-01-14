@@ -108,10 +108,11 @@ class ThumbnailEngine:
     # 기본 설정
     THUMBNAIL_SIZE = (1280, 720)  # YouTube 권장 크기
 
-    # 언어별 썸네일 전용 폰트
-    KOREAN_THUMBNAIL_FONT = "fonts/GapyeongHanseokbongB.ttf"      # 한국어: 가평한석봉체
-    ENGLISH_THUMBNAIL_FONT = "fonts/PlayfairDisplay-Italic.ttf"  # 영어: Playfair Display Italic
-    JAPANESE_THUMBNAIL_FONT = "fonts/YujiSyuku-Regular.ttf"      # 일본어: 佑字肅 (서예체)
+    # 언어별 썸네일 전용 폰트 (절대 경로로 변환)
+    _BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    KOREAN_THUMBNAIL_FONT = os.path.join(_BASE_DIR, "fonts/GapyeongHanseokbongB.ttf")      # 한국어: 가평한석봉체
+    ENGLISH_THUMBNAIL_FONT = os.path.join(_BASE_DIR, "fonts/PlayfairDisplay-Italic.ttf")  # 영어: Playfair Display Italic
+    JAPANESE_THUMBNAIL_FONT = os.path.join(_BASE_DIR, "fonts/YujiSyuku-Regular.ttf")      # 일본어: 佑字肅 (서예체)
 
     # 스타일별 색상 프리셋 (모든 스타일에 두꺼운 외곽선 적용)
     COLOR_PRESETS = {
@@ -282,16 +283,43 @@ class ThumbnailEngine:
         # 텍스트 오버레이
         draw = ImageDraw.Draw(bg)
 
-        # 폰트 로드 (한국어: 전용 폰트 / 영어,일본어: 시스템 폰트)
+        # 폰트 로드 (언어별 전용 폰트)
         try:
             font_path = self._get_font_for_language(language)
+            print(f"[ThumbnailEngine] 폰트 로드 시도: {font_path} (language={language})")
+
+            if not os.path.exists(font_path):
+                raise FileNotFoundError(f"폰트 파일 없음: {font_path}")
+
             main_font = ImageFont.truetype(font_path, 100)
             sub_font = ImageFont.truetype(font_path, 56)
             bottom_font = ImageFont.truetype(font_path, 40)
-        except Exception:
-            main_font = ImageFont.load_default()
-            sub_font = ImageFont.load_default()
-            bottom_font = ImageFont.load_default()
+            print(f"[ThumbnailEngine] ✅ 폰트 로드 성공: {os.path.basename(font_path)}")
+        except Exception as e:
+            print(f"[ThumbnailEngine] ⚠️ 폰트 로드 실패: {e}")
+            # 폴백: 시스템 폰트 시도
+            fallback_fonts = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+                "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+                "arial.ttf",
+            ]
+            loaded = False
+            for fb_font in fallback_fonts:
+                if os.path.exists(fb_font):
+                    try:
+                        main_font = ImageFont.truetype(fb_font, 100)
+                        sub_font = ImageFont.truetype(fb_font, 56)
+                        bottom_font = ImageFont.truetype(fb_font, 40)
+                        print(f"[ThumbnailEngine] 폴백 폰트 사용: {fb_font}")
+                        loaded = True
+                        break
+                    except Exception:
+                        continue
+            if not loaded:
+                print(f"[ThumbnailEngine] ❌ 모든 폰트 로드 실패, 기본 폰트 사용")
+                main_font = ImageFont.load_default()
+                sub_font = ImageFont.load_default()
+                bottom_font = ImageFont.load_default()
 
         # 텍스트 위치 계산
         width, height = self.THUMBNAIL_SIZE
