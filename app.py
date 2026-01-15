@@ -367,6 +367,14 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         project.style = style  # 스타일 저장
         project.episode_type = episode_type  # 에피소드 타입 저장 (불교강의용)
 
+        # 스타일에 따른 언어 자동 설정 (썸네일 폰트 선택에 사용)
+        if style == "일본텔링":
+            project.language = "ja"
+        elif style == "영어Saying전용":
+            project.language = "en"
+        else:
+            project.language = "ko"
+
         # 분량에 따른 글자 수 계산 (TTS 속도 0.9 기준, 분당 약 180자)
         from config import DURATION_SPECS
         spec = DURATION_SPECS.get(duration, DURATION_SPECS[10])

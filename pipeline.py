@@ -155,6 +155,9 @@ class Pipeline:
         elif style == "영어Saying전용":
             language = "en"
 
+        # 프로젝트 언어 업데이트 (썸네일 폰트 선택 등에서 사용)
+        self.project.language = language
+
         metadata = self.script_engine.generate_youtube_metadata(
             script=self.project.script,
             style=style,
