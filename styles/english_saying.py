@@ -6,6 +6,71 @@
 - YouTube 최적화: 빠른 호흡, 핵심 문장 강조
 """
 
+# ═══════════════════════════════════════════════════════════════
+# 📝 입력 예시 (INPUT EXAMPLES)
+# 스타일 선택 시 이런 형태로 입력하세요
+# ═══════════════════════════════════════════════════════════════
+INPUT_EXAMPLES = """
+## 🇺🇸 영어Saying전용 - 입력 예시
+
+### 기본 형식
+영어로 주제/테마를 입력합니다. 간단한 문장이나 키워드도 가능합니다.
+
+### ✅ 좋은 입력 예시
+
+**1. 불안/걱정에 대한 위로**
+```
+When anxiety keeps you awake at night
+```
+
+**2. 하나님의 사랑**
+```
+God's unconditional love for broken people
+```
+
+**3. 기도의 힘**
+```
+The power of morning prayer
+```
+
+**4. 시련 속 희망**
+```
+Finding hope in difficult times
+```
+
+**5. 용서와 치유**
+```
+Forgiveness - healing the wounds of the past
+```
+
+**6. 감사의 삶**
+```
+Living a life of gratitude
+```
+
+**7. 인내와 기다림**
+```
+Trusting God's timing when you're tired of waiting
+```
+
+### ✅ 한국어로 입력해도 됨 (자동 변환)
+```
+불안할 때 평안을 찾는 방법
+아침 기도의 축복
+하나님의 사랑과 은혜
+```
+
+### ❌ 피해야 할 입력
+- 너무 짧은 단어: "prayer" (맥락 부족)
+- 논쟁적 주제: 정치, 특정 교단 비판
+- 구체적 성경 구절만: "요한복음 3:16" (주제가 필요)
+
+### 💡 팁
+- 시청자의 감정/상황을 포함하면 더 좋음
+- "When you feel...", "For those who are..." 형태 권장
+- 영어 타이틀 스타일로 입력하면 그대로 활용됨
+"""
+
 PROMPT = """You are a professional Christian Morning Prayer & Devotional scriptwriter for YouTube.
 
 ## TOPIC/THEME
