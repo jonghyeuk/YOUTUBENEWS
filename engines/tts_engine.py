@@ -445,8 +445,8 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 불교종교/불교강의/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
-            if self.style in ("영어Saying전용", "불교종교", "불교강의"):
+            # 불교종교/불교강의/불교명상/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style in ("영어Saying전용", "불교종교", "불교강의", "불교명상"):
                 self.voice_id = voice_config["voice_id"]
             else:
                 # 다른 스타일: 언어별 voice_id 우선
@@ -477,8 +477,8 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 불교종교/불교강의/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
-            if self.style in ("영어Saying전용", "불교종교", "불교강의"):
+            # 불교종교/불교강의/불교명상/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style in ("영어Saying전용", "불교종교", "불교강의", "불교명상"):
                 self.voice_id = voice_config["voice_id"]
             else:
                 # 다른 스타일: 언어별 voice_id 우선
@@ -509,8 +509,8 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 불교종교/불교강의/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
-            if self.style in ("영어Saying전용", "불교종교", "불교강의"):
+            # 불교종교/불교강의/불교명상/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style in ("영어Saying전용", "불교종교", "불교강의", "불교명상"):
                 self.voice_id = voice_config["voice_id"]
             else:
                 # 다른 스타일: 언어별 voice_id 우선

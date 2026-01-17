@@ -5,6 +5,10 @@
 
 from .buddhist import PROMPT as BUDDHIST_PROMPT
 
+# 불교명상 (옵션 A - 진짜 가이드 명상)
+from .buddhist_meditation import PROMPT as BUDDHIST_MEDITATION_PROMPT
+from .buddhist_meditation import IMAGE_STYLE_GUIDE as BUDDHIST_MEDITATION_IMAGE_GUIDE
+
 # 불교강의 v2 (역사 미스터리형)
 from .buddhist_lecture import PROMPT as BUDDHIST_LECTURE_PROMPT
 from .buddhist_lecture import WORLD_STYLE_GUIDE as BUDDHIST_LECTURE_WORLD_GUIDE
@@ -30,7 +34,7 @@ from .english_saying import WORLD_STYLE_GUIDE as ENGLISH_SAYING_WORLD_GUIDE
 # 스타일 프롬프트 딕셔너리
 STYLE_PROMPTS = {
     "불교강의": BUDDHIST_LECTURE_PROMPT,
-    "불교명상": BUDDHIST_PROMPT,
+    "불교명상": BUDDHIST_MEDITATION_PROMPT,
     # 스토리텔링 지역별 버전
     "스토리텔링:한국불교": STORYTELLING_KOREA_PROMPT,
     "스토리텔링:중국불교": STORYTELLING_CHINA_PROMPT,
@@ -44,6 +48,7 @@ STYLE_PROMPTS = {
 # 스토리텔링 세계관 가이드 (StoryMaker AI용)
 WORLD_STYLE_GUIDES = {
     "불교강의": BUDDHIST_LECTURE_WORLD_GUIDE,
+    "불교명상": BUDDHIST_MEDITATION_IMAGE_GUIDE,
     "스토리텔링:한국불교": KOREA_WORLD_GUIDE,
     "스토리텔링:중국불교": CHINA_WORLD_GUIDE,
     "스토리텔링:인도불교": INDIA_WORLD_GUIDE,
