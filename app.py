@@ -92,7 +92,7 @@ STYLE_IMAGE_GUIDES = {
     "스토리텔링:한국불교": "classical Korean ink-wash narrative painting, Joseon dynasty landscape painting style, soft mineral colors, traditional hanok and village scenery, wide negative space, storytelling composition, gentle brush texture, hand-painted feeling, no anime, no modern illustration, no bright digital colors, no cartoon style",
     "스토리텔링:중국불교": "buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood, storytelling iconography, no anime, no modern illustration",
     "스토리텔링:인도불교": "narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast shading, wide negative space, storyboard composition, no cute, no anime gloss, no bright color",
-    "불교명상": "Serene meditation style, golden dawn light, lotus flowers, misty mountains, peaceful temple, soft glow, silhouette meditation pose"
+    "불교명상": "ethereal Buddhist temple illustration, peaceful dawn atmosphere, soft moonlight on lotus pond, misty mountain monastery, gentle candlelight in dharma hall, serene meditation space, traditional Korean temple architecture, muted pastel colors, dreamy atmosphere, wide negative space, no text, no people close-up, no modern elements, no anime style"
 }
 
 # 스타일 → StoryMaker 설정 매핑
@@ -144,12 +144,13 @@ STYLE_GUIDES = {
 🎨 **스타일**: 서사 콘셉트아트 (Narrative Concept Art)
 📍 **배경**: 녹야원, 보리수, 간다라 풍경
 👤 **인물**: 붓다, 제자, 수행자 (실루엣 스케치)""",
-    "불교명상": """**💡 불교명상**: '사람의 상태'로 입력하세요!
+    "불교명상": """**💡 불교 수면명상**: '분위기/장소 키워드'를 입력하세요!
 
-❌ 불교 업보, 기도하면 돈 벌까
-✅ 삶이 힘들 때, 돈이 안 풀릴 때, 관계가 자꾸 깨질 때
+✅ 새벽 산사, 달빛 연못, 법당의 고요함, 대나무 숲
+❌ 부처님 말씀, 교훈, 설교 (❌ 인용 없음!)
 
-**감정 코드**: 불안 / 죄책감 / 후회 / 구원욕구 / 희망 / 분노 / 고립""",
+**구조**: 호흡 안내 → Body Scan → 시각화 여행 → 페이드아웃
+**핵심**: 실제 명상 유도, 감각 묘사 중심, 교훈/설교 없음""",
     "일본텔링": """**💡 일본텔링 (日本語専用)**: Seed Line을 입력하세요!
 
 예시: "나도 모르게 거짓말을 합니다" / "가족이 부담스럽습니다"
@@ -1117,12 +1118,12 @@ def generate_thumbnail_texts():
 
     # 스타일별 텍스트 생성
     if style == "불교명상":
-        sub_text = "잠자면서 듣는"
+        sub_text = "수면 명상"
         if len(title) > 20:
             main_text = title[:20] + "..."
         else:
             main_text = title
-        bottom_text = "마음이 편안해지는 말씀"
+        bottom_text = "깊은 잠으로"
     elif style == "불교강의":
         sub_text = "함께 읽는"
         main_text = title[:25] if len(title) > 25 else title
