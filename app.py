@@ -745,7 +745,7 @@ def parse_image_prompts(prompts_text: str):
     return parsed
 
 
-def generate_images_from_text(prompts_text: str, engine: str, model: str, style: str = "불교강의"):
+def generate_images_from_text(prompts_text: str, engine: str, model: str, style: str = "불교강의", image_style: str = "korea"):
     if not pipeline.project:
         return "❌ 스크립트 먼저 생성하세요", []
     try:
@@ -756,8 +756,13 @@ def generate_images_from_text(prompts_text: str, engine: str, model: str, style:
         # 스토리텔링 스타일일 때 StoryMaker 설정 전달
         storymaker_config = None
         if style in STYLE_TO_STORYMAKER:
+            # 기존 스토리텔링 스타일: 고정된 region 사용
             storymaker_config = STYLE_TO_STORYMAKER[style]
             print(f"[App] 스토리텔링 스타일 감지: {style} → {storymaker_config}")
+        elif style in ("불교강의", "불교명상"):
+            # 불교강의/불교명상: 사용자가 선택한 image_style 적용
+            storymaker_config = {"region": image_style}
+            print(f"[App] {style} 이미지 스타일 적용: region={image_style}")
 
         image_paths = pipeline.step4_generate_images_from_prompts(
             prompts=prompts,
@@ -1683,8 +1688,24 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         visible=True
                     )
 
-                    def toggle_episode_type(style):
-                        return gr.update(visible=(style == "불교강의"))
+                    # 이미지 스타일 선택 (불교강의/불교명상 전용)
+                    image_style_input = gr.Dropdown(
+                        choices=[
+                            ("🇰🇷 한국불교 (수묵담채)", "korea"),
+                            ("🇨🇳 중국불교 (도상화)", "china"),
+                            ("🇮🇳 인도불교 (콘셉트아트)", "india"),
+                        ],
+                        value="korea",
+                        label="🎨 이미지 스타일 (불교강의/불교명상 전용)",
+                        info="한국: 수묵담채 | 중국: 강렬한 원색 | 인도: 연필 스케치",
+                        visible=True
+                    )
+
+                    def toggle_style_options(style):
+                        """스타일에 따라 에피소드 타입과 이미지 스타일 드롭다운 표시/숨김"""
+                        show_episode = (style == "불교강의")
+                        show_image_style = (style in ("불교강의", "불교명상"))
+                        return gr.update(visible=show_episode), gr.update(visible=show_image_style)
 
                     style_guide = gr.Markdown(STYLE_GUIDES["불교강의"])
 
@@ -2069,7 +2090,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
 
     # 스타일 변경시 가이드 업데이트 + 에피소드 타입 토글
     style_input.change(update_style_guide, [style_input], [style_guide])
-    style_input.change(toggle_episode_type, [style_input], [episode_type_input])
+    style_input.change(toggle_style_options, [style_input], [episode_type_input, image_style_input])
 
     # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 + 에피소드 타입 추가)
     generate_btn.click(
@@ -2091,7 +2112,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     image_engine.change(update_model_choices, [image_engine], [image_model])
     gen_images_btn.click(
         generate_images_from_text,
-        [final_prompts, image_engine, image_model, style_input],
+        [final_prompts, image_engine, image_model, style_input, image_style_input],
         [status, images_gallery]
     )
     apply_images_btn.click(
