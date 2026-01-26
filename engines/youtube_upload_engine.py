@@ -41,6 +41,25 @@ LANGUAGE_NAMES = {
     "en": "🇺🇸 영어",
 }
 
+# 언어별 YouTube 업로드 기본 설정
+LANGUAGE_UPLOAD_DEFAULTS = {
+    "ko": {
+        "defaultLanguage": "ko",           # 제목/설명 언어
+        "defaultAudioLanguage": "ko",      # 동영상 언어
+        "categoryId": "27",                # Education
+    },
+    "ja": {
+        "defaultLanguage": "ja",           # 제목/설명 언어
+        "defaultAudioLanguage": "ja",      # 동영상 언어
+        "categoryId": "27",                # Education
+    },
+    "en": {
+        "defaultLanguage": "en-US",        # 제목/설명 언어 (영어-미국)
+        "defaultAudioLanguage": "en",      # 동영상 언어
+        "categoryId": "27",                # Education
+    },
+}
+
 # 업로드 재시도 설정
 MAX_RETRIES = 3
 RETRY_DELAY = 5  # seconds
@@ -135,7 +154,7 @@ class YouTubeUploadEngine:
         title: str,
         description: str,
         tags: str,
-        category_id: str = "22",  # 22 = People & Blogs
+        category_id: str = None,  # None이면 언어별 기본값 사용 (Education)
         privacy_status: str = "private",  # private, unlisted, public
         thumbnail_path: Optional[str] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
@@ -148,7 +167,7 @@ class YouTubeUploadEngine:
             title: 영상 제목
             description: 영상 설명
             tags: 태그 (쉼표 구분)
-            category_id: 카테고리 ID (기본: 22 = People & Blogs)
+            category_id: 카테고리 ID (기본: 언어별 설정, 없으면 27=Education)
             privacy_status: 공개 상태 (private/unlisted/public)
             thumbnail_path: 썸네일 이미지 경로 (선택)
             progress_callback: 진행률 콜백 함수 (uploaded_bytes, total_bytes)
@@ -166,19 +185,32 @@ class YouTubeUploadEngine:
         # 태그 처리
         tag_list = [t.strip() for t in tags.split(",") if t.strip()]
 
+        # 언어별 기본 설정 가져오기
+        lang_defaults = LANGUAGE_UPLOAD_DEFAULTS.get(self.language, {})
+        final_category = category_id or lang_defaults.get("categoryId", "27")
+
         # 영상 메타데이터
         body = {
             "snippet": {
                 "title": title[:100],  # YouTube 제목 제한
                 "description": description[:5000],  # 설명 제한
                 "tags": tag_list[:500],  # 태그 제한
-                "categoryId": category_id,
+                "categoryId": final_category,
             },
             "status": {
                 "privacyStatus": privacy_status,
-                "selfDeclaredMadeForKids": False,
+                "selfDeclaredMadeForKids": False,  # 아동용 콘텐츠 아님
+                "madeForKids": False,              # 아동용 콘텐츠 아님 (명시적)
+                "license": "youtube",              # 표준 YouTube 라이선스
             },
         }
+
+        # 언어 설정 적용 (동영상 언어, 제목/설명 언어)
+        if lang_defaults:
+            if "defaultLanguage" in lang_defaults:
+                body["snippet"]["defaultLanguage"] = lang_defaults["defaultLanguage"]
+            if "defaultAudioLanguage" in lang_defaults:
+                body["snippet"]["defaultAudioLanguage"] = lang_defaults["defaultAudioLanguage"]
 
         # 미디어 업로드 설정
         media = MediaFileUpload(
@@ -227,15 +259,34 @@ class YouTubeUploadEngine:
             "status": response["status"]["privacyStatus"],
         }
 
-        # 썸네일 업로드 (있는 경우)
-        if thumbnail_path and os.path.exists(thumbnail_path):
-            try:
-                self._upload_thumbnail(video_id, thumbnail_path)
-                result["thumbnail_uploaded"] = True
-            except Exception as e:
-                print(f"[YouTube] 썸네일 업로드 실패: {e}")
+        # 썸네일 업로드
+        if thumbnail_path:
+            if os.path.exists(thumbnail_path):
+                try:
+                    self._upload_thumbnail(video_id, thumbnail_path)
+                    result["thumbnail_uploaded"] = True
+                except HttpError as e:
+                    # YouTube API 에러 (권한 부족 등)
+                    error_reason = e.error_details[0].get("reason", "") if e.error_details else ""
+                    error_msg = str(e)
+                    if "forbidden" in error_msg.lower() or error_reason == "forbidden":
+                        result["thumbnail_error"] = "forbidden - 채널 전화번호 인증 필요"
+                    else:
+                        result["thumbnail_error"] = error_msg
+                    print(f"[YouTube] 썸네일 업로드 실패 (API): {result['thumbnail_error']}")
+                    result["thumbnail_uploaded"] = False
+                except Exception as e:
+                    print(f"[YouTube] 썸네일 업로드 실패: {e}")
+                    result["thumbnail_uploaded"] = False
+                    result["thumbnail_error"] = str(e)
+            else:
+                print(f"[YouTube] 썸네일 파일 없음: {thumbnail_path}")
                 result["thumbnail_uploaded"] = False
-                result["thumbnail_error"] = str(e)
+                result["thumbnail_error"] = f"썸네일 파일이 존재하지 않음: {thumbnail_path}"
+        else:
+            # 썸네일 경로가 제공되지 않음
+            result["thumbnail_uploaded"] = False
+            result["thumbnail_error"] = "썸네일이 생성되지 않음 (thumbnail.jpg 없음)"
 
         return result
 

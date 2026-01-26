@@ -35,7 +35,8 @@ class VideoEngine:
         scene_images: Dict[int, List[str]],
         audio_segments: List[AudioSegment],
         output_dir: str,
-        use_ken_burns: bool = True  # 하위 호환용 파라미터명 유지
+        use_ken_burns: bool = True,  # 하위 호환용 파라미터명 유지
+        key_sentences: Optional[Dict[int, str]] = None  # 영어Saying전용: 씬별 핵심 문장
     ) -> List[str]:
         """
         씬별 영상 클립 생성 (부드러운 줌 효과 적용)
@@ -45,6 +46,7 @@ class VideoEngine:
             audio_segments: 씬별 오디오 세그먼트
             output_dir: 출력 디렉토리
             use_ken_burns: 이미지 효과 사용 여부
+            key_sentences: 씬별 핵심 문장 (영어Saying전용) {scene_id: "text"}
 
         Returns:
             씬 클립 경로 리스트
@@ -78,10 +80,83 @@ class VideoEngine:
                     output_path=clip_path
                 )
 
+            # 영어Saying전용: key_sentence 오버레이 적용
+            if key_sentences and scene_id in key_sentences:
+                key_text = key_sentences[scene_id]
+                if key_text:
+                    self._add_key_sentence_overlay(clip_path, key_text)
+                    print(f"[VideoEngine] Scene {scene_id} key_sentence: '{key_text}'")
+
             clip_paths.append(clip_path)
             print(f"[VideoEngine] Scene {scene_id} clip: {clip_path}")
 
         return clip_paths
+
+    def _add_key_sentence_overlay(self, video_path: str, text: str):
+        """
+        영상에 핵심 문장 오버레이 (영어Saying전용)
+        - 화면 중앙에 큰 글씨 (더 크고 굵게)
+        - 흰색 텍스트 + 검정 외곽선 (썸네일 스타일)
+        - 천천히 부드럽게 나타났다 사라짐 (1회만, 반복 없음)
+        """
+        temp_output = video_path.replace(".mp4", "_keysent.mp4")
+
+        # FFmpeg drawtext 필터로 텍스트 오버레이
+        # 폰트 설정 (ExtraBold/Black 우선)
+        font_candidates = [
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-ExtraBold.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Black.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",
+        ]
+        font_path = next((f for f in font_candidates if os.path.exists(f)), font_candidates[0])
+
+        # 텍스트 이스케이프 (FFmpeg용)
+        escaped_text = text.replace("'", "'\\''").replace(":", "\\:")
+
+        # 천천히 나타났다 사라지는 효과 (1회만, 반복 없음)
+        # 1.0-3.0초: fade in (2초간 천천히 나타남)
+        # 3.0-7.0초: 유지 (4초간 완전히 보임)
+        # 7.0-9.0초: fade out (2초간 천천히 사라짐)
+        fade_expr = (
+            "if(lt(t,1),0,"                           # 0-1초: 안 보임
+            "if(lt(t,3),(t-1)/2,"                     # 1-3초: fade in (0→1, 2초간)
+            "if(lt(t,7),1,"                           # 3-7초: 유지 (4초간)
+            "if(lt(t,9),(9-t)/2,"                     # 7-9초: fade out (1→0, 2초간)
+            "0))))"                                    # 9초 이후: 안 보임
+        )
+
+        # drawtext 필터: 중앙 배치, 더 크고 굵게, 천천히 fade
+        drawtext_filter = (
+            f"drawtext=text='{escaped_text}'"
+            f":fontfile={font_path}"
+            f":fontsize=100"
+            f":fontcolor=white"
+            f":borderw=8"
+            f":bordercolor=black"
+            f":shadowcolor=black@0.5"
+            f":shadowx=3:shadowy=3"
+            f":x=(w-text_w)/2"
+            f":y=(h-text_h)/2"
+            f":alpha='{fade_expr}'"
+        )
+
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", video_path.replace("\\", "/"),
+            "-vf", drawtext_filter,
+            "-c:a", "copy",
+            temp_output.replace("\\", "/")
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        if result.returncode == 0:
+            # 원본 교체
+            os.replace(temp_output, video_path)
+            print(f"[VideoEngine] Key sentence overlay applied (slow fade, once)")
+        else:
+            print(f"[VideoEngine] Key sentence overlay failed: {result.stderr[:200]}")
+            # 실패해도 원본 유지 (오류 무시)
 
     def _create_scene_clip_smooth_zoom(
         self,
@@ -126,21 +201,45 @@ class VideoEngine:
         effect: str,
         output_path: str
     ):
-        """FFmpeg zoompan 필터로 단일 이미지 줌 클립 생성 (10배 이상 빠름)"""
+        """
+        FFmpeg zoompan 필터로 단일 이미지 줌 클립 생성
+        - Cinematic Pan: 한 방향으로 부드럽게 이동 (흔들림 제로)
+        - 시작=끝 위치 일치로 씬 전환 시 끊김 없음
+        """
         # 총 프레임 수
         total_frames = int(duration * self.fps)
 
-        # 줌 범위: 1.0 ~ 1.15 (15% 줌)
-        if effect == "zoom_in":
-            # 1.0 → 1.15 줌인
-            zoom_expr = f"min(1+0.15*on/{total_frames},1.15)"
-        else:
-            # 1.15 → 1.0 줌아웃
-            zoom_expr = f"max(1.15-0.15*on/{total_frames},1.0)"
+        # ========================================
+        # Cinematic Pan 로직 (흔들림 제로)
+        # - 한 방향으로만 부드럽게 이동 (왕복 없음)
+        # - sin(PI/2 * progress): 0→1 가속 곡선
+        # ========================================
 
-        # 중앙 고정 (x, y 표현식)
-        x_expr = f"iw/2-(iw/zoom/2)"
-        y_expr = f"ih/2-(ih/zoom/2)"
+        # 진행률: 0.0 → 1.0
+        progress = f"(on/{total_frames})"
+
+        # 줌: 1.0 → 1.22 (한 방향 확대, 더 역동적)
+        zoom_expr = f"1.0+0.22*{progress}"
+
+        # 기본 중앙 위치
+        center_x = f"(iw/2-(iw/zoom/2))"
+        center_y = f"(ih/2-(ih/zoom/2))"
+
+        # ========================================
+        # X축: 왼쪽→오른쪽 한 방향 이동 (sin으로 가감속)
+        # sin(PI/2 * progress) = 0에서 시작 → 1로 끝 (가속 곡선)
+        # ========================================
+        pan_x = f"(iw-ow)*sin(PI/2*{progress})*0.25"
+
+        # ========================================
+        # Y축: 위→아래 이동 (대각선 느낌)
+        # X와 동일한 방향
+        # ========================================
+        tilt_y = f"(ih-oh)*sin(PI/2*{progress})*0.15"
+
+        # 최종 좌표 = 중앙 + Pan(좌우) + Tilt(상하)
+        x_expr = f"{center_x}+{pan_x}"
+        y_expr = f"{center_y}+{tilt_y}"
 
         # zoompan 필터 (bicubic 보간, 부드러운 줌)
         filter_complex = (
@@ -447,8 +546,12 @@ class VideoEngine:
             f"Alignment={style.get('alignment', 2)}"
         )
 
-        # Windows 경로 호환: forward slash + 콜론 이스케이프
-        subtitle_path_escaped = subtitle_path.replace("\\", "/").replace(":", "\\:")
+        # Windows 경로 호환: FFmpeg subtitles 필터용 이스케이프
+        # 콤마, 콜론, 대괄호, 세미콜론, 작은따옴표 등 이스케이프 필요
+        subtitle_path_escaped = subtitle_path.replace("\\", "/")
+        # FFmpeg 필터 특수문자 이스케이프 (순서 중요: 백슬래시 먼저)
+        for char in ["'", ",", ";", "[", "]", ":"]:
+            subtitle_path_escaped = subtitle_path_escaped.replace(char, f"\\{char}")
 
         cmd = [
             "ffmpeg", "-y",

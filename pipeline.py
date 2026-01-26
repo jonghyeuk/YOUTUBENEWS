@@ -145,9 +145,18 @@ class Pipeline:
 
         self._log("유튜브 제목/썸네일 생성 중... (AI)")
 
-        style = getattr(self.project, 'style', '정보')
+        style = getattr(self.project, 'style', '뉴스')
         duration = self.project.duration_min
         language = getattr(self.project, 'language', 'ko')
+
+        # 언어별 전용 스타일은 해당 언어로 메타데이터 생성
+        if style == "일본텔링":
+            language = "ja"
+        elif style == "영어Saying전용":
+            language = "en"
+
+        # 프로젝트 언어 업데이트 (썸네일 폰트 선택 등에서 사용)
+        self.project.language = language
 
         metadata = self.script_engine.generate_youtube_metadata(
             script=self.project.script,
@@ -227,7 +236,7 @@ class Pipeline:
     def step4_generate_images_from_prompts(
         self,
         prompts: List[str],
-        engine: str = "fal",
+        engine: str = "fal-anime",
         model: str = None,
         storymaker_config: dict = None
     ) -> List[str]:
@@ -235,7 +244,7 @@ class Pipeline:
 
         Args:
             prompts: 이미지 프롬프트 리스트
-            engine: 이미지 엔진 (fal, dalle, imagen, storymaker)
+            engine: 이미지 엔진 (fal-anime, fal-realistic, dalle, imagen, storymaker)
             model: 모델명
             storymaker_config: StoryMaker 설정 (region, world_style, character_type)
         """
@@ -370,12 +379,29 @@ class Pipeline:
                         scene_images[scene.scene_id] = cut_paths[idx:idx + images_per_scene]
                         idx += images_per_scene
 
+        # 영어Saying전용: key_sentence 추출 (다른 스타일에는 영향 없음)
+        key_sentences = None
+        style = getattr(self.project, 'style', '')
+        if style == "영어Saying전용":
+            key_sentences = {}
+            for scene in scenes:
+                # scene 객체 또는 dict에서 key_sentence 추출
+                if hasattr(scene, 'key_sentence') and scene.key_sentence:
+                    key_sentences[scene.scene_id] = scene.key_sentence
+                elif hasattr(scene, '__dict__'):
+                    ks = getattr(scene, 'key_sentence', None)
+                    if ks:
+                        key_sentences[scene.scene_id] = ks
+            if key_sentences:
+                self._log(f"영어Saying전용: key_sentence {len(key_sentences)}개 적용")
+
         # 씬별 클립 생성 (줌 효과 옵션)
         clip_paths = self.video_engine.render_scene_clips(
             scene_images=scene_images,
             audio_segments=self.project.audio_segments,
             output_dir=clips_dir,
-            use_ken_burns=use_ken_burns
+            use_ken_burns=use_ken_burns,
+            key_sentences=key_sentences  # 영어Saying전용에만 전달됨
         )
 
         # BGM 경로 로깅

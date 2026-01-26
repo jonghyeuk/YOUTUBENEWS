@@ -8,6 +8,7 @@ import re
 from typing import List, Tuple, Optional, Dict
 from dataclasses import dataclass
 from pydub import AudioSegment as PydubSegment
+from pydub.effects import normalize as pydub_normalize
 
 from models.types import Script, Scene, AudioSegment
 from config import TTS_CONFIG, ELEVENLABS_STYLE_VOICES, EMOTION_TAGS, LANGUAGE_CONFIG
@@ -77,6 +78,114 @@ def clean_text_for_subtitle(text: str) -> str:
     return clean
 
 
+# ========== TTS 텍스트 전처리 (스크립트 → TTS용 변환) ==========
+
+def _number_to_korean(num: int) -> str:
+    """
+    숫자를 한글 읽기로 변환 (년도용)
+    예: 501 → 오백일, 1234 → 천이백삼십사, 2024 → 이천이십사
+    """
+    if num == 0:
+        return "영"
+
+    units = ["", "일", "이", "삼", "사", "오", "육", "칠", "팔", "구"]
+
+    result = []
+
+    # 천 단위
+    if num >= 1000:
+        thousands = num // 1000
+        if thousands == 1:
+            result.append("천")
+        else:
+            result.append(units[thousands] + "천")
+        num %= 1000
+
+    # 백 단위
+    if num >= 100:
+        hundreds = num // 100
+        if hundreds == 1:
+            result.append("백")
+        else:
+            result.append(units[hundreds] + "백")
+        num %= 100
+
+    # 십 단위
+    if num >= 10:
+        tens = num // 10
+        if tens == 1:
+            result.append("십")
+        else:
+            result.append(units[tens] + "십")
+        num %= 10
+
+    # 일 단위
+    if num > 0:
+        result.append(units[num])
+
+    return "".join(result)
+
+
+def convert_to_tts_text(text: str) -> str:
+    """
+    스크립트 원문을 TTS 최적화 텍스트로 변환
+    - 한자 병기 제거: 임(林) → 임
+    - 년도 변환: 501년 → 오백일년
+    - 특수 괄호 제거: <<금강경>>, 《》, 〈〉 → 내용만
+    - 특수 따옴표 정규화
+    - 기타 TTS가 어색하게 읽는 패턴 수정
+    """
+    t = text.strip()
+
+    # 1. 한자 병기 제거: 임(林) → 임, 색(色) → 색
+    t = re.sub(r'\([\u4e00-\u9fff]+\)', '', t)
+
+    # 2. 년도 변환: 3자리 이상 숫자 + 년 → 한글로
+    # 501년 → 오백일년, 1234년 → 천이백삼십사년
+    def year_replace(m):
+        year_num = int(m.group(1))
+        return _number_to_korean(year_num) + "년"
+
+    t = re.sub(r'(\d{3,4})년', year_replace, t)
+
+    # 3. 서기/기원전 + 숫자도 처리
+    def era_year_replace(m):
+        era = m.group(1)  # 서기 or 기원전
+        year_num = int(m.group(2))
+        return era + " " + _number_to_korean(year_num) + "년"
+
+    t = re.sub(r'(서기|기원전)\s*(\d{3,4})년', era_year_replace, t)
+
+    # 4. 특수 괄호 제거 (내용은 유지)
+    # <<금강경>> → 금강경
+    t = re.sub(r'<<([^>]+)>>', r'\1', t)
+    t = re.sub(r'《([^》]+)》', r'\1', t)
+    t = re.sub(r'〈([^〉]+)〉', r'\1', t)
+    # 이미 없는 경우 개별 문자 제거
+    t = re.sub(r'[《》〈〉<<>>]', '', t)
+
+    # 5. 유니코드 특수 따옴표 → 표준 따옴표
+    t = re.sub(r'[\u2018\u2019\u201a\u201b]', "'", t)  # ' ' ‚ ‛ → '
+    t = re.sub(r'[\u201c\u201d\u201e\u201f]', '"', t)  # " " „ ‟ → "
+
+    # 6. 큰따옴표 안 내용이 TTS에서 어색하지 않도록
+    # "마음이 곧 부처다"라고 → 마음이 곧 부처다 라고
+    t = re.sub(r'"([^"]+)"라고', r'\1 라고', t)
+    t = re.sub(r'"([^"]+)"라며', r'\1 라며', t)
+    t = re.sub(r'"([^"]+)"라는', r'\1 라는', t)
+    t = re.sub(r"'([^']+)'라고", r'\1 라고', t)
+    t = re.sub(r"'([^']+)'라며", r'\1 라며', t)
+    t = re.sub(r"'([^']+)'라는", r'\1 라는', t)
+
+    # 7. 연속된 점 정리
+    t = re.sub(r'\.{2,}', '...', t)
+
+    # 8. 연속 공백 단일화
+    t = re.sub(r'\s+', ' ', t)
+
+    return t.strip()
+
+
 def extract_break_duration(text: str) -> float:
     """텍스트에서 <break> 태그들의 총 시간 추출 (초)"""
     total = 0.0
@@ -132,8 +241,12 @@ def shape_text_for_turbo(text: str, emotion: str) -> str:
     """
     감정 흉내를 강화하는 텍스트 변형 (구두점/호흡/SSML break)
     Turbo v2.5는 태그 대신 문장 형태에 반응
+
+    1단계: convert_to_tts_text()로 기본 TTS 전처리 (년도 변환, 한자 제거 등)
+    2단계: 감정별 미세 튜닝 (구두점, break 태그 등)
     """
-    t = text.strip()
+    # 1단계: TTS 기본 전처리 적용
+    t = convert_to_tts_text(text)
 
     # (필수) 남아있는 모든 [ ... ] 제거 — Turbo가 읽어버리는 사고 방지
     t = re.sub(r"\[[^\]]+\]", "", t)
@@ -332,14 +445,18 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 언어별 voice_id가 있으면 우선 사용, 없으면 스타일 voice_id 사용
-            self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+            # 불교종교/불교강의/불교명상/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style in ("영어Saying전용", "불교종교", "불교강의", "불교명상"):
+                self.voice_id = voice_config["voice_id"]
+            else:
+                # 다른 스타일: 언어별 voice_id 우선
+                self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
             self.stability = voice_config.get("stability", 0.5)
             self.similarity_boost = voice_config.get("similarity_boost", 0.75)
             # 속도: UI 지정값 > 스타일 값 > 전역 설정
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
-            print(f"[TTSEngine] ElevenLabs 초기화 완료 ({lang_name}, 스타일: {self.style}, 속도: {self.speed})")
+            print(f"[TTSEngine] ElevenLabs 초기화 완료 ({lang_name}, 스타일: {self.style}, voice: {self.voice_id[:8]}..., 속도: {self.speed})")
         else:
             self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.stability = 0.5
@@ -360,19 +477,23 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            # 언어별 voice_id가 있으면 우선 사용
-            self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+            # 불교종교/불교강의/불교명상/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style in ("영어Saying전용", "불교종교", "불교강의", "불교명상"):
+                self.voice_id = voice_config["voice_id"]
+            else:
+                # 다른 스타일: 언어별 voice_id 우선
+                self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
             # 속도: UI 지정값 > 스타일 값 > 전역 설정
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
-            print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 ({lang_name}, 스타일: {self.style}, 속도: {self.speed})")
+            print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 ({lang_name}, 스타일: {self.style}, voice: {self.voice_id[:8]}..., 속도: {self.speed})")
         else:
             self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
             print(f"[TTSEngine] ElevenLabs Turbo v2.5 초기화 완료 ({lang_name}, 기본 음성, 속도: {self.speed})")
 
     def _init_elevenlabs_v25_limkony(self):
-        """ElevenLabs Turbo v2.5 (limkony 계정) 초기화 - 별도 API 키 사용"""
+        """ElevenLabs Turbo v2.5 (limkony 계정) 초기화 - 별도 API 키 사용, elevenlabs2.5와 동일 로직"""
         from elevenlabs.client import ElevenLabs
         # limkony 전용 API 키 사용
         api_key = os.getenv("ELEVENLABS_API_KEY_LIMKONY")
@@ -380,7 +501,7 @@ class TTSEngine:
             raise ValueError("ELEVENLABS_API_KEY_LIMKONY 환경변수가 설정되지 않았습니다")
         self.client = ElevenLabs(api_key=api_key)
 
-        # 언어별 voice_id 우선 적용
+        # 언어별 voice_id 우선 적용 (elevenlabs2.5와 동일)
         lang_config = LANGUAGE_CONFIG.get(self.language, {})
         lang_voice_id = lang_config.get("tts_voice_id")
         lang_name = lang_config.get("name", "🇰🇷 한국어")
@@ -388,10 +509,16 @@ class TTSEngine:
         # 스타일별 음성 설정 가져오기
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
-            self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+            # 불교종교/불교강의/불교명상/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
+            if self.style in ("영어Saying전용", "불교종교", "불교강의", "불교명상"):
+                self.voice_id = voice_config["voice_id"]
+            else:
+                # 다른 스타일: 언어별 voice_id 우선
+                self.voice_id = lang_voice_id if lang_voice_id else voice_config["voice_id"]
+            # 속도: UI 지정값 > 스타일 값 > 전역 설정
             style_speed = voice_config.get("speed", TTS_CONFIG.get("speed", 1.0))
             self.speed = self._speed_override if self._speed_override else style_speed
-            print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 스타일: {self.style}, 속도: {self.speed})")
+            print(f"[TTSEngine] ElevenLabs v2.5 (limkony) 초기화 완료 ({lang_name}, 스타일: {self.style}, voice: {self.voice_id[:8]}..., 속도: {self.speed})")
         else:
             self.voice_id = lang_voice_id if lang_voice_id else TTS_CONFIG.get("elevenlabs_voice_id", "pNInz6obpgDQGcFmaJgB")
             self.speed = self._speed_override if self._speed_override else TTS_CONFIG.get("speed", 1.0)
@@ -437,10 +564,11 @@ class TTSEngine:
         print(f"[TTSEngine] {total_scenes}개 씬 TTS 생성 시작...")
 
         for i, scene in enumerate(script.scenes):
-            print(f"[TTSEngine] 씬 {scene.scene_id}/{total_scenes} 처리 중...")
-
             # 원본 텍스트 저장 (자막용)
             original_text = scene.text
+            text_len = len(original_text)
+
+            print(f"[TTSEngine] 씬 {scene.scene_id}/{total_scenes} 처리 중... (텍스트: {text_len}자)")
 
             # 감정 태그 추가 (ElevenLabs v3 + 스타일 설정 시)
             text_with_emotion = self._add_emotion_tag(scene.text, i, total_scenes)
@@ -449,7 +577,20 @@ class TTSEngine:
             audio_data = self._synthesize(text_with_emotion, scene_idx=i, total_scenes=total_scenes)
             scene_audio = PydubSegment.from_mp3(io.BytesIO(audio_data))
 
+            # 씬별 볼륨 평준화 (목표 dBFS로 강제 맞춤)
+            target_dBFS = -18.0  # 목표 볼륨 (BGM 믹싱 여유 확보)
+            change_in_dBFS = target_dBFS - scene_audio.dBFS
+            scene_audio = scene_audio.apply_gain(change_in_dBFS)
+            print(f"[TTSEngine] 🔊 볼륨 조정: {scene_audio.dBFS:.1f}dBFS → {target_dBFS}dBFS (gain: {change_in_dBFS:+.1f}dB)")
+
             duration = len(scene_audio) / 1000.0  # ms → sec
+
+            # 디버그: 텍스트 길이 대비 오디오 길이 체크
+            chars_per_sec = text_len / duration if duration > 0 else 0
+            if chars_per_sec > 10:  # 초당 10자 이상이면 너무 빠름 (의심)
+                print(f"[TTSEngine] ⚠️ 씬 {scene.scene_id}: {text_len}자 → {duration:.1f}초 (초당 {chars_per_sec:.1f}자, 너무 빠름?)")
+            else:
+                print(f"[TTSEngine] ✓ 씬 {scene.scene_id}: {text_len}자 → {duration:.1f}초")
 
             segment = AudioSegment(
                 scene_id=scene.scene_id,
@@ -529,10 +670,17 @@ class TTSEngine:
             return self._synthesize_openai(text)
 
     def _synthesize_wavenet(self, text: str) -> bytes:
-        """Google WaveNet TTS"""
+        """Google WaveNet TTS (영어Saying전용: SSML prosody 적용)"""
         from google.cloud import texttospeech
 
-        input_text = texttospeech.SynthesisInput(text=text)
+        # 영어Saying전용 스타일: SSML prosody로 따뜻한 목회자 톤 적용
+        if self.style == "영어Saying전용" and self.language == "en":
+            # rate=0.85 (느리게), pitch=-5% (낮게) → 따뜻한 목회자 톤
+            ssml_text = f'<speak><prosody rate="0.85" pitch="-5%">{text}</prosody></speak>'
+            input_text = texttospeech.SynthesisInput(ssml=ssml_text)
+            print(f"[TTSEngine] WaveNet 영어Saying전용: SSML prosody 적용 (rate=0.85, pitch=-5%)")
+        else:
+            input_text = texttospeech.SynthesisInput(text=text)
 
         response = self.client.synthesize_speech(
             input=input_text,
@@ -556,7 +704,8 @@ class TTSEngine:
                 "style": 0.5,
                 "use_speaker_boost": True,
                 "speed": getattr(self, 'speed', 1.0)  # 속도 설정 (0.5 ~ 2.0)
-            }
+            },
+            apply_text_normalization="off"  # 한국어: 직접 정규화가 안전
         )
 
         # generator를 bytes로 변환
@@ -584,7 +733,14 @@ class TTSEngine:
             # 감정에 맞게 텍스트 변형 (구두점, SSML break 등)
             shaped_text = shape_text_for_turbo(seg.text, seg.emotion)
 
+            # 디버그: 원본 vs 변형 텍스트 비교
+            if len(seg.text) != len(shaped_text):
+                print(f"[TTSEngine] ⚠️ 텍스트 변형: {len(seg.text)}자 → {len(shaped_text)}자")
+                if len(shaped_text) < 10:
+                    print(f"[TTSEngine] ⚠️ 변형 후 텍스트가 너무 짧음: '{shaped_text}'")
+
             if not shaped_text.strip():
+                print(f"[TTSEngine] ⚠️ 빈 텍스트 건너뜀 (원본: {len(seg.text)}자)")
                 continue
 
             # 감정별 voice_settings 적용
@@ -598,7 +754,8 @@ class TTSEngine:
                 text=shaped_text,
                 voice_id=self.voice_id,
                 model_id="eleven_turbo_v2_5",  # Turbo v2.5: SSML 지원, 빠름
-                voice_settings=vs
+                voice_settings=vs,
+                apply_text_normalization="off"  # 한국어: 직접 정규화가 안전
             )
 
             audio_bytes = b"".join(audio_generator)

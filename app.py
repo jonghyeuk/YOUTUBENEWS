@@ -1,6 +1,6 @@
 """
 Gradio UI - AI 콘텐츠 생성기
-스타일: 뉴스/정보/스토리텔링/불교명상
+스타일: 불교강의/불교명상/스토리텔링(한국/중국/인도)/일본텔링/영어Saying전용
 """
 import os
 from dotenv import load_dotenv
@@ -13,7 +13,7 @@ import json
 from pipeline import Pipeline
 from engines import ScriptEngine, ImageEngine
 from engines.thumbnail_engine import ThumbnailEngine
-from styles import STYLE_PROMPTS  # 스타일별 프롬프트 (파일 분리됨)
+from styles import STYLE_PROMPTS, BUDDHIST_LECTURE_EPISODE_TYPES, get_buddhist_lecture_prompt  # 스타일별 프롬프트 (파일 분리됨)
 from config import (
     DURATION_SPECS, BGM_CONFIG,
     YOUTUBE_TITLE_TEMPLATES, YOUTUBE_DEFAULT_TAGS,
@@ -86,13 +86,14 @@ INTEGRATED_OUTPUT_FORMAT = """
 
 # 스타일별 이미지 스타일 가이드
 STYLE_IMAGE_GUIDES = {
-    "뉴스": "Professional news broadcast style, clean composition, neutral lighting",
-    "정보": "Bright, friendly infographic style, clear visuals, warm colors",
+    "불교강의": "soft ink wash illustration, contemplative atmosphere, warm neutral tones, minimalist composition, meditative mood, wide negative space",
+    "영어Saying전용": "warm spiritual illustration, peaceful sunrise, golden hour lighting, serene landscape, hopeful atmosphere, pastoral scene, soft natural light, gentle colors, no text, no dark themes",
     "스토리텔링": "Dark mysterious atmosphere, dramatic lighting, suspenseful mood, shadows",
     "스토리텔링:한국불교": "classical Korean ink-wash narrative painting, Joseon dynasty landscape painting style, soft mineral colors, traditional hanok and village scenery, wide negative space, storytelling composition, gentle brush texture, hand-painted feeling, no anime, no modern illustration, no bright digital colors, no cartoon style",
     "스토리텔링:중국불교": "buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood, storytelling iconography, no anime, no modern illustration",
     "스토리텔링:인도불교": "narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast shading, wide negative space, storyboard composition, no cute, no anime gloss, no bright color",
-    "불교명상": "Serene meditation style, golden dawn light, lotus flowers, misty mountains, peaceful temple, soft glow, silhouette meditation pose"
+    "불교명상": "ethereal Buddhist temple illustration, peaceful dawn atmosphere, soft moonlight on lotus pond, misty mountain monastery, gentle candlelight in dharma hall, serene meditation space, traditional Korean temple architecture, muted pastel colors, dreamy atmosphere, wide negative space, no text, no people close-up, no modern elements, no anime style",
+    "일본텔링": "soft watercolor illustration, gentle muted colors, peaceful atmosphere, minimalist composition, Japanese aesthetic, middle-aged or senior Japanese person, contemplative mood, no anime, no cute style, no harsh contrast"
 }
 
 # 스타일 → StoryMaker 설정 매핑
@@ -116,9 +117,19 @@ STYLE_TO_STORYMAKER = {
 
 # 스타일별 입력 가이드
 STYLE_GUIDES = {
-    "뉴스": "**💡 뉴스**: 사실 기반 내용을 입력하세요.",
-    "정보": "**💡 정보**: 설명할 주제를 입력하세요. (예: 항산화 물질 5가지)",
-    "스토리텔링": "**💡 스토리텔링**: 역사/종교/흥미로운 이야기 주제를 입력하세요.",
+    "불교강의": """**💡 불교강의 v2 (역사 미스터리형)**: 경전/선사/논쟁/수행/유물 주제를 입력하세요!
+
+📚 **에피소드 타입 선택**:
+- 경전 성립/전승: 금강경 32분, 현장법사 번역
+- 선사 일화/공안: 조주 무, 달마 9년 벽관
+- 전승 논쟁/해석: 돈오점수, 남북종 갈등
+- 수행 이야기: 간화선 화두, 염불 수행
+- 유물/장소: 목탁의 비밀, 사리의 행방
+
+🎯 **핵심 구조**: 콜드오픈(15초 훅) → 역사적 문제 → 인물/사건 → 짧은 가르침 → 여운 회수
+⚡ **초반 15초**: 구체 장면 + 미스터리 + 스테이크 + 약속
+📌 **역사 핀**: 사실/전승/논쟁 라벨 필수 (최소 3개)
+⚠️ **금지**: 반복 문장, 추상어 과다, 교리 30% 초과""",
     "스토리텔링:한국불교": """**💡 한국불교 스토리텔링**: 한국 불교/선종/경전/역사적 일화를 입력하세요.
 
 🎨 **스타일**: 조선 수묵채색 정본화 (Classical Korean Ink-Wash)
@@ -134,16 +145,34 @@ STYLE_GUIDES = {
 🎨 **스타일**: 서사 콘셉트아트 (Narrative Concept Art)
 📍 **배경**: 녹야원, 보리수, 간다라 풍경
 👤 **인물**: 붓다, 제자, 수행자 (실루엣 스케치)""",
-    "불교명상": """**💡 불교명상**: '사람의 상태'로 입력하세요!
+    "불교명상": """**💡 불교 수면명상**: '분위기/장소 키워드'를 입력하세요!
 
-❌ 불교 업보, 기도하면 돈 벌까
-✅ 삶이 힘들 때, 돈이 안 풀릴 때, 관계가 자꾸 깨질 때
+✅ 새벽 산사, 달빛 연못, 법당의 고요함, 대나무 숲
+❌ 부처님 말씀, 교훈, 설교 (❌ 인용 없음!)
 
-**감정 코드**: 불안 / 죄책감 / 후회 / 구원욕구 / 희망 / 분노 / 고립"""
+**구조**: 호흡 안내 → Body Scan → 시각화 여행 → 페이드아웃
+**핵심**: 실제 명상 유도, 감각 묘사 중심, 교훈/설교 없음""",
+    "일본텔링": """**💡 일본텔링 (日本語専用)**: Seed Line을 입력하세요!
+
+예시: "나도 모르게 거짓말을 합니다" / "가족이 부담스럽습니다"
+
+🎯 **대상**: 일본 40~70대, 인간관계에 지친 분들
+🎨 **스타일**: 부드러운 수채화, 차분한 분위기
+📝 **구조**: Hook → 共感 → 正体 → 仏教的視点 → 実践 → まとめ
+⚠️ **주의**: 일본어로 직접 생성됨 (번역 아님)""",
+    "영어Saying전용": """**💡 영어Saying전용 (English Only)**: Theme/Topic을 입력하세요!
+
+예시: "Trusting God in difficult times" / "Finding peace in chaos"
+
+🎯 **대상**: 글로벌 영어권, 40~70대
+🎨 **스타일**: 따뜻한 영적 일러스트, 황금빛 일출/일몰
+📝 **구조**: Hook → Teaching 1,2,3 → Prayer → CTA & Blessing
+⚠️ **주의**: 영어로 직접 생성됨 (번역 아님)
+🙏 **특징**: "My dear friends" 호칭, Anchor phrase 반복, 성경 레퍼런스"""
 }
 
 def update_style_guide(style: str):
-    return STYLE_GUIDES.get(style, STYLE_GUIDES["정보"])
+    return STYLE_GUIDES.get(style, STYLE_GUIDES["불교강의"])
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -320,7 +349,7 @@ def _translate_existing_script(language: str):
 # 통합 스크립트 + 이미지 프롬프트 생성
 # ═══════════════════════════════════════════════════════════════
 
-def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko"):
+def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko", episode_type: str = "sutra_origin"):
     """주제 입력 → 스크립트 + 이미지 프롬프트 한번에 생성"""
     if not topic.strip():
         return "❌ 주제를 입력해주세요", "", ""
@@ -338,6 +367,15 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         # 프로젝트 생성 (스타일 저장)
         project = pipeline.create_project(topic, duration)
         project.style = style  # 스타일 저장
+        project.episode_type = episode_type  # 에피소드 타입 저장 (불교강의용)
+
+        # 스타일에 따른 언어 자동 설정 (썸네일 폰트 선택에 사용)
+        if style == "일본텔링":
+            project.language = "ja"
+        elif style == "영어Saying전용":
+            project.language = "en"
+        else:
+            project.language = "ko"
 
         # 분량에 따른 글자 수 계산 (TTS 속도 0.9 기준, 분당 약 180자)
         from config import DURATION_SPECS
@@ -347,10 +385,17 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         chars_per_scene = total_chars // num_scenes
 
         # 스타일별 프롬프트 구성
-        base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["정보"])
+        # 불교강의: v2 역사 미스터리형 (에피소드 타입 적용)
+        if style == "불교강의":
+            base_prompt = get_buddhist_lecture_prompt(topic, duration, episode_type)
+            print(f"[스크립트] 불교강의 v2 사용 - 에피소드 타입: {episode_type}")
+        else:
+            base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["불교강의"])
+            base_prompt = base_prompt.format(topic=topic, duration=duration)
+
         image_style = STYLE_IMAGE_GUIDES.get(style, "")
 
-        prompt = base_prompt.format(topic=topic, duration=duration)
+        prompt = base_prompt
         prompt += INTEGRATED_OUTPUT_FORMAT.format(
             duration=duration,
             total_chars=total_chars,
@@ -429,12 +474,18 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             for i, s in enumerate(data["scenes"]):
                 original_prompts = data["scenes"][i].get("image_prompts", []) if i < len(data["scenes"]) else []
 
+                # 영어Saying전용: key_sentence 추출 (다른 스타일에는 영향 없음)
+                key_sentence = ""
+                if style == "영어Saying전용":
+                    key_sentence = s.get("key_sentence", "")
+
                 scenes.append(Scene(
                     scene_id=s["scene_id"],
                     title=s["title"],
                     text=s["text"],
                     image_count=len(original_prompts) if original_prompts else 0,
-                    importance=s.get("importance", 3)
+                    importance=s.get("importance", 3),
+                    key_sentence=key_sentence
                 ))
 
             script = Script(
@@ -452,6 +503,9 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             for i, scene in enumerate(script.scenes):
                 preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
                 preview += f"🖼️ {scene.image_count}장\n\n"
+                # 영어Saying전용: key_sentence 표시
+                if scene.key_sentence:
+                    preview += f"**📺 KEY: {scene.key_sentence}**\n\n"
                 preview += f"{scene.text}\n\n---\n\n"
 
             # 이미지 프롬프트 포맷팅
@@ -559,13 +613,20 @@ def preview_tts_script(engine: str):
 
     # EMOTION_TAGS 가져오기
     from config import EMOTION_TAGS
-    from engines.tts_engine import STYLE_DEFAULT_EMOTIONS_V25
+    from engines.tts_engine import STYLE_DEFAULT_EMOTIONS_V25, convert_to_tts_text
 
     preview = f"## 🎙️ TTS 입력 대사 미리보기\n"
     preview += f"**엔진**: {engine} | **스타일**: {style or '없음'} | **씬**: {total_scenes}개\n"
     if usage_info:
         preview += usage_info
     preview += "\n---\n\n"
+
+    # TTS 변환 규칙 안내
+    preview += "### 📝 TTS 전처리 규칙\n"
+    preview += "- 한자 병기 제거: `임(林)` → `임`\n"
+    preview += "- 년도 변환: `501년` → `오백일년`\n"
+    preview += "- 특수 괄호 제거: `<<금강경>>` → `금강경`\n"
+    preview += "- 특수 따옴표 정규화\n\n---\n\n"
 
     for i, scene in enumerate(script.scenes):
         position = i / total_scenes
@@ -599,15 +660,23 @@ def preview_tts_script(engine: str):
             else:
                 emotion_info = emotions.get("ending", "calm")
 
+        # TTS 전처리 적용
+        original_text = scene.text
+        tts_text = convert_to_tts_text(original_text)
+        has_changes = original_text.strip() != tts_text.strip()
+
         preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
         if tag:
             preview += f"🎭 **감정태그 (v3)**: `{tag}`\n\n"
-            preview += f"```\n{tag} {scene.text}\n```\n\n"
         elif emotion_info:
             preview += f"🎭 **감정흉내 (v2.5)**: `{emotion_info}` → voice_settings 자동 조정\n\n"
-            preview += f"```\n{scene.text}\n```\n\n"
+
+        # 변환 전/후 비교 표시
+        if has_changes:
+            preview += f"**📄 원본:**\n```\n{original_text}\n```\n\n"
+            preview += f"**🔊 TTS용 (변환됨):**\n```\n{tts_text}\n```\n\n"
         else:
-            preview += f"```\n{scene.text}\n```\n\n"
+            preview += f"**🔊 TTS 입력:**\n```\n{tts_text}\n```\n\n"
 
     return preview
 
@@ -677,7 +746,7 @@ def parse_image_prompts(prompts_text: str):
     return parsed
 
 
-def generate_images_from_text(prompts_text: str, engine: str, model: str, style: str = "정보"):
+def generate_images_from_text(prompts_text: str, engine: str, model: str, style: str = "불교강의", image_style: str = "korea"):
     if not pipeline.project:
         return "❌ 스크립트 먼저 생성하세요", []
     try:
@@ -688,8 +757,13 @@ def generate_images_from_text(prompts_text: str, engine: str, model: str, style:
         # 스토리텔링 스타일일 때 StoryMaker 설정 전달
         storymaker_config = None
         if style in STYLE_TO_STORYMAKER:
+            # 기존 스토리텔링 스타일: 고정된 region 사용
             storymaker_config = STYLE_TO_STORYMAKER[style]
             print(f"[App] 스토리텔링 스타일 감지: {style} → {storymaker_config}")
+        elif style in ("불교강의", "불교명상"):
+            # 불교강의/불교명상: 사용자가 선택한 image_style 적용
+            storymaker_config = {"region": image_style}
+            print(f"[App] {style} 이미지 스타일 적용: region={image_style}")
 
         image_paths = pipeline.step4_generate_images_from_prompts(
             prompts=prompts,
@@ -755,7 +829,14 @@ def apply_existing_images():
 
 # 엔진별 모델 옵션
 IMAGE_MODEL_OPTIONS = {
-    "fal": [
+    "fal-anime": [
+        ("flux-schnell (빠름/$0.003)", "flux-schnell"),
+        ("flux-dev (균형/$0.025)", "flux-dev"),
+        ("flux-pro (고품질/$0.05)", "flux-pro"),
+        ("flux-pro-v1.1 (최신/$0.05)", "flux-pro-v1.1"),
+        ("flux-ultra (최고품질/$0.06)", "flux-ultra"),
+    ],
+    "fal-realistic": [
         ("flux-schnell (빠름/$0.003)", "flux-schnell"),
         ("flux-dev (균형/$0.025)", "flux-dev"),
         ("flux-pro (고품질/$0.05)", "flux-pro"),
@@ -777,7 +858,7 @@ IMAGE_MODEL_OPTIONS = {
 
 def update_model_choices(engine: str):
     """엔진 변경시 모델 선택 옵션 업데이트"""
-    choices = IMAGE_MODEL_OPTIONS.get(engine, IMAGE_MODEL_OPTIONS["fal"])
+    choices = IMAGE_MODEL_OPTIONS.get(engine, IMAGE_MODEL_OPTIONS["fal-anime"])
     default_value = choices[0][1] if choices else None
     return gr.update(choices=choices, value=default_value)
 
@@ -860,6 +941,11 @@ def finalize_video():
     if not pipeline.project or not pipeline.project.video_path:
         return "❌ 렌더링 필요", None
     try:
+        # 자막이 없으면 자동 생성
+        if not pipeline.project.subtitle_path:
+            print("[finalize_video] 자막 없음 - 자동 생성 중...")
+            pipeline.step5_generate_subtitles(use_whisper=False)
+
         final_path = pipeline.step7_burn_subtitles()
         # 프로젝트 자동 저장
         pipeline.save_project()
@@ -960,7 +1046,8 @@ def generate_thumbnail(
         return "❌ 배경 이미지를 업로드하거나 이미지를 먼저 생성하세요", None
 
     try:
-        style = getattr(pipeline.project, 'style', '정보') if pipeline.project else '정보'
+        style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
+        language = getattr(pipeline.project, 'language', 'ko') if pipeline.project else 'ko'
 
         # 출력 경로
         if pipeline.project:
@@ -975,7 +1062,8 @@ def generate_thumbnail(
             bottom_text=bottom_text,
             style=style,
             darken=darken,
-            output_path=output_path
+            output_path=output_path,
+            language=language
         )
 
         return f"✅ 썸네일 생성 완료!", thumbnail_path
@@ -1032,28 +1120,38 @@ def generate_thumbnail_texts():
     # AI 메타데이터 없으면 기존 방식으로 생성
     script = pipeline.project.script
     title = script.title or ""
-    style = getattr(pipeline.project, 'style', '정보')
+    style = getattr(pipeline.project, 'style', '불교강의')
 
     # 스타일별 텍스트 생성
     if style == "불교명상":
-        sub_text = "잠자면서 듣는"
+        sub_text = "수면 명상"
         if len(title) > 20:
             main_text = title[:20] + "..."
         else:
             main_text = title
-        bottom_text = "마음이 편안해지는 말씀"
-    elif style == "뉴스":
-        sub_text = "긴급 속보"
+        bottom_text = "깊은 잠으로"
+    elif style == "불교강의":
+        sub_text = "함께 읽는"
         main_text = title[:25] if len(title) > 25 else title
-        bottom_text = "지금 바로 확인하세요"
+        bottom_text = "마음의 여운"
     elif "스토리텔링" in style:
         sub_text = "그날 밤"
         main_text = title[:25] if len(title) > 25 else title
         bottom_text = ""
-    else:  # 정보
-        sub_text = "꼭 알아야 할"
+    elif style == "일본텔링":
+        # 일본어 썸네일 텍스트
+        sub_text = "心の処方箋"
+        main_text = title[:20] if len(title) > 20 else title
+        bottom_text = ""
+    elif style == "영어Saying전용":
+        # 영어 썸네일 텍스트
+        sub_text = "PRAY THIS"
         main_text = title[:25] if len(title) > 25 else title
-        bottom_text = "지금 확인하세요"
+        bottom_text = ""
+    else:  # 기본 스타일
+        sub_text = "함께 읽는"
+        main_text = title[:25] if len(title) > 25 else title
+        bottom_text = "마음의 여운"
 
     return "✅ 텍스트 생성 완료!", sub_text, main_text, bottom_text
 
@@ -1078,7 +1176,8 @@ def preview_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
         return "❌ 메인 텍스트를 입력하세요", None
 
     try:
-        style = getattr(pipeline.project, 'style', '정보') if pipeline.project else '정보'
+        style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
+        language = getattr(pipeline.project, 'language', 'ko') if pipeline.project else 'ko'
 
         # 미리보기 경로 (임시)
         if pipeline.project:
@@ -1093,7 +1192,8 @@ def preview_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
             bottom_text=bottom_text,
             style=style,
             darken=darken,
-            output_path=preview_path
+            output_path=preview_path,
+            language=language
         )
 
         return "👁️ 미리보기 생성됨 (확정하려면 '✅ 확정' 버튼 클릭)", thumbnail_path
@@ -1109,7 +1209,8 @@ def confirm_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
         return "❌ 메인 텍스트를 입력하세요", None, None
 
     try:
-        style = getattr(pipeline.project, 'style', '정보') if pipeline.project else '정보'
+        style = getattr(pipeline.project, 'style', '불교강의') if pipeline.project else '불교강의'
+        language = getattr(pipeline.project, 'language', 'ko') if pipeline.project else 'ko'
 
         # 최종 경로
         if pipeline.project:
@@ -1124,7 +1225,8 @@ def confirm_thumbnail(bg_path, main_text, sub_text, bottom_text, darken):
             bottom_text=bottom_text,
             style=style,
             darken=darken,
-            output_path=output_path
+            output_path=output_path,
+            language=language
         )
 
         return f"✅ 썸네일 확정 저장: {output_path}", thumbnail_path, thumbnail_path
@@ -1146,8 +1248,8 @@ def reset_project():
         "🔄 새 프로젝트 시작! 주제를 입력하세요.",  # status
         "",  # topic_input
         10,  # duration_input
-        "정보",  # style_input
-        STYLE_GUIDES["정보"],  # style_guide
+        "불교강의",  # style_input
+        STYLE_GUIDES["불교강의"],  # style_guide
         "ko",  # script_language (한국어 기본값)
         "*주제를 입력하고 생성 버튼을 누르세요*",  # script_preview
         "",  # image_prompts
@@ -1369,10 +1471,15 @@ def upload_to_youtube(title: str, description: str, tags: str, privacy: str, lan
         thumb_note = ""
         if not result.get("thumbnail_uploaded"):
             thumb_status = "⚠️"
-            if "forbidden" in str(result.get("thumbnail_error", "")).lower():
+            thumb_error = result.get("thumbnail_error", "")
+            if "forbidden" in str(thumb_error).lower():
                 thumb_note = "\n\n⚠️ **썸네일 업로드 실패**: YouTube 채널 전화번호 인증이 필요합니다.\n[YouTube 스튜디오 → 설정 → 채널 → 기능 사용 자격 요건](https://studio.youtube.com)"
+            elif "존재하지 않음" in str(thumb_error) or "생성되지 않음" in str(thumb_error):
+                thumb_note = f"\n\n⚠️ **썸네일 업로드 실패**: 썸네일 이미지가 없습니다.\n업로드 전에 '썸네일 생성' 탭에서 썸네일을 먼저 생성하세요."
+            elif thumb_error:
+                thumb_note = f"\n\n⚠️ 썸네일 업로드 실패: {thumb_error}"
             else:
-                thumb_note = f"\n\n⚠️ 썸네일 업로드 실패: {result.get('thumbnail_error', '알 수 없음')}"
+                thumb_note = "\n\n⚠️ 썸네일 업로드 실패: 원인을 확인할 수 없습니다."
 
         yield (
             f"🎉 **{lang_name} 채널에 업로드 완료!**",
@@ -1413,7 +1520,7 @@ def prepare_youtube_upload(language: str = "ko"):
 
     project = pipeline.project
     script = project.script
-    style = getattr(project, 'style', '정보')
+    style = getattr(project, 'style', '불교강의')
 
     # 영상 길이 계산 (분)
     duration = getattr(project, 'duration', 10)
@@ -1451,7 +1558,7 @@ def prepare_youtube_upload(language: str = "ko"):
         if script and script.title:
             if language != "ko" and contains_korean(script.title):
                 # 한국어 제목이면 기본 템플릿 사용
-                title_templates = YOUTUBE_TITLE_TEMPLATES.get(style, YOUTUBE_TITLE_TEMPLATES.get("정보", []))
+                title_templates = YOUTUBE_TITLE_TEMPLATES.get(style, YOUTUBE_TITLE_TEMPLATES.get("불교강의", []))
                 if title_templates:
                     title = random.choice(title_templates).format(duration=duration)
                 else:
@@ -1563,14 +1670,45 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         )
 
                     style_input = gr.Radio(
-                        ["뉴스", "정보", "스토리텔링",
+                        ["불교강의",
                          "스토리텔링:한국불교", "스토리텔링:중국불교", "스토리텔링:인도불교",
-                         "불교명상"],
-                        value="정보",
+                         "불교명상", "일본텔링", "영어Saying전용"],
+                        value="불교강의",
                         label="스타일"
                     )
 
-                    style_guide = gr.Markdown(STYLE_GUIDES["정보"])
+                    # 불교강의 에피소드 타입 (불교강의 선택시만 표시)
+                    episode_type_choices = [
+                        (v["name"], k) for k, v in BUDDHIST_LECTURE_EPISODE_TYPES.items()
+                    ]
+                    episode_type_input = gr.Dropdown(
+                        choices=episode_type_choices,
+                        value="sutra_origin",
+                        label="📚 에피소드 타입 (불교강의 전용)",
+                        info="경전/선사일화/논쟁/수행/유물 중 선택",
+                        visible=True
+                    )
+
+                    # 이미지 스타일 선택 (불교강의/불교명상 전용)
+                    image_style_input = gr.Dropdown(
+                        choices=[
+                            ("🇰🇷 한국불교 (수묵담채)", "korea"),
+                            ("🇨🇳 중국불교 (도상화)", "china"),
+                            ("🇮🇳 인도불교 (콘셉트아트)", "india"),
+                        ],
+                        value="korea",
+                        label="🎨 이미지 스타일 (불교강의/불교명상 전용)",
+                        info="한국: 수묵담채 | 중국: 강렬한 원색 | 인도: 연필 스케치",
+                        visible=True
+                    )
+
+                    def toggle_style_options(style):
+                        """스타일에 따라 에피소드 타입과 이미지 스타일 드롭다운 표시/숨김"""
+                        show_episode = (style == "불교강의")
+                        show_image_style = (style in ("불교강의", "불교명상"))
+                        return gr.update(visible=show_episode), gr.update(visible=show_image_style)
+
+                    style_guide = gr.Markdown(STYLE_GUIDES["불교강의"])
 
                     # 언어 선택 (스크립트 번역용)
                     gr.Markdown("### 🌍 출력 언어")
@@ -1665,12 +1803,13 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                 with gr.Column():
                     image_engine = gr.Radio(
                         [
-                            ("fal.ai", "fal"),
+                            ("fal.ai (애니)", "fal-anime"),
+                            ("fal.ai (실사)", "fal-realistic"),
                             ("DALL-E", "dalle"),
                             ("Imagen", "imagen"),
                             ("스토리텔링전용", "storymaker"),
                         ],
-                        value="fal",
+                        value="fal-anime",
                         label="이미지 엔진"
                     )
 
@@ -1950,13 +2089,14 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
         ]
     )
 
-    # 스타일 변경시 가이드 업데이트
+    # 스타일 변경시 가이드 업데이트 + 에피소드 타입 토글
     style_input.change(update_style_guide, [style_input], [style_guide])
+    style_input.change(toggle_style_options, [style_input], [episode_type_input, image_style_input])
 
-    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 추가)
+    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 + 에피소드 타입 추가)
     generate_btn.click(
         generate_script_and_images,
-        [topic_input, duration_input, style_input, script_language],
+        [topic_input, duration_input, style_input, script_language, episode_type_input],
         [status, script_preview, image_prompts, yt_title_input, yt_thumbnail_input]
     )
 
@@ -1973,7 +2113,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     image_engine.change(update_model_choices, [image_engine], [image_model])
     gen_images_btn.click(
         generate_images_from_text,
-        [final_prompts, image_engine, image_model, style_input],
+        [final_prompts, image_engine, image_model, style_input, image_style_input],
         [status, images_gallery]
     )
     apply_images_btn.click(

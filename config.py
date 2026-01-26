@@ -57,10 +57,28 @@ ELEVENLABS_STYLE_VOICES = {
         "speed": 0.9,  # 미스터리: 느리게 (긴장감)
     },
     "불교종교": {
-        "voice_id": "4p0HBzAAGyju0nYfNntV",  # 사용자 지정 - 명상/위로 스타일
-        "stability": 0.0,  # Creative - 감정적이고 따뜻한 톤
+        "voice_id": "zgDzx5jLLCqEp6Fl7Kl7",  # 불교강의 전용 (여성 음성)
+        "stability": 0.3,  # 자연스러움 + 적당한 안정 (0.5는 딱딱함)
         "similarity_boost": 0.8,
         "speed": 0.85,  # 불교: 천천히 (명상적)
+    },
+    "불교강의": {
+        "voice_id": "zgDzx5jLLCqEp6Fl7Kl7",  # 불교강의 전용 (여성 음성)
+        "stability": 0.3,  # 자연스러움 + 적당한 안정 (0.5는 딱딱함)
+        "similarity_boost": 0.8,
+        "speed": 0.85,  # 불교: 천천히 (명상적)
+    },
+    "불교명상": {
+        "voice_id": "zgDzx5jLLCqEp6Fl7Kl7",  # 여성 음성 (차분한 톤)
+        "stability": 0.4,  # 안정적이고 일관된 톤 (명상 유도용)
+        "similarity_boost": 0.8,
+        "speed": 0.75,  # 매우 느리게 (수면 명상)
+    },
+    "영어Saying전용": {
+        "voice_id": "87tjwokZlpNU7QL3HaLP",  # 영어 목회자 톤 전용
+        "stability": 0.4,  # 따뜻하고 자연스러운 톤
+        "similarity_boost": 0.7,
+        "speed": 0.85,  # 느리고 차분하게
     },
 }
 
@@ -73,6 +91,13 @@ EMOTION_TAGS = {
         "body_hope": "[warm, hopeful]",
         "climax": "[deep, emotional]",
         "ending": "[peaceful, soothing]",
+    },
+    "불교명상": {
+        "intro": "[calm, gentle, soothing]",
+        "body_scan": "[soft, peaceful, relaxed]",
+        "visualization": "[dreamy, serene, peaceful]",
+        "deep_relax": "[whisper, fading, sleepy]",
+        "ending": "[barely audible, peaceful]",
     },
     "믿거나말거나": {
         "intro": "[curious, intrigued]",
@@ -196,6 +221,18 @@ YOUTUBE_HOOK_TYPES = {
 
 # 스타일별 제목 템플릿
 YOUTUBE_TITLE_TEMPLATES = {
+    "불교강의": [
+        "오늘 밤 {duration}분, 이 문장을 함께 읽어보실래요",
+        "경전의 한 구절, {duration}분 동안 천천히 생각해봅니다",
+        "부처님이 남긴 이 말, {duration}분만 같이 들여다볼까요",
+        "잠들기 전 {duration}분, 마음에 남는 한 문장",
+        "왜 이 문장이 마음에 걸릴까요 ({duration}분 함께 읽기)",
+        "경전 속 이 대목, {duration}분 동안 곱씹어봅니다",
+        "오래된 말 속에서 {duration}분, 질문 하나를 건져봅니다",
+        "이 구절이 유독 남는 이유 ({duration}분 낭독)",
+        "밤에 읽으면 다르게 들리는 부처님 말씀 {duration}분",
+        "생각이 많은 밤, {duration}분만 이 문장과 함께",
+    ],
     "불교종교": [
         "잠들기 전 {duration}분, 불안이 가라앉는 부처님의 한마디",
         "생각이 많고 예민한 사람, 오늘 밤 {duration}분만 이렇게 하세요",
@@ -216,6 +253,18 @@ YOUTUBE_TITLE_TEMPLATES = {
         "마음이 복잡할수록 단순하게, 불교의 정리 {duration}분",
         "노후가 불안한 분들께, 딱 이것만 {duration}분",
         "오늘 하루를 놓아주는 {duration}분, 수면 낭독",
+    ],
+    "불교명상": [
+        "잠들기 전 {duration}분, 산사의 고요함 속으로",
+        "깊은 잠을 위한 {duration}분 수면 명상",
+        "새벽 산사에서 보내는 {duration}분",
+        "달빛 연못가, {duration}분의 평온",
+        "목탁 소리와 함께하는 {duration}분 수면 명상",
+        "법당의 고요함, {duration}분 이완 명상",
+        "대나무 숲 산책, {duration}분 마음 비우기",
+        "안개 낀 산사, {duration}분 깊은 휴식",
+        "촛불과 함께하는 {duration}분 수면 여행",
+        "고요한 새벽, {duration}분 호흡 명상",
     ],
     "뉴스": [
         "오늘 꼭 알아야 할 소식 {duration}분 정리",
@@ -243,6 +292,7 @@ YOUTUBE_FORBIDDEN_WORDS = [
 # 스타일별 기본 태그
 YOUTUBE_DEFAULT_TAGS = {
     "불교종교": "불교,부처님말씀,석가모니,법정스님,명언낭독,불교오디오북,수면낭독,잠잘때듣는,ASMR,마음공부,명상,힐링,위로,불안,걱정,인간관계,자존감,마음정리,오디오북,철학",
+    "불교명상": "수면명상,가이드명상,이완명상,BodyScan,호흡명상,산사,템플스테이,잠잘때듣는,ASMR,힐링,릴렉스,깊은잠,수면유도,명상음악,불면증,마음챙김,mindfulness,meditation,sleep",
     "뉴스": "뉴스, 이슈, 시사, 정보, 핫이슈, 트렌드, 속보, 정리",
     "정보": "정보, 꿀팁, 생활정보, 유용한정보, 알아두면좋은, 상식",
     "믿거나말거나": "미스터리, 실화, 소름, 충격, 믿거나말거나, 신기한이야기",
@@ -264,6 +314,27 @@ YOUTUBE_DESCRIPTION_TEMPLATE = {
 👍 구독/좋아요는 제작에 도움이 됩니다.
 
 #불교 #수면낭독 #명언
+""",
+    "불교명상": """깊은 잠을 위한 수면 명상입니다.
+편안한 자세로 누워서, 천천히 호흡과 함께 따라오세요.
+
+🧘 구성
+- 호흡 안내: 긴장을 풀고 호흡에 집중
+- Body Scan: 발끝부터 머리까지 순차 이완
+- 시각화: 고요한 산사 풍경 속으로
+- 깊은 휴식: 목소리가 점점 멀어지며 자연스럽게 잠으로
+
+⏱️ 타임라인
+00:00 시작
+{scene_summaries}
+
+📌 채널 안내
+산사의 고요함 속에서 깊은 잠을 찾아드립니다.
+
+※ 의료/치료 목적이 아닌 이완/수면 유도 콘텐츠입니다.
+👍 구독/좋아요는 제작에 도움이 됩니다.
+
+#수면명상 #가이드명상 #깊은잠 #이완명상
 """,
     "default": """📺 {title}
 
@@ -300,6 +371,23 @@ YOUTUBE_THUMBNAIL_TEXT_TEMPLATES = {
         "걱정이 많다면\n오늘만 {duration}분",
         "오늘 밤\n{duration}분",
         "마음이 힘들 때\n듣는 말씀",
+    ],
+    "불교명상": [
+        # 1줄 (6~12자, 강력)
+        "깊은 잠",
+        "마음 비우기",
+        "고요한 밤",
+        "산사의 새벽",
+        "편안한 휴식",
+        "달빛 명상",
+        "숨 고르기",
+        "깊은 휴식",
+        # 2줄 패턴 (\n으로 구분)
+        "수면 명상\n{duration}분",
+        "잠들기 전\n호흡 명상",
+        "산사의 밤\n{duration}분",
+        "깊은 잠으로\n{duration}분",
+        "편안한 밤\n명상 여행",
     ],
     "뉴스": [
         "오늘 핵심만",
