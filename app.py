@@ -92,7 +92,8 @@ STYLE_IMAGE_GUIDES = {
     "스토리텔링:한국불교": "classical Korean ink-wash narrative painting, Joseon dynasty landscape painting style, soft mineral colors, traditional hanok and village scenery, wide negative space, storytelling composition, gentle brush texture, hand-painted feeling, no anime, no modern illustration, no bright digital colors, no cartoon style",
     "스토리텔링:중국불교": "buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood, storytelling iconography, no anime, no modern illustration",
     "스토리텔링:인도불교": "narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast shading, wide negative space, storyboard composition, no cute, no anime gloss, no bright color",
-    "불교명상": "ethereal Buddhist temple illustration, peaceful dawn atmosphere, soft moonlight on lotus pond, misty mountain monastery, gentle candlelight in dharma hall, serene meditation space, traditional Korean temple architecture, muted pastel colors, dreamy atmosphere, wide negative space, no text, no people close-up, no modern elements, no anime style"
+    "불교명상": "ethereal Buddhist temple illustration, peaceful dawn atmosphere, soft moonlight on lotus pond, misty mountain monastery, gentle candlelight in dharma hall, serene meditation space, traditional Korean temple architecture, muted pastel colors, dreamy atmosphere, wide negative space, no text, no people close-up, no modern elements, no anime style",
+    "일본텔링": "soft watercolor illustration, gentle muted colors, peaceful atmosphere, minimalist composition, Japanese aesthetic, middle-aged or senior Japanese person, contemplative mood, no anime, no cute style, no harsh contrast"
 }
 
 # 스타일 → StoryMaker 설정 매핑
