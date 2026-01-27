@@ -13,7 +13,11 @@ import json
 from pipeline import Pipeline
 from engines import ScriptEngine, ImageEngine
 from engines.thumbnail_engine import ThumbnailEngine
-from styles import STYLE_PROMPTS, BUDDHIST_LECTURE_EPISODE_TYPES, get_buddhist_lecture_prompt  # 스타일별 프롬프트 (파일 분리됨)
+from styles import (
+    STYLE_PROMPTS, BUDDHIST_LECTURE_EPISODE_TYPES, get_buddhist_lecture_prompt,
+    # 일본텔링 전용
+    JAPAN_SERIES_CONFIG, get_japan_prompt, get_japan_review_prompt, get_japan_image_prompt_with_prop,
+)  # 스타일별 프롬프트 (파일 분리됨)
 from config import (
     DURATION_SPECS, BGM_CONFIG,
     YOUTUBE_TITLE_TEMPLATES, YOUTUBE_DEFAULT_TAGS,
@@ -349,7 +353,7 @@ def _translate_existing_script(language: str):
 # 통합 스크립트 + 이미지 프롬프트 생성
 # ═══════════════════════════════════════════════════════════════
 
-def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko", episode_type: str = "sutra_origin"):
+def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko", episode_type: str = "sutra_origin", japan_series: str = "senior", japan_twopass: bool = True):
     """주제 입력 → 스크립트 + 이미지 프롬프트 한번에 생성"""
     if not topic.strip():
         return "❌ 주제를 입력해주세요", "", ""
@@ -368,6 +372,11 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         project = pipeline.create_project(topic, duration)
         project.style = style  # 스타일 저장
         project.episode_type = episode_type  # 에피소드 타입 저장 (불교강의용)
+
+        # 일본텔링 전용 옵션 저장
+        if style == "일본텔링":
+            project.japan_series = japan_series
+            project.japan_twopass = japan_twopass
 
         # 스타일에 따른 언어 자동 설정 (썸네일 폰트 선택에 사용)
         if style == "일본텔링":
@@ -389,6 +398,11 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         if style == "불교강의":
             base_prompt = get_buddhist_lecture_prompt(topic, duration, episode_type)
             print(f"[스크립트] 불교강의 v2 사용 - 에피소드 타입: {episode_type}")
+        # 일본텔링: 시리즈별 프롬프트 (Senior/Adult)
+        elif style == "일본텔링":
+            base_prompt = get_japan_prompt(topic, duration, japan_series)
+            series_name = JAPAN_SERIES_CONFIG.get(japan_series, {}).get("name", japan_series)
+            print(f"[스크립트] 일본텔링 사용 - 시리즈: {series_name}, 2패스: {japan_twopass}")
         else:
             base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["불교강의"])
             base_prompt = base_prompt.format(topic=topic, duration=duration)
@@ -444,16 +458,65 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
             data = json.loads(json_str)
 
-            # 원본 한국어 스크립트 저장 (다국어 번역용)
+            # ═══════════════════════════════════════════════════════════════
+            # 일본텔링 2패스 검수 (선택된 경우만)
+            # ═══════════════════════════════════════════════════════════════
+            if style == "일본텔링" and japan_twopass:
+                print(f"[일본텔링] 2패스 검수 시작...")
+                review_prompt = get_japan_review_prompt()
+                review_input = review_prompt + "\n\n" + json.dumps(data, ensure_ascii=False, indent=2)
+
+                review_response = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=8192,
+                    messages=[{"role": "user", "content": review_input}]
+                )
+
+                review_result = review_response.content[0].text
+
+                # 검수된 JSON 파싱
+                try:
+                    if "```json" in review_result:
+                        rev_start = review_result.find("```json") + 7
+                        rev_end = review_result.find("```", rev_start)
+                        review_json_str = review_result[rev_start:rev_end].strip()
+                    elif "```" in review_result and "{" in review_result:
+                        rev_start = review_result.find("```") + 3
+                        rev_end = review_result.find("```", rev_start)
+                        if rev_end > rev_start:
+                            review_json_str = review_result[rev_start:rev_end].strip()
+                        else:
+                            review_json_str = None
+                    else:
+                        first_brace = review_result.find("{")
+                        last_brace = review_result.rfind("}")
+                        if first_brace != -1 and last_brace != -1:
+                            review_json_str = review_result[first_brace:last_brace + 1]
+                        else:
+                            review_json_str = None
+
+                    if review_json_str:
+                        reviewed_data = json.loads(review_json_str)
+                        data = reviewed_data
+                        print(f"[일본텔링] 2패스 검수 완료 - 수정 적용됨")
+                    else:
+                        print(f"[일본텔링] 2패스 검수 - JSON 추출 실패, 원본 유지")
+                except json.JSONDecodeError as e:
+                    print(f"[일본텔링] 2패스 검수 JSON 파싱 실패: {e}, 원본 유지")
+
+            # 원본 스크립트 저장 (다국어 번역용)
             # 항상 원본에서 번역해야 일본어→영어 같은 문제 방지
             import copy
             pipeline.project.original_script_data = copy.deepcopy(data)
-            print(f"[스크립트] 원본 한국어 스크립트 저장 완료")
+            print(f"[스크립트] 스크립트 저장 완료")
 
             # 이미지 프롬프트 먼저 추출 (번역 전에)
             all_image_prompts = []
             for s in data["scenes"]:
                 image_prompts = s.get("image_prompts", [])
+                # 일본텔링: signature prop (スマホ通知) 추가
+                if style == "일본텔링":
+                    image_prompts = [get_japan_image_prompt_with_prop(p) for p in image_prompts]
                 all_image_prompts.extend(image_prompts)
 
             # 번역 (한국어가 아닌 경우) - 항상 원본에서 번역
@@ -1702,11 +1765,38 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         visible=True
                     )
 
+                    # ═══════════════════════════════════════════════════════════════
+                    # 일본텔링 전용 옵션 (일본텔링 선택시만 표시)
+                    # ═══════════════════════════════════════════════════════════════
+                    japan_series_choices = [
+                        (v["name"], k) for k, v in JAPAN_SERIES_CONFIG.items()
+                    ]
+                    japan_series_input = gr.Dropdown(
+                        choices=japan_series_choices,
+                        value="senior",
+                        label="🇯🇵 시리즈 선택 (일본텔링 전용)",
+                        info="Senior(40-70): 따뜻한 안심 톤 | Adult(20-40): 쿨하고 담백",
+                        visible=False
+                    )
+
+                    japan_twopass_input = gr.Checkbox(
+                        label="🔄 2패스 검수 활성화",
+                        value=True,
+                        info="AI가 생성 후 자체 검수로 금지어/패턴 수정 (일본텔링 전용)",
+                        visible=False
+                    )
+
                     def toggle_style_options(style):
                         """스타일에 따라 에피소드 타입과 이미지 스타일 드롭다운 표시/숨김"""
                         show_episode = (style == "불교강의")
                         show_image_style = (style in ("불교강의", "불교명상"))
-                        return gr.update(visible=show_episode), gr.update(visible=show_image_style)
+                        show_japan_options = (style == "일본텔링")
+                        return (
+                            gr.update(visible=show_episode),
+                            gr.update(visible=show_image_style),
+                            gr.update(visible=show_japan_options),
+                            gr.update(visible=show_japan_options)
+                        )
 
                     style_guide = gr.Markdown(STYLE_GUIDES["불교강의"])
 
@@ -2091,12 +2181,12 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
 
     # 스타일 변경시 가이드 업데이트 + 에피소드 타입 토글
     style_input.change(update_style_guide, [style_input], [style_guide])
-    style_input.change(toggle_style_options, [style_input], [episode_type_input, image_style_input])
+    style_input.change(toggle_style_options, [style_input], [episode_type_input, image_style_input, japan_series_input, japan_twopass_input])
 
-    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 + 에피소드 타입 추가)
+    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 + 에피소드 타입 + 일본텔링 옵션 추가)
     generate_btn.click(
         generate_script_and_images,
-        [topic_input, duration_input, style_input, script_language, episode_type_input],
+        [topic_input, duration_input, style_input, script_language, episode_type_input, japan_series_input, japan_twopass_input],
         [status, script_preview, image_prompts, yt_title_input, yt_thumbnail_input]
     )
 
