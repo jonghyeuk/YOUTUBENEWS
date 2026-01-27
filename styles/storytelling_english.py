@@ -133,8 +133,8 @@ OUTPUT JSON (must be valid)
   "scenes": [
     {
       "scene_id": 1,
-      "scene_title": "HOOK - ...",
-      "script": "...",
+      "title": "HOOK - ...",
+      "text": "...",
       "key_sentence": "...",
       "image_prompts": ["..."]
     }
