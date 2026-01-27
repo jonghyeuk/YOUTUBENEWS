@@ -17,6 +17,8 @@ from styles import (
     STYLE_PROMPTS, BUDDHIST_LECTURE_EPISODE_TYPES, get_buddhist_lecture_prompt,
     # 일본텔링 전용
     JAPAN_SERIES_CONFIG, get_japan_prompt, get_japan_review_prompt, get_japan_image_prompt_with_prop,
+    # 영어 디보셔널 전용
+    ENGLISH_STYLE_CONFIG, get_english_prompt, get_english_review_prompt, get_english_image_prompt_with_prop,
 )  # 스타일별 프롬프트 (파일 분리됨)
 from config import (
     DURATION_SPECS, BGM_CONFIG,
@@ -97,7 +99,8 @@ STYLE_IMAGE_GUIDES = {
     "스토리텔링:중국불교": "buddhist icon narrative painting, flat symbolic composition, traditional temple painting style, strong primary colors, no perspective realism, spiritual sacred mood, storytelling iconography, no anime, no modern illustration",
     "스토리텔링:인도불교": "narrative concept art illustration, soft pencil sketch, desaturated muted colors, low contrast shading, wide negative space, storyboard composition, no cute, no anime gloss, no bright color",
     "불교명상": "ethereal Buddhist temple illustration, peaceful dawn atmosphere, soft moonlight on lotus pond, misty mountain monastery, gentle candlelight in dharma hall, serene meditation space, traditional Korean temple architecture, muted pastel colors, dreamy atmosphere, wide negative space, no text, no people close-up, no modern elements, no anime style",
-    "일본텔링": "soft watercolor illustration, gentle muted colors, peaceful atmosphere, minimalist composition, Japanese aesthetic, middle-aged or senior Japanese person, contemplative mood, no anime, no cute style, no harsh contrast"
+    "일본텔링": "soft watercolor illustration, gentle muted colors, peaceful atmosphere, minimalist composition, Japanese aesthetic, middle-aged or senior Japanese person, contemplative mood, no anime, no cute style, no harsh contrast",
+    "영어디보셔널": "warm spiritual illustration, peaceful sunrise, golden hour lighting, serene landscape, hopeful atmosphere, pastoral scene, soft natural light, gentle colors, soft sunlight streaming through window, no text, no dark themes"
 }
 
 # 스타일 → StoryMaker 설정 매핑
@@ -172,7 +175,16 @@ STYLE_GUIDES = {
 🎨 **스타일**: 따뜻한 영적 일러스트, 황금빛 일출/일몰
 📝 **구조**: Hook → Teaching 1,2,3 → Prayer → CTA & Blessing
 ⚠️ **주의**: 영어로 직접 생성됨 (번역 아님)
-🙏 **특징**: "My dear friends" 호칭, Anchor phrase 반복, 성경 레퍼런스"""
+🙏 **특징**: "My dear friends" 호칭, Anchor phrase 반복, 성경 레퍼런스""",
+    "영어디보셔널": """**💡 영어 디보셔널 (English Devotional)**: Theme/Topic을 입력하세요!
+
+예시: "When anxiety keeps you awake" / "Trusting God with your finances"
+
+🎯 **대상**: 미국/영어권 35~70대 (tired, anxious, faith-seeking)
+🎨 **스타일**: 따뜻한 영적 일러스트 + 창문으로 들어오는 햇살 (시그니처)
+📝 **구조**: Hook → Teaching → Application → Bible Story → Reframe → Practice → Prayer → CTA
+⚠️ **AI티 제거**: micro-scene + softener + 클리셰 블랙리스트 + 2패스 검수
+🙏 **옵션**: 기도 톤 (gentle/warfare), CTA 강도 (soft/medium)"""
 }
 
 def update_style_guide(style: str):
@@ -353,7 +365,7 @@ def _translate_existing_script(language: str):
 # 통합 스크립트 + 이미지 프롬프트 생성
 # ═══════════════════════════════════════════════════════════════
 
-def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko", episode_type: str = "sutra_origin", japan_series: str = "senior", japan_twopass: bool = True):
+def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko", episode_type: str = "sutra_origin", japan_series: str = "senior", japan_twopass: bool = True, english_prayer_style: str = "gentle", english_cta_strength: str = "soft", english_twopass: bool = True):
     """주제 입력 → 스크립트 + 이미지 프롬프트 한번에 생성"""
     if not topic.strip():
         return "❌ 주제를 입력해주세요", "", ""
@@ -378,10 +390,16 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             project.japan_series = japan_series
             project.japan_twopass = japan_twopass
 
+        # 영어 디보셔널 전용 옵션 저장
+        if style == "영어디보셔널":
+            project.english_prayer_style = english_prayer_style
+            project.english_cta_strength = english_cta_strength
+            project.english_twopass = english_twopass
+
         # 스타일에 따른 언어 자동 설정 (썸네일 폰트 선택에 사용)
         if style == "일본텔링":
             project.language = "ja"
-        elif style == "영어Saying전용":
+        elif style in ["영어Saying전용", "영어디보셔널"]:
             project.language = "en"
         else:
             project.language = "ko"
@@ -403,6 +421,12 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             base_prompt = get_japan_prompt(topic, duration, japan_series)
             series_name = JAPAN_SERIES_CONFIG.get(japan_series, {}).get("name", japan_series)
             print(f"[스크립트] 일본텔링 사용 - 시리즈: {series_name}, 2패스: {japan_twopass}")
+        # 영어 디보셔널: prayer_style + cta_strength 옵션
+        elif style == "영어디보셔널":
+            base_prompt = get_english_prompt(topic, english_prayer_style, english_cta_strength)
+            prayer_name = ENGLISH_STYLE_CONFIG["prayer_style"].get(english_prayer_style, {}).get("name", english_prayer_style)
+            cta_name = ENGLISH_STYLE_CONFIG["cta_strength"].get(english_cta_strength, {}).get("name", english_cta_strength)
+            print(f"[스크립트] 영어디보셔널 사용 - 기도톤: {prayer_name}, CTA: {cta_name}, 2패스: {english_twopass}")
         else:
             base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["불교강의"])
             base_prompt = base_prompt.format(topic=topic, duration=duration)
@@ -504,6 +528,52 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                 except json.JSONDecodeError as e:
                     print(f"[일본텔링] 2패스 검수 JSON 파싱 실패: {e}, 원본 유지")
 
+            # ═══════════════════════════════════════════════════════════════
+            # 영어 디보셔널 2패스 검수 (선택된 경우만)
+            # ═══════════════════════════════════════════════════════════════
+            if style == "영어디보셔널" and english_twopass:
+                print(f"[영어디보셔널] 2패스 검수 시작...")
+                review_prompt = get_english_review_prompt()
+                review_input = review_prompt + "\n\n" + json.dumps(data, ensure_ascii=False, indent=2)
+
+                review_response = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=8192,
+                    messages=[{"role": "user", "content": review_input}]
+                )
+
+                review_result = review_response.content[0].text
+
+                # 검수된 JSON 파싱
+                try:
+                    if "```json" in review_result:
+                        rev_start = review_result.find("```json") + 7
+                        rev_end = review_result.find("```", rev_start)
+                        review_json_str = review_result[rev_start:rev_end].strip()
+                    elif "```" in review_result and "{" in review_result:
+                        rev_start = review_result.find("```") + 3
+                        rev_end = review_result.find("```", rev_start)
+                        if rev_end > rev_start:
+                            review_json_str = review_result[rev_start:rev_end].strip()
+                        else:
+                            review_json_str = None
+                    else:
+                        first_brace = review_result.find("{")
+                        last_brace = review_result.rfind("}")
+                        if first_brace != -1 and last_brace != -1:
+                            review_json_str = review_result[first_brace:last_brace + 1]
+                        else:
+                            review_json_str = None
+
+                    if review_json_str:
+                        reviewed_data = json.loads(review_json_str)
+                        data = reviewed_data
+                        print(f"[영어디보셔널] 2패스 검수 완료 - 수정 적용됨")
+                    else:
+                        print(f"[영어디보셔널] 2패스 검수 - JSON 추출 실패, 원본 유지")
+                except json.JSONDecodeError as e:
+                    print(f"[영어디보셔널] 2패스 검수 JSON 파싱 실패: {e}, 원본 유지")
+
             # 원본 스크립트 저장 (다국어 번역용)
             # 항상 원본에서 번역해야 일본어→영어 같은 문제 방지
             import copy
@@ -517,6 +587,9 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                 # 일본텔링: signature prop (スマホ通知) 추가
                 if style == "일본텔링":
                     image_prompts = [get_japan_image_prompt_with_prop(p) for p in image_prompts]
+                # 영어디보셔널: signature prop (window sunlight) 추가
+                elif style == "영어디보셔널":
+                    image_prompts = [get_english_image_prompt_with_prop(p) for p in image_prompts]
                 all_image_prompts.extend(image_prompts)
 
             # 번역 (한국어가 아닌 경우) - 항상 원본에서 번역
@@ -1735,7 +1808,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     style_input = gr.Radio(
                         ["불교강의",
                          "스토리텔링:한국불교", "스토리텔링:중국불교", "스토리텔링:인도불교",
-                         "불교명상", "일본텔링", "영어Saying전용"],
+                         "불교명상", "일본텔링", "영어Saying전용", "영어디보셔널"],
                         value="불교강의",
                         label="스타일"
                     )
@@ -1786,16 +1859,52 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         visible=False
                     )
 
+                    # ═══════════════════════════════════════════════════════════════
+                    # 영어 디보셔널 전용 옵션 (영어디보셔널 선택시만 표시)
+                    # ═══════════════════════════════════════════════════════════════
+                    english_prayer_choices = [
+                        (v["name"], k) for k, v in ENGLISH_STYLE_CONFIG["prayer_style"].items()
+                    ]
+                    english_prayer_input = gr.Dropdown(
+                        choices=english_prayer_choices,
+                        value="gentle",
+                        label="🙏 기도 톤 (영어디보셔널 전용)",
+                        info="Gentle: 부드럽고 평화로운 | Warfare: 영적 전쟁 스타일",
+                        visible=False
+                    )
+
+                    english_cta_choices = [
+                        (v["name"], k) for k, v in ENGLISH_STYLE_CONFIG["cta_strength"].items()
+                    ]
+                    english_cta_input = gr.Dropdown(
+                        choices=english_cta_choices,
+                        value="soft",
+                        label="📢 CTA 강도 (영어디보셔널 전용)",
+                        info="Soft: 한 줄만 | Medium: 두 줄까지",
+                        visible=False
+                    )
+
+                    english_twopass_input = gr.Checkbox(
+                        label="🔄 2패스 검수 활성화",
+                        value=True,
+                        info="AI가 생성 후 자체 검수로 클리셰/패턴 수정 (영어디보셔널 전용)",
+                        visible=False
+                    )
+
                     def toggle_style_options(style):
                         """스타일에 따라 에피소드 타입과 이미지 스타일 드롭다운 표시/숨김"""
                         show_episode = (style == "불교강의")
                         show_image_style = (style in ("불교강의", "불교명상"))
                         show_japan_options = (style == "일본텔링")
+                        show_english_options = (style == "영어디보셔널")
                         return (
                             gr.update(visible=show_episode),
                             gr.update(visible=show_image_style),
                             gr.update(visible=show_japan_options),
-                            gr.update(visible=show_japan_options)
+                            gr.update(visible=show_japan_options),
+                            gr.update(visible=show_english_options),
+                            gr.update(visible=show_english_options),
+                            gr.update(visible=show_english_options)
                         )
 
                     style_guide = gr.Markdown(STYLE_GUIDES["불교강의"])
@@ -2181,12 +2290,12 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
 
     # 스타일 변경시 가이드 업데이트 + 에피소드 타입 토글
     style_input.change(update_style_guide, [style_input], [style_guide])
-    style_input.change(toggle_style_options, [style_input], [episode_type_input, image_style_input, japan_series_input, japan_twopass_input])
+    style_input.change(toggle_style_options, [style_input], [episode_type_input, image_style_input, japan_series_input, japan_twopass_input, english_prayer_input, english_cta_input, english_twopass_input])
 
-    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 + 에피소드 타입 + 일본텔링 옵션 추가)
+    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 + 에피소드 타입 + 일본텔링/영어디보셔널 옵션 추가)
     generate_btn.click(
         generate_script_and_images,
-        [topic_input, duration_input, style_input, script_language, episode_type_input, japan_series_input, japan_twopass_input],
+        [topic_input, duration_input, style_input, script_language, episode_type_input, japan_series_input, japan_twopass_input, english_prayer_input, english_cta_input, english_twopass_input],
         [status, script_preview, image_prompts, yt_title_input, yt_thumbnail_input]
     )
 

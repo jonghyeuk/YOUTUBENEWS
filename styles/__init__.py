@@ -38,6 +38,18 @@ from .storytelling_japan import (
 from .english_saying import PROMPT as ENGLISH_SAYING_PROMPT
 from .english_saying import WORLD_STYLE_GUIDE as ENGLISH_SAYING_WORLD_GUIDE
 
+# 영어 디보셔널 (English Devotional) - 2패스 검수 + 시그니처 prop 지원
+from .storytelling_english import (
+    PROMPT_BASE as ENGLISH_DEVOTIONAL_PROMPT,
+    WORLD_STYLE_GUIDE as ENGLISH_DEVOTIONAL_WORLD_GUIDE,
+    SIGNATURE_PROP as ENGLISH_SIGNATURE_PROP,
+    STYLE_CONFIG as ENGLISH_STYLE_CONFIG,
+    CLICHE_BLACKLIST as ENGLISH_CLICHE_BLACKLIST,
+    get_english_prompt,
+    get_review_prompt as get_english_review_prompt,
+    get_image_prompt_with_prop as get_english_image_prompt_with_prop,
+)
+
 # 스타일 프롬프트 딕셔너리
 STYLE_PROMPTS = {
     "불교강의": BUDDHIST_LECTURE_PROMPT,
@@ -50,6 +62,8 @@ STYLE_PROMPTS = {
     "일본텔링": STORYTELLING_JAPAN_PROMPT,
     # 영어Saying전용 (English Only)
     "영어Saying전용": ENGLISH_SAYING_PROMPT,
+    # 영어 디보셔널 (English Devotional)
+    "영어디보셔널": ENGLISH_DEVOTIONAL_PROMPT,
 }
 
 # 스토리텔링 세계관 가이드 (StoryMaker AI용)
@@ -61,6 +75,7 @@ WORLD_STYLE_GUIDES = {
     "스토리텔링:인도불교": INDIA_WORLD_GUIDE,
     "일본텔링": JAPAN_WORLD_GUIDE,
     "영어Saying전용": ENGLISH_SAYING_WORLD_GUIDE,
+    "영어디보셔널": ENGLISH_DEVOTIONAL_WORLD_GUIDE,
 }
 
 __all__ = [
@@ -74,4 +89,11 @@ __all__ = [
     "get_japan_prompt",
     "get_japan_review_prompt",
     "get_japan_image_prompt_with_prop",
+    # 영어 디보셔널 전용
+    "ENGLISH_SIGNATURE_PROP",
+    "ENGLISH_STYLE_CONFIG",
+    "ENGLISH_CLICHE_BLACKLIST",
+    "get_english_prompt",
+    "get_english_review_prompt",
+    "get_english_image_prompt_with_prop",
 ]
