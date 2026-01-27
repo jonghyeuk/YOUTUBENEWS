@@ -593,10 +593,11 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                 all_image_prompts.extend(image_prompts)
 
             # 번역 (한국어가 아닌 경우) - 항상 원본에서 번역
+            # 단, 영어디보셔널/일본텔링은 이미 해당 언어로 생성되므로 번역 불필요
             lang_info = LANGUAGE_CONFIG.get(language, {})
             lang_name = lang_info.get("name", "🇰🇷 한국어")
 
-            if language != "ko":
+            if language != "ko" and style not in ("영어디보셔널", "일본텔링"):
                 print(f"[번역] 원본 한국어 → {lang_name}로 현지화 중...")
                 data = translate_script_to_language(pipeline.project.original_script_data, language)
 
