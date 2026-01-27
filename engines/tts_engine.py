@@ -365,6 +365,13 @@ STYLE_DEFAULT_EMOTIONS_V25 = {
         "climax": "happy",
         "ending": "calm",
     },
+    "영어디보셔널": {
+        "intro": "calm",           # Hook - 따뜻한 시작
+        "body_early": "tender",    # Teaching/Application - 부드러운 위로
+        "body_late": "thoughtful", # Bible Story/Reframe - 깊은 생각
+        "climax": "sad",           # Prayer - 감정적 기도
+        "ending": "calm",          # CTA/Blessing - 평안한 마무리
+    },
 }
 
 
@@ -446,7 +453,7 @@ class TTSEngine:
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
             # 불교종교/불교강의/불교명상/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
-            if self.style in ("영어Saying전용", "불교종교", "불교강의", "불교명상"):
+            if self.style in ("영어Saying전용", "영어디보셔널", "불교종교", "불교강의", "불교명상"):
                 self.voice_id = voice_config["voice_id"]
             else:
                 # 다른 스타일: 언어별 voice_id 우선
@@ -478,7 +485,7 @@ class TTSEngine:
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
             # 불교종교/불교강의/불교명상/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
-            if self.style in ("영어Saying전용", "불교종교", "불교강의", "불교명상"):
+            if self.style in ("영어Saying전용", "영어디보셔널", "불교종교", "불교강의", "불교명상"):
                 self.voice_id = voice_config["voice_id"]
             else:
                 # 다른 스타일: 언어별 voice_id 우선
@@ -510,7 +517,7 @@ class TTSEngine:
         if self.style and self.style in ELEVENLABS_STYLE_VOICES:
             voice_config = ELEVENLABS_STYLE_VOICES[self.style]
             # 불교종교/불교강의/불교명상/영어Saying전용: 스타일 voice_id 우선 사용 (전용 음성)
-            if self.style in ("영어Saying전용", "불교종교", "불교강의", "불교명상"):
+            if self.style in ("영어Saying전용", "영어디보셔널", "불교종교", "불교강의", "불교명상"):
                 self.voice_id = voice_config["voice_id"]
             else:
                 # 다른 스타일: 언어별 voice_id 우선
