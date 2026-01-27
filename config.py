@@ -80,6 +80,12 @@ ELEVENLABS_STYLE_VOICES = {
         "similarity_boost": 0.7,
         "speed": 0.85,  # 느리고 차분하게
     },
+    "영어디보셔널": {
+        "voice_id": "87tjwokZlpNU7QL3HaLP",  # 영어 목회자 톤 (따뜻한 감정 표현)
+        "stability": 0.45,  # 감정 표현 여유 (너무 낮으면 불안정)
+        "similarity_boost": 0.75,
+        "speed": 0.85,  # 느리고 차분하게
+    },
 }
 
 # 스타일별 감정 태그 매핑 (ElevenLabs v3 Audio Tags - 영어만 인식)
@@ -116,6 +122,13 @@ EMOTION_TAGS = {
         "body": "[clear, explanatory]",
         "climax": "[enthusiastic]",
         "ending": "[warm, encouraging]",
+    },
+    "영어디보셔널": {
+        "intro": "[warm, gentle]",           # Hook - 따뜻한 시작
+        "body_sad": "[tender, comforting]",  # Teaching/Application - 부드러운 위로
+        "body_hope": "[hopeful, calm]",      # Bible Story/Reframe - 희망적
+        "climax": "[deep, emotional]",       # Prayer - 깊은 감정
+        "ending": "[peaceful, reassuring]",  # CTA/Blessing - 평안한 마무리
     },
 }
 
