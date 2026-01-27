@@ -132,7 +132,7 @@ OUTPUT JSON (must be valid)
   "thumbnail_main_text": "8-15 words hook with line break",
   "scenes": [
     {
-      "scene_number": 1,
+      "scene_id": 1,
       "scene_title": "HOOK - ...",
       "script": "...",
       "key_sentence": "...",
