@@ -1448,11 +1448,12 @@ def check_youtube_auth(language: str = "ko"):
         if status["authenticated"] and status["channel"]:
             channel = status["channel"]
             return (
-                f"✅ **{lang_names.get(language, language)} 채널 연결됨**: {channel['title']}",
-                f"### 📺 {lang_names.get(language, language)} 채널 정보\n"
-                f"- **채널명**: {channel['title']}\n"
-                f"- **구독자**: {channel['subscribers']}\n"
-                f"- **영상 수**: {channel['videos']}개",
+                f"✅ **{lang_names.get(language, language)} 채널 연결됨**",
+                f"### 📺 현재 연결된 채널\n"
+                f"## 🎬 {channel['title']}\n"
+                f"- **구독자**: {channel['subscribers']}명\n"
+                f"- **영상 수**: {channel['videos']}개\n\n"
+                f"⚠️ 다른 채널에 올리려면 **다른 채널로 변경** 버튼 클릭!",
                 gr.update(interactive=True),
             )
         else:
@@ -1544,6 +1545,59 @@ def authenticate_youtube(language: str = "ko"):
     except Exception as e:
         yield (
             f"❌ 인증 실패: {e}",
+            "",
+            gr.update(interactive=False),
+        )
+
+
+def change_youtube_channel(language: str = "ko"):
+    """YouTube 채널 변경 (기존 연결 해제 후 새로 인증)"""
+    lang_names = {"ko": "🇰🇷 한국어", "ja": "🇯🇵 일본어", "en": "🇺🇸 영어"}
+    lang_name = lang_names.get(language, language)
+
+    # 기존 엔진 리셋
+    reset_youtube_engine(language)
+
+    yield (
+        f"🔄 **{lang_name} 채널 연결 해제 중...**",
+        "기존 연결을 해제하고 새 채널에 연결합니다...",
+        gr.update(interactive=False),
+    )
+
+    try:
+        engine = get_youtube_engine(language)
+        # 기존 토큰 삭제
+        engine.disconnect_channel()
+
+        yield (
+            f"🔐 **{lang_name} 새 채널 인증 중...**",
+            "브라우저에서 연결할 Google 계정으로 로그인하세요...",
+            gr.update(interactive=False),
+        )
+
+        # 새로 인증
+        engine.authenticate()
+        channel = engine.get_channel_info()
+
+        if channel:
+            yield (
+                f"✅ **{lang_name} 채널 변경 완료!**",
+                f"### 📺 새로 연결된 채널\n"
+                f"- **채널명**: {channel['title']}\n"
+                f"- **구독자**: {channel.get('subscribers', '비공개')}명\n"
+                f"- **영상 수**: {channel.get('videos', 0)}개\n\n"
+                f"이제 이 채널에 업로드할 수 있습니다!",
+                gr.update(interactive=True),
+            )
+        else:
+            yield (
+                f"⚠️ 채널 정보를 가져올 수 없습니다",
+                "",
+                gr.update(interactive=False),
+            )
+    except Exception as e:
+        yield (
+            f"❌ 채널 변경 실패: {e}",
             "",
             gr.update(interactive=False),
         )
@@ -2168,6 +2222,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     yt_auth_status = gr.Markdown("*인증 상태 확인 중...*")
                 with gr.Column(scale=1):
                     yt_auth_btn = gr.Button("🔐 선택한 채널 연결", variant="secondary")
+                    yt_change_btn = gr.Button("🔄 다른 채널로 변경", variant="stop", size="sm")
 
             yt_channel_info = gr.Markdown("")
 
@@ -2400,6 +2455,13 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
     # 인증 버튼 (선택된 언어 채널 인증)
     yt_auth_btn.click(
         authenticate_youtube,
+        [yt_language],
+        [yt_auth_status, yt_channel_info, yt_upload_btn]
+    )
+
+    # 채널 변경 버튼 (다른 채널로 연결)
+    yt_change_btn.click(
+        change_youtube_channel,
         [yt_language],
         [yt_auth_status, yt_channel_info, yt_upload_btn]
     )
