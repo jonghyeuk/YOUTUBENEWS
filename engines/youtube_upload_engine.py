@@ -327,6 +327,22 @@ class YouTubeUploadEngine:
 
         return result
 
+    def disconnect_channel(self) -> bool:
+        """현재 언어의 채널 연결 해제 (토큰 삭제)"""
+        if os.path.exists(self._token_file):
+            os.remove(self._token_file)
+            self.youtube = None
+            self.credentials = None
+            print(f"[YouTube] {LANGUAGE_NAMES.get(self.language, '기본')} 채널 연결 해제됨")
+            return True
+        return False
+
+    def reconnect_channel(self) -> Dict[str, Any]:
+        """채널 재연결 (토큰 삭제 후 새로 인증)"""
+        self.disconnect_channel()
+        self.authenticate()
+        return self.get_channel_info()
+
     @staticmethod
     def get_all_channels_status() -> Dict[str, Dict[str, Any]]:
         """모든 언어의 채널 인증 상태 확인"""
