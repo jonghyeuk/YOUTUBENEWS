@@ -427,6 +427,26 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             prayer_name = ENGLISH_STYLE_CONFIG["prayer_style"].get(english_prayer_style, {}).get("name", english_prayer_style)
             cta_name = ENGLISH_STYLE_CONFIG["cta_strength"].get(english_cta_strength, {}).get("name", english_cta_strength)
             print(f"[스크립트] 영어디보셔널 사용 - 기도톤: {prayer_name}, CTA: {cta_name}, 2패스: {english_twopass}")
+        # 자유모드: 사용자 입력 중심 - episode_type 불필요
+        elif style == "자유모드":
+            base_prompt = f"""# 자유모드 - 살을 붙이는 작가 스타일
+
+당신은 **고스트라이터(대필작가)**입니다.
+사용자가 준 간략한 이야기에 "살을 붙여서" 풍성한 대본으로 완성하세요.
+
+## 핵심 원칙
+1. **뼈대(논지) 절대 유지**: 사용자가 준 핵심 메시지, 주제, 결론은 그대로
+2. **살(디테일)만 추가**: 감정, 묘사, 대화, 장면 전환 등 극적 요소 보강
+3. **창작 금지**: 새로운 사건, 인물, 결론 추가 불가
+4. **분량 맞춤**: {duration}분 분량에 맞게 확장
+
+## 사용자 입력 내용
+{topic}
+
+## 요청사항
+위 내용의 논지를 100% 유지하면서, 감정과 디테일을 추가해 풍성한 대본을 작성하세요.
+"""
+            print(f"[스크립트] 자유모드 사용 - 살을 붙이는 작가 스타일")
         else:
             base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["불교강의"])
             base_prompt = base_prompt.format(topic=topic, duration=duration)
