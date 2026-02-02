@@ -427,6 +427,106 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             prayer_name = ENGLISH_STYLE_CONFIG["prayer_style"].get(english_prayer_style, {}).get("name", english_prayer_style)
             cta_name = ENGLISH_STYLE_CONFIG["cta_strength"].get(english_cta_strength, {}).get("name", english_cta_strength)
             print(f"[스크립트] 영어디보셔널 사용 - 기도톤: {prayer_name}, CTA: {cta_name}, 2패스: {english_twopass}")
+        # 자유모드: 완전 독립 - 다른 스타일과 절대 섞이지 않음
+        elif style == "자유모드":
+            # 자유모드 전용 프롬프트 (출력 형식 포함)
+            prompt = f"""# 자유모드 - 살을 붙이는 작가
+
+당신은 **고스트라이터(대필작가)**입니다.
+사용자가 준 이야기에 "살을 붙여서" 풍성한 대본으로 완성하세요.
+
+## 핵심 원칙 (절대 준수!)
+1. **뼈대(논지) 100% 유지**: 사용자가 준 핵심 메시지, 주제, 결론은 단 한 글자도 바꾸지 마세요
+2. **살(디테일)만 추가**: 감정 묘사, 상황 설명, 장면 전환 등 극적 요소만 보강
+3. **창작 절대 금지**: 새로운 사건, 인물, 결론, 교훈을 추가하지 마세요
+4. **원문 존중**: 사용자 글의 어투와 분위기를 유지하세요
+
+## 사용자 입력 내용
+{topic}
+
+## 분량 규칙
+- **{duration}분** 분량 = 최소 **{total_chars}자** 이상
+- **씬 개수**: {num_scenes}개
+- **씬당 글자 수**: 각 씬 최소 {chars_per_scene}자 이상
+
+## 출력 형식 (JSON)
+```json
+{{
+  "title": "사용자 이야기에서 추출한 제목",
+  "scenes": [
+    {{
+      "scene_id": 1,
+      "title": "씬 제목",
+      "text": "나레이션 텍스트 (살을 붙인 내용)",
+      "image_prompts": ["English image prompt, visual description of scene"],
+      "importance": 3
+    }}
+  ]
+}}
+```
+
+## 이미지 프롬프트 규칙
+- 영어로 작성, 400자 이내
+- 씬당 정확히 1개
+- 이야기 내용에 맞는 자연스러운 장면 묘사
+- 스타일: warm illustration, soft lighting, emotional atmosphere
+"""
+            print(f"[스크립트] 자유모드 사용 - 살을 붙이는 작가 스타일 (독립 모드)")
+
+            # 자유모드는 여기서 바로 API 호출 (다른 스타일과 섞이지 않음)
+            from anthropic import Anthropic
+            client = Anthropic()
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=8192,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            result_text = response.content[0].text
+
+            # JSON 파싱
+            try:
+                json_str = None
+                if "```json" in result_text:
+                    start = result_text.find("```json") + 7
+                    end = result_text.find("```", start)
+                    json_str = result_text[start:end].strip()
+                elif "```" in result_text and "{" in result_text:
+                    start = result_text.find("```") + 3
+                    end = result_text.find("```", start)
+                    if end > start:
+                        json_str = result_text[start:end].strip()
+                if not json_str or not json_str.startswith("{"):
+                    start = result_text.find("{")
+                    end = result_text.rfind("}") + 1
+                    if start != -1 and end > start:
+                        json_str = result_text[start:end]
+
+                import json
+                data = json.loads(json_str)
+
+                # 결과 저장
+                pipeline.project.script_data = data
+                pipeline.project.original_script_data = data.copy()
+
+                script_text = ""
+                image_prompts = []
+                for scene in data.get("scenes", []):
+                    script_text += f"\n[씬 {scene.get('scene_id', '?')}] {scene.get('title', '')}\n"
+                    script_text += scene.get("text", "") + "\n"
+                    prompts = scene.get("image_prompts", [])
+                    if isinstance(prompts, list):
+                        image_prompts.extend(prompts)
+                    elif prompts:
+                        image_prompts.append(prompts)
+
+                prompts_text = "\n\n".join([f"[{i+1}] {p}" for i, p in enumerate(image_prompts)])
+
+                return script_text.strip(), prompts_text, f"✅ 자유모드 완료: {len(data.get('scenes', []))}개 씬"
+
+            except Exception as e:
+                return f"❌ JSON 파싱 오류: {str(e)}", "", result_text[:500]
         else:
             base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["불교강의"])
             base_prompt = base_prompt.format(topic=topic, duration=duration)
