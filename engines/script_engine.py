@@ -371,6 +371,8 @@ JSON 형식으로 응답:
             "일본텔링": {"format": "japanese", "tag": "心の処方箋"},
             # 영어Saying전용 (English Only) - Christian Devotional
             "영어Saying전용": {"format": "english", "tag": "Morning Prayer"},
+            # 자유모드 - 사용자 이야기 중심, 태그 없음
+            "자유모드": {"format": "none", "tag": ""},
         }
         title_format_info = style_title_format.get(style, {"format": "none", "tag": ""})
 
@@ -413,6 +415,26 @@ JSON 형식으로 응답:
 - Top: "PRAY THIS" / Main: "The Morning Prayer\\nThat Changes Everything"
 - Top: "GOD SAYS" / Main: "This Message\\nIs For You Today"
 - Top: "3 KEYS" / Main: "To Finding Peace\\nIn Difficult Times"
+"""
+        elif style == "자유모드":
+            language_specific_examples = """
+
+**자유모드 콘텐츠 (감동/교훈 스토리):**
+- "이 이야기, 끝까지 들어보세요 (10분)"
+- "듣고 나면 생각이 바뀝니다"
+- "누구에게도 말 못한 이야기"
+- "인생이 달라지는 깨달음"
+
+### 자유모드 제목 규칙
+1. **사용자 이야기 중심**: 입력된 내용의 핵심을 그대로 살림
+2. **극적 전개 강조**: 갈등 → 절정 → 깨달음 구조
+3. **교훈/깨달음 암시**: "듣고 나면...", "생각이 바뀝니다"
+4. **태그 없음**: 순수 제목만 사용
+
+### 자유모드 썸네일 예시
+- 상단: "실화" / 메인: "듣고 나면\\n생각이 바뀝니다"
+- 상단: "교훈" / 메인: "이 이야기\\n끝까지 들어보세요"
+- 상단: "인생" / 메인: "이걸 몰랐다면\\n손해입니다"
 """
 
         prompt = f"""당신은 유튜브 SEO 전문가이자 썸네일 카피라이터입니다.
