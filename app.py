@@ -504,29 +504,75 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                         json_str = result_text[start:end]
 
                 import json
+                import copy
                 data = json.loads(json_str)
 
                 # 결과 저장
                 pipeline.project.script_data = data
-                pipeline.project.original_script_data = data.copy()
+                pipeline.project.original_script_data = copy.deepcopy(data)
 
-                script_text = ""
-                image_prompts = []
+                # 이미지 프롬프트 추출
+                all_image_prompts = []
                 for scene in data.get("scenes", []):
-                    script_text += f"\n[씬 {scene.get('scene_id', '?')}] {scene.get('title', '')}\n"
-                    script_text += scene.get("text", "") + "\n"
                     prompts = scene.get("image_prompts", [])
                     if isinstance(prompts, list):
-                        image_prompts.extend(prompts)
+                        all_image_prompts.extend(prompts)
                     elif prompts:
-                        image_prompts.append(prompts)
+                        all_image_prompts.append(prompts)
 
-                prompts_text = "\n\n".join([f"[{i+1}] {p}" for i, p in enumerate(image_prompts)])
+                # Script 객체 생성
+                from models.types import Script, Scene
+                scenes = []
+                for s in data.get("scenes", []):
+                    scenes.append(Scene(
+                        scene_id=s.get("scene_id", 0),
+                        title=s.get("title", ""),
+                        text=s.get("text", ""),
+                        image_count=len(s.get("image_prompts", [])),
+                        importance=s.get("importance", 3)
+                    ))
 
-                return script_text.strip(), prompts_text, f"✅ 자유모드 완료: {len(data.get('scenes', []))}개 씬"
+                script = Script(
+                    title=data.get("title", topic[:20]),
+                    scenes=scenes,
+                    duration_min=duration,
+                    total_panels=len(all_image_prompts)
+                )
+                pipeline.project.script = script
+
+                # 스크립트 미리보기 (markdown 형식)
+                preview = f"# {script.title}\n\n"
+                preview += f"**🇰🇷 한국어 | {len(scenes)}개 씬 | 이미지 {len(all_image_prompts)}장**\n\n"
+                for scene in scenes:
+                    preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
+                    preview += f"🖼️ {scene.image_count}장\n\n"
+                    preview += f"{scene.text}\n\n---\n\n"
+
+                # 이미지 프롬프트 포맷팅
+                prompts_text = ""
+                for i, prompt in enumerate(all_image_prompts, 1):
+                    prompts_text += f"이미지 {i}: {prompt}\n\n"
+
+                # 유튜브 메타데이터 생성
+                try:
+                    yt_metadata = pipeline.generate_youtube_metadata()
+                    yt_title = yt_metadata.get("title", script.title)
+                    yt_thumbnail = yt_metadata.get("thumbnail_text", "")
+                except Exception as e:
+                    print(f"[자유모드] YouTube 메타데이터 생성 실패: {e}")
+                    yt_title = script.title
+                    yt_thumbnail = f"오늘의 이야기\n{duration}분"
+
+                return (
+                    f"✅ 자유모드 완료! {len(scenes)}개 씬, {len(all_image_prompts)}장 이미지",
+                    preview,
+                    prompts_text,
+                    yt_title,
+                    yt_thumbnail.replace("\\n", "\n")
+                )
 
             except Exception as e:
-                return f"❌ JSON 파싱 오류: {str(e)}", "", result_text[:500]
+                return f"❌ JSON 파싱 오류: {str(e)}", result_text[:500], "", "", ""
         else:
             base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["불교강의"])
             base_prompt = base_prompt.format(topic=topic, duration=duration)
