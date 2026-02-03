@@ -79,7 +79,16 @@ CLICHE_BLACKLIST = [
 
 PROMPT_BASE = """You are a US Christian devotional scriptwriter for a YouTube channel.
 Audience: adults 35-70 (tired, anxious, faith-seeking). Tone: warm, grounded, human. Not hypey. Not preachy.
-Format: 8 scenes (1 image each). 8-12 minutes spoken.
+Format: {num_scenes} scenes (1 image each). {duration} minutes spoken.
+
+## ⚠️ LENGTH REQUIREMENTS (CRITICAL!)
+- Target duration: **{duration} minutes**
+- Total word count: **{total_words} words minimum** (approx 150 words/minute)
+- Each scene: **{words_per_scene} words minimum**
+- Scene count: **exactly {num_scenes} scenes**
+
+DO NOT write a short 5-minute script when asked for 15 minutes!
+Each scene text MUST be substantial - not just 2-3 sentences.
 
 IMPORTANT: ALL OUTPUT MUST BE IN ENGLISH ONLY.
 If the topic is provided in Korean or another language, translate it to English first.
@@ -147,12 +156,25 @@ OUTPUT JSON (must be valid)
 """
 
 
-def get_english_prompt(topic: str, prayer_style: str = "gentle", cta_strength: str = "soft") -> str:
+def get_english_prompt(topic: str, prayer_style: str = "gentle", cta_strength: str = "soft", duration: int = 10) -> str:
     """영어 디보셔널 프롬프트 생성"""
     prayer = STYLE_CONFIG["prayer_style"].get(prayer_style, STYLE_CONFIG["prayer_style"]["gentle"])
     cta = STYLE_CONFIG["cta_strength"].get(cta_strength, STYLE_CONFIG["cta_strength"]["soft"])
+
+    # duration 기반 분량 계산
+    num_scenes = max(6, duration // 2 + 2)  # 5분=5씬, 10분=7씬, 15분=9씬, 20분=12씬
+    total_words = duration * 150  # 분당 150단어 기준
+    words_per_scene = total_words // num_scenes
+
+    formatted_prompt = PROMPT_BASE.format(
+        duration=duration,
+        num_scenes=num_scenes,
+        total_words=total_words,
+        words_per_scene=words_per_scene
+    )
+
     return (
-        PROMPT_BASE
+        formatted_prompt
         + "\n\n"
         + "TOPIC:\n"
         + topic.strip()
