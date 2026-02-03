@@ -577,13 +577,15 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         image_style = STYLE_IMAGE_GUIDES.get(style, "")
 
         prompt = base_prompt
-        prompt += INTEGRATED_OUTPUT_FORMAT.format(
-            duration=duration,
-            total_chars=total_chars,
-            num_scenes=num_scenes,
-            chars_per_scene=chars_per_scene
-        )
-        prompt += f"\n\n## 이미지 스타일\n{image_style}"
+        # 영어디보셔널/일본텔링은 자체 프롬프트에 출력 형식이 있으므로 INTEGRATED_OUTPUT_FORMAT 추가 안 함
+        if style not in ("영어디보셔널", "일본텔링"):
+            prompt += INTEGRATED_OUTPUT_FORMAT.format(
+                duration=duration,
+                total_chars=total_chars,
+                num_scenes=num_scenes,
+                chars_per_scene=chars_per_scene
+            )
+            prompt += f"\n\n## 이미지 스타일\n{image_style}"
 
         # Claude API 호출
         from anthropic import Anthropic
