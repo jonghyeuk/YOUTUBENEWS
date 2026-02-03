@@ -9,6 +9,7 @@ load_dotenv()
 import gradio as gr
 from PIL import Image
 import json
+import copy
 
 from pipeline import Pipeline
 from engines import ScriptEngine, ImageEngine
@@ -275,8 +276,6 @@ SCENE_TEXT_1: [번역된 나레이션]
 
 def _translate_existing_script(language: str):
     """기존 원본 스크립트를 새 언어로 번역 (새로 생성하지 않음)"""
-    import copy
-
     if not pipeline.project or not hasattr(pipeline.project, 'original_script_data'):
         return "❌ 원본 스크립트가 없습니다. 한국어로 먼저 생성하세요.", "", "", "", ""
 
@@ -503,8 +502,6 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                     if start != -1 and end > start:
                         json_str = result_text[start:end]
 
-                import json
-                import copy
                 data = json.loads(json_str)
 
                 # 결과 저장
@@ -722,7 +719,6 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
             # 원본 스크립트 저장 (다국어 번역용)
             # 항상 원본에서 번역해야 일본어→영어 같은 문제 방지
-            import copy
             pipeline.project.original_script_data = copy.deepcopy(data)
             print(f"[스크립트] 스크립트 저장 완료")
 
