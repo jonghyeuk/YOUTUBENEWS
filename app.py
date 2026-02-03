@@ -422,10 +422,10 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             print(f"[스크립트] 일본텔링 사용 - 시리즈: {series_name}, 2패스: {japan_twopass}")
         # 영어 디보셔널: prayer_style + cta_strength 옵션
         elif style == "영어디보셔널":
-            base_prompt = get_english_prompt(topic, english_prayer_style, english_cta_strength)
+            base_prompt = get_english_prompt(topic, english_prayer_style, english_cta_strength, duration)
             prayer_name = ENGLISH_STYLE_CONFIG["prayer_style"].get(english_prayer_style, {}).get("name", english_prayer_style)
             cta_name = ENGLISH_STYLE_CONFIG["cta_strength"].get(english_cta_strength, {}).get("name", english_cta_strength)
-            print(f"[스크립트] 영어디보셔널 사용 - 기도톤: {prayer_name}, CTA: {cta_name}, 2패스: {english_twopass}")
+            print(f"[스크립트] 영어디보셔널 사용 - 기도톤: {prayer_name}, CTA: {cta_name}, 2패스: {english_twopass}, 분량: {duration}분")
         # 자유모드: 완전 독립 - 다른 스타일과 절대 섞이지 않음
         elif style == "자유모드":
             # 자유모드 전용 프롬프트 (출력 형식 포함)
