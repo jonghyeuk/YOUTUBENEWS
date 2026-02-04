@@ -570,6 +570,160 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
             except Exception as e:
                 return f"❌ JSON 파싱 오류: {str(e)}", result_text[:500], "", "", ""
+        # 불교명상: 완전 독립 - 사용자 글을 불교적 관점에서 확장
+        elif style == "불교명상":
+            prompt = f"""# 불교명상 - 불교적 관점의 고스트라이터
+
+당신은 **불교적 관점에서 글을 확장하는 고스트라이터**입니다.
+사용자가 준 이야기에 불교적 지혜와 위로를 더해 풍성한 대본으로 완성하세요.
+
+## 핵심 원칙 (절대 준수!)
+1. **뼈대(논지) 100% 유지**: 사용자가 준 핵심 메시지, 주제, 결론은 단 한 글자도 바꾸지 마세요
+2. **불교적 살 추가**: 무상(無常), 인연, 업보, 자비, 집착, 마음 다스림 등 불교적 관점으로 해석
+3. **새로운 경전/일화 날조 금지**: 사용자가 언급하지 않은 경전 구절, 부처님 일화를 지어내지 마세요
+4. **원문 존중**: 사용자 글의 핵심 감정과 상황을 유지하세요
+
+## 불교적 확장 방법
+- 사용자의 고통/상황을 무상(無常)의 관점에서 바라보기
+- 집착을 내려놓는 지혜로 위로하기
+- 인연의 소중함으로 관계 해석하기
+- 마음의 평화를 찾는 명상적 분위기 조성
+- **단, 모든 불교적 해석은 사용자 글에서 출발해야 함**
+
+## 톤과 문체
+- 명상적이고 차분한 어조
+- "~입니다", "~합니다" 경어체
+- 60세 이상 시니어 대상 - 어려운 불교 용어는 쉽게 풀어서
+
+## 사용자 입력 내용
+{topic}
+
+## 분량 규칙
+- **{duration}분** 분량 = 최소 **{total_chars}자** 이상
+- **씬 개수**: {num_scenes}개
+- **씬당 글자 수**: 각 씬 최소 {chars_per_scene}자 이상
+
+## 출력 형식 (JSON)
+```json
+{{
+  "title": "사용자 이야기에서 추출한 제목",
+  "scenes": [
+    {{
+      "scene_id": 1,
+      "title": "씬 제목",
+      "text": "나레이션 텍스트 (불교적 관점으로 확장된 내용)",
+      "image_prompts": ["English image prompt, visual description of scene"],
+      "importance": 3
+    }}
+  ]
+}}
+```
+
+## 이미지 프롬프트 규칙
+- 영어로 작성, 400자 이내
+- 씬당 정확히 1개
+- 스타일: ethereal Buddhist temple illustration, peaceful dawn atmosphere, soft moonlight, misty mountain monastery, meditative mood, muted pastel colors
+"""
+            print(f"[스크립트] 불교명상 사용 - 불교적 고스트라이터 스타일 (독립 모드)")
+
+            # 불교명상도 독립 API 호출 (다른 스타일과 섞이지 않음)
+            from anthropic import Anthropic
+            client = Anthropic()
+
+            response = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=8192,
+                messages=[{"role": "user", "content": prompt}]
+            )
+
+            result_text = response.content[0].text
+
+            # JSON 파싱
+            try:
+                json_str = None
+                if "```json" in result_text:
+                    start = result_text.find("```json") + 7
+                    end = result_text.find("```", start)
+                    json_str = result_text[start:end].strip()
+                elif "```" in result_text and "{" in result_text:
+                    start = result_text.find("```") + 3
+                    end = result_text.find("```", start)
+                    if end > start:
+                        json_str = result_text[start:end].strip()
+                if not json_str or not json_str.startswith("{"):
+                    start = result_text.find("{")
+                    end = result_text.rfind("}") + 1
+                    if start != -1 and end > start:
+                        json_str = result_text[start:end]
+
+                data = json.loads(json_str)
+
+                # 결과 저장
+                pipeline.project.script_data = data
+                pipeline.project.original_script_data = copy.deepcopy(data)
+
+                # 이미지 프롬프트 추출
+                all_image_prompts = []
+                for scene in data.get("scenes", []):
+                    prompts = scene.get("image_prompts", [])
+                    if isinstance(prompts, list):
+                        all_image_prompts.extend(prompts)
+                    elif prompts:
+                        all_image_prompts.append(prompts)
+
+                # Script 객체 생성
+                from models.types import Script, Scene
+                scenes = []
+                for s in data.get("scenes", []):
+                    scenes.append(Scene(
+                        scene_id=s.get("scene_id", 0),
+                        title=s.get("title", ""),
+                        text=s.get("text", ""),
+                        image_count=len(s.get("image_prompts", [])),
+                        importance=s.get("importance", 3)
+                    ))
+
+                script = Script(
+                    title=data.get("title", topic[:20]),
+                    scenes=scenes,
+                    duration_min=duration,
+                    total_panels=len(all_image_prompts)
+                )
+                pipeline.project.script = script
+
+                # 스크립트 미리보기 (markdown 형식)
+                preview = f"# {script.title}\n\n"
+                preview += f"**🇰🇷 한국어 | {len(scenes)}개 씬 | 이미지 {len(all_image_prompts)}장**\n\n"
+                for scene in scenes:
+                    preview += f"### 씬 {scene.scene_id}: {scene.title}\n"
+                    preview += f"🖼️ {scene.image_count}장\n\n"
+                    preview += f"{scene.text}\n\n---\n\n"
+
+                # 이미지 프롬프트 포맷팅
+                prompts_text = ""
+                for i, prompt in enumerate(all_image_prompts, 1):
+                    prompts_text += f"이미지 {i}: {prompt}\n\n"
+
+                # 유튜브 메타데이터 생성
+                try:
+                    yt_metadata = pipeline.generate_youtube_metadata()
+                    yt_title = yt_metadata.get("title", script.title)
+                    yt_thumbnail = yt_metadata.get("thumbnail_text", "")
+                except Exception as e:
+                    print(f"[불교명상] YouTube 메타데이터 생성 실패: {e}")
+                    yt_title = script.title
+                    yt_thumbnail = f"마음의 평화\n{duration}분"
+
+                return (
+                    f"✅ 불교명상 완료! {len(scenes)}개 씬, {len(all_image_prompts)}장 이미지",
+                    preview,
+                    prompts_text,
+                    yt_title,
+                    yt_thumbnail.replace("\\n", "\n")
+                )
+
+            except Exception as e:
+                return f"❌ JSON 파싱 오류: {str(e)}", result_text[:500], "", "", ""
         else:
             base_prompt = STYLE_PROMPTS.get(style, STYLE_PROMPTS["불교강의"])
             base_prompt = base_prompt.format(topic=topic, duration=duration)
