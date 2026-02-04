@@ -1354,11 +1354,18 @@ def render_video(use_ken_burns: bool, selected_bgm: str, bgm_volume: float):
     try:
         # BGM 경로 결정
         bgm_path = None
+        style = getattr(pipeline.project, 'style', 'unknown')
+        print(f"[렌더링] 스타일: {style}, 선택된 BGM: {selected_bgm}, 볼륨: {bgm_volume}")
+
         if selected_bgm and not selected_bgm.startswith("("):
             bgm_folder = BGM_CONFIG.get("folder", "assets/bgm")
             bgm_path = os.path.join(bgm_folder, selected_bgm)
+            print(f"[렌더링] BGM 경로: {bgm_path}, 존재: {os.path.exists(bgm_path)}")
             if not os.path.exists(bgm_path):
+                print(f"[렌더링] ⚠️ BGM 파일 없음! 경로: {bgm_path}")
                 bgm_path = None
+        else:
+            print(f"[렌더링] BGM 미선택 (selected_bgm={selected_bgm})")
 
         video_path = pipeline.step6_render_video(
             use_ken_burns,
@@ -1366,7 +1373,10 @@ def render_video(use_ken_burns: bool, selected_bgm: str, bgm_volume: float):
             bgm_volume=bgm_volume
         )
 
-        bgm_status = f" + BGM: {selected_bgm} (볼륨 {int(bgm_volume*100)}%)" if bgm_path else ""
+        if bgm_path:
+            bgm_status = f" + BGM: {selected_bgm} (볼륨 {int(bgm_volume*100)}%)"
+        else:
+            bgm_status = " (BGM 없음 - 드롭다운에서 선택하세요)"
         return f"✅ 렌더링 완료{bgm_status}", video_path
     except Exception as e:
         return f"❌ 오류: {e}", None
