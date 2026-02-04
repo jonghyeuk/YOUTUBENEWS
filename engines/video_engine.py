@@ -418,8 +418,10 @@ class VideoEngine:
 
         # 오디오 추가 (BGM 믹싱 여부에 따라)
         if bgm_path and os.path.exists(bgm_path):
+            print(f"[VideoEngine] BGM 믹싱 시작: {os.path.basename(bgm_path)}, 볼륨: {bgm_volume}")
             self._add_audio_with_bgm(temp_video, audio_path, bgm_path, output_path, bgm_volume)
         else:
+            print(f"[VideoEngine] BGM 없음 - TTS만 사용 (bgm_path={bgm_path})")
             self._add_audio_simple(temp_video, audio_path, output_path)
 
         # 임시 파일 삭제
@@ -491,10 +493,12 @@ class VideoEngine:
 
         result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
         if result.returncode != 0:
-            print(f"[VideoEngine] BGM 믹싱 오류: {result.stderr}")
+            print(f"[VideoEngine] ❌ BGM 믹싱 오류: {result.stderr}")
             # 실패 시 BGM 없이 재시도
             print("[VideoEngine] BGM 없이 재시도...")
             self._add_audio_simple(video_path, tts_path, output_path)
+        else:
+            print(f"[VideoEngine] ✅ BGM 믹싱 성공!")
 
     def get_random_bgm(self) -> Optional[str]:
         """BGM 폴더에서 무작위 BGM 선택"""
