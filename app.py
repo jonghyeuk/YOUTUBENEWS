@@ -12,6 +12,40 @@ import json
 import copy
 
 from pipeline import Pipeline
+
+
+def _sanitize_json_control_chars(s: str) -> str:
+    """JSON 문자열 값 안의 이스케이프되지 않은 제어문자(줄바꿈 등)를 이스케이프 처리.
+
+    Claude가 JSON string 내부에 literal newline을 넣으면 json.loads()가 실패함.
+    이 함수는 문자열 안팎을 추적하면서 string 내부의 제어문자만 이스케이프한다.
+    """
+    result = []
+    in_string = False
+    i = 0
+    length = len(s)
+    while i < length:
+        c = s[i]
+        if c == '"':
+            # 앞의 연속 백슬래시 갯수를 세서 실제 이스케이프인지 판별
+            num_bs = 0
+            j = i - 1
+            while j >= 0 and s[j] == '\\':
+                num_bs += 1
+                j -= 1
+            if num_bs % 2 == 0:
+                in_string = not in_string
+            result.append(c)
+        elif in_string and c == '\n':
+            result.append('\\n')
+        elif in_string and c == '\r':
+            result.append('\\r')
+        elif in_string and c == '\t':
+            result.append('\\t')
+        else:
+            result.append(c)
+        i += 1
+    return ''.join(result)
 from engines import ScriptEngine, ImageEngine
 from engines.thumbnail_engine import ThumbnailEngine
 from styles import (
@@ -502,7 +536,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                     if start != -1 and end > start:
                         json_str = result_text[start:end]
 
-                data = json.loads(json_str)
+                data = json.loads(_sanitize_json_control_chars(json_str))
 
                 # 결과 저장
                 pipeline.project.script_data = data
@@ -656,7 +690,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                     if start != -1 and end > start:
                         json_str = result_text[start:end]
 
-                data = json.loads(json_str)
+                data = json.loads(_sanitize_json_control_chars(json_str))
 
                 # 결과 저장
                 pipeline.project.script_data = data
@@ -779,7 +813,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             if not json_str:
                 raise json.JSONDecodeError("No JSON found", result_text, 0)
 
-            data = json.loads(json_str)
+            data = json.loads(_sanitize_json_control_chars(json_str))
 
             # ═══════════════════════════════════════════════════════════════
             # 일본텔링 2패스 검수 (선택된 경우만)
@@ -819,7 +853,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                             review_json_str = None
 
                     if review_json_str:
-                        reviewed_data = json.loads(review_json_str)
+                        reviewed_data = json.loads(_sanitize_json_control_chars(review_json_str))
                         data = reviewed_data
                         print(f"[일본텔링] 2패스 검수 완료 - 수정 적용됨")
                     else:
@@ -865,7 +899,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                             review_json_str = None
 
                     if review_json_str:
-                        reviewed_data = json.loads(review_json_str)
+                        reviewed_data = json.loads(_sanitize_json_control_chars(review_json_str))
                         data = reviewed_data
                         print(f"[영어디보셔널] 2패스 검수 완료 - 수정 적용됨")
                     else:
