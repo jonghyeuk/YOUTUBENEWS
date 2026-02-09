@@ -138,11 +138,11 @@ KEY SENTENCE (for on-screen display)
 - EVERY SCENE MUST HAVE A DIFFERENT key_sentence - NO REPETITION!
 - Examples: "God sees your struggle", "His grace is enough", "You are never alone"
 
-OUTPUT JSON (must be valid)
+OUTPUT JSON (must be valid — use \\n for line breaks inside strings, never actual newlines)
 {
   "title": "...",
   "thumbnail_top_text": "2-4 word power phrase (e.g., MORNING PRAYER)",
-  "thumbnail_main_text": "8-15 words hook with line break",
+  "thumbnail_main_text": "8-15 words hook with \\n for line break (e.g. \"When Worry Won't\\nLet You Sleep\")",
   "scenes": [
     {
       "scene_id": 1,
