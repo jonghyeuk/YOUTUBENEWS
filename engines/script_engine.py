@@ -11,6 +11,35 @@ from models.types import Script, Scene
 from config import DURATION_SPECS, TRANSLATION_PROMPTS, LANGUAGE_CONFIG
 
 
+def _sanitize_json_control_chars(s: str) -> str:
+    """JSON 문자열 값 안의 이스케이프되지 않은 제어문자를 이스케이프 처리."""
+    result = []
+    in_string = False
+    i = 0
+    length = len(s)
+    while i < length:
+        c = s[i]
+        if c == '"':
+            num_bs = 0
+            j = i - 1
+            while j >= 0 and s[j] == '\\':
+                num_bs += 1
+                j -= 1
+            if num_bs % 2 == 0:
+                in_string = not in_string
+            result.append(c)
+        elif in_string and c == '\n':
+            result.append('\\n')
+        elif in_string and c == '\r':
+            result.append('\\r')
+        elif in_string and c == '\t':
+            result.append('\\t')
+        else:
+            result.append(c)
+        i += 1
+    return ''.join(result)
+
+
 # 휴먼터치 프롬프트 템플릿
 HUMAN_TOUCH_PROMPT = """당신은 유튜브 감성 스토리 영상 전문 작가입니다.
 시청자가 영상에 몰입하고 감정적으로 공감할 수 있도록 대본을 작성합니다.
@@ -352,7 +381,7 @@ JSON 형식으로 응답:
         else:
             json_str = content.strip()
 
-        return json.loads(json_str)
+        return json.loads(_sanitize_json_control_chars(json_str))
 
     def generate_youtube_metadata(
         self,
