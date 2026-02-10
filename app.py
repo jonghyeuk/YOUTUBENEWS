@@ -10,6 +10,7 @@ import gradio as gr
 from PIL import Image
 import json
 import copy
+import traceback
 
 from pipeline import Pipeline
 
@@ -914,7 +915,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
             # 이미지 프롬프트 먼저 추출 (번역 전에)
             all_image_prompts = []
-            for s in data["scenes"]:
+            for s in data.get("scenes", []):
                 image_prompts = s.get("image_prompts", [])
                 # 일본텔링: signature prop (スマホ通知) 추가
                 if style == "일본텔링":
@@ -940,25 +941,25 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             from models.types import Script, Scene
             scenes = []
 
-            for i, s in enumerate(data["scenes"]):
-                original_prompts = data["scenes"][i].get("image_prompts", []) if i < len(data["scenes"]) else []
+            for i, s in enumerate(data.get("scenes", [])):
+                original_prompts = s.get("image_prompts", [])
 
-                # 영어Saying전용: key_sentence 추출 (다른 스타일에는 영향 없음)
+                # 영어Saying전용 / 영어디보셔널: key_sentence 추출
                 key_sentence = ""
-                if style == "영어Saying전용":
+                if style in ("영어Saying전용", "영어디보셔널"):
                     key_sentence = s.get("key_sentence", "")
 
                 scenes.append(Scene(
-                    scene_id=s["scene_id"],
-                    title=s["title"],
-                    text=s["text"],
+                    scene_id=s.get("scene_id", i + 1),
+                    title=s.get("title", ""),
+                    text=s.get("text", ""),
                     image_count=len(original_prompts) if original_prompts else 0,
                     importance=s.get("importance", 3),
                     key_sentence=key_sentence
                 ))
 
             script = Script(
-                title=data["title"],
+                title=data.get("title", topic[:30]),
                 scenes=scenes,
                 duration_min=duration,
                 total_panels=len(all_image_prompts)
@@ -1017,7 +1018,8 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             return "⚠️ JSON 파싱 실패 - 원본 확인", result_text, "", "", ""
 
     except Exception as e:
-        return f"❌ 오류: {e}", "", "", "", ""
+        traceback.print_exc()
+        return f"❌ 오류: {type(e).__name__}: {e}", "", "", "", ""
 
 
 # ═══════════════════════════════════════════════════════════════
