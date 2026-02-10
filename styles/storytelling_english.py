@@ -139,20 +139,20 @@ KEY SENTENCE (for on-screen display)
 - Examples: "God sees your struggle", "His grace is enough", "You are never alone"
 
 OUTPUT JSON (must be valid — use \\n for line breaks inside strings, never actual newlines)
-{
+{{
   "title": "...",
   "thumbnail_top_text": "2-4 word power phrase (e.g., MORNING PRAYER)",
   "thumbnail_main_text": "8-15 words hook with \\n for line break (e.g. \"When Worry Won't\\nLet You Sleep\")",
   "scenes": [
-    {
+    {{
       "scene_id": 1,
       "title": "HOOK - ...",
       "text": "...",
       "key_sentence": "...",
       "image_prompts": ["..."]
-    }
+    }}
   ]
-}
+}}
 """
 
 
