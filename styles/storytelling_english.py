@@ -208,7 +208,7 @@ You will receive a JSON script. Your job:
 - CTA: keep short and non-pushy.
 - Ensure all key_sentence values are UNIQUE across scenes.
 
-Output ONLY the corrected JSON (valid). No commentary.
+IMPORTANT: Output ONLY valid JSON. Use \\n for line breaks inside string values, never actual newlines.
 """
 
 
