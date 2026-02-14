@@ -63,7 +63,7 @@ ELEVENLABS_STYLE_VOICES = {
         "speed": 0.85,  # 불교: 천천히 (명상적)
     },
     "불교강의": {
-        "voice_id": "zgDzx5jLLCqEp6Fl7Kl7",  # 불교강의 전용 (여성 음성)
+        "voice_id": "4p0HBzAAGyju0nYfNntV",  # 한국어 스토리텔링 voice (묵직한 톤)
         "stability": 0.3,  # 자연스러움 + 적당한 안정 (0.5는 딱딱함)
         "similarity_boost": 0.8,
         "speed": 0.85,  # 불교: 천천히 (명상적)
