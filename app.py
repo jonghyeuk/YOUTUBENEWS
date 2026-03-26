@@ -2248,14 +2248,14 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         value="senior",
                         label="🇯🇵 시리즈 선택 (일본텔링 전용)",
                         info="Senior(40-70): 따뜻한 안심 톤 | Adult(20-40): 쿨하고 담백",
-                        visible=False
+                        visible=True
                     )
 
                     japan_twopass_input = gr.Checkbox(
                         label="🔄 2패스 검수 활성화",
                         value=True,
                         info="AI가 생성 후 자체 검수로 금지어/패턴 수정 (일본텔링 전용)",
-                        visible=False
+                        visible=True
                     )
 
                     # ═══════════════════════════════════════════════════════════════
@@ -2269,7 +2269,7 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         value="gentle",
                         label="🙏 기도 톤 (영어디보셔널 전용)",
                         info="Gentle: 부드럽고 평화로운 | Warfare: 영적 전쟁 스타일",
-                        visible=False
+                        visible=True
                     )
 
                     english_cta_choices = [
@@ -2280,30 +2280,26 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         value="soft",
                         label="📢 CTA 강도 (영어디보셔널 전용)",
                         info="Soft: 한 줄만 | Medium: 두 줄까지",
-                        visible=False
+                        visible=True
                     )
 
                     english_twopass_input = gr.Checkbox(
                         label="🔄 2패스 검수 활성화",
                         value=True,
                         info="AI가 생성 후 자체 검수로 클리셰/패턴 수정 (영어디보셔널 전용)",
-                        visible=False
+                        visible=True
                     )
 
                     def toggle_style_options(style):
-                        """스타일에 따라 에피소드 타입과 이미지 스타일 드롭다운 표시/숨김"""
-                        show_episode = (style == "불교강의")
-                        show_image_style = (style in ("불교강의", "불교명상"))
-                        show_japan_options = (style == "일본텔링")
-                        show_english_options = (style == "영어디보셔널")
+                        """스타일에 따라 에피소드 타입과 이미지 스타일 드롭다운 표시/숨김 — 모든 옵션 항상 표시"""
                         return (
-                            gr.update(visible=show_episode),
-                            gr.update(visible=show_image_style),
-                            gr.update(visible=show_japan_options),
-                            gr.update(visible=show_japan_options),
-                            gr.update(visible=show_english_options),
-                            gr.update(visible=show_english_options),
-                            gr.update(visible=show_english_options)
+                            gr.update(visible=True),
+                            gr.update(visible=True),
+                            gr.update(visible=True),
+                            gr.update(visible=True),
+                            gr.update(visible=True),
+                            gr.update(visible=True),
+                            gr.update(visible=True)
                         )
 
                     style_guide = gr.Markdown(STYLE_GUIDES["불교강의"])
