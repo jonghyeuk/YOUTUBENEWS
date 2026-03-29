@@ -50,7 +50,7 @@ def _sanitize_json_control_chars(s: str) -> str:
 from engines import ScriptEngine, ImageEngine
 from engines.thumbnail_engine import ThumbnailEngine
 from styles import (
-    STYLE_PROMPTS, BUDDHIST_LECTURE_EPISODE_TYPES, get_buddhist_lecture_prompt,
+    STYLE_PROMPTS, get_buddhist_lecture_prompt,
     # 일본텔링 전용
     JAPAN_SERIES_CONFIG, get_japan_prompt, get_japan_review_prompt, get_japan_image_prompt_with_prop,
     # 영어 디보셔널 전용
@@ -399,7 +399,7 @@ def _translate_existing_script(language: str):
 # 통합 스크립트 + 이미지 프롬프트 생성
 # ═══════════════════════════════════════════════════════════════
 
-def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko", episode_type: str = "sutra_origin", japan_series: str = "senior", japan_twopass: bool = True, english_prayer_style: str = "gentle", english_cta_strength: str = "soft", english_twopass: bool = True):
+def generate_script_and_images(topic: str, duration: int, style: str, language: str = "ko", japan_series: str = "senior", japan_twopass: bool = True, english_prayer_style: str = "gentle", english_cta_strength: str = "soft", english_twopass: bool = True):
     """주제 입력 → 스크립트 + 이미지 프롬프트 한번에 생성"""
     if not topic.strip():
         return "❌ 주제를 입력해주세요", "", ""
@@ -417,7 +417,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         # 프로젝트 생성 (스타일 저장)
         project = pipeline.create_project(topic, duration)
         project.style = style  # 스타일 저장
-        project.episode_type = episode_type  # 에피소드 타입 저장 (불교강의용)
+        project.episode_type = None  # 불교강의 에피소드 타입 제거됨
 
         # 일본텔링 전용 옵션 저장
         if style == "일본텔링":
@@ -448,8 +448,8 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         # 스타일별 프롬프트 구성
         # 불교강의: v2 역사 미스터리형 (에피소드 타입 적용)
         if style == "불교강의":
-            base_prompt = get_buddhist_lecture_prompt(topic, duration, episode_type)
-            print(f"[스크립트] 불교강의 v2 사용 - 에피소드 타입: {episode_type}")
+            base_prompt = get_buddhist_lecture_prompt(topic, duration)
+            print(f"[스크립트] 불교강의 사용 (대본작가용 프롬프트)")
         # 일본텔링: 시리즈별 프롬프트 (Senior/Adult)
         elif style == "일본텔링":
             base_prompt = get_japan_prompt(topic, duration, japan_series)
@@ -2212,18 +2212,6 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                         label="스타일"
                     )
 
-                    # 불교강의 에피소드 타입 (불교강의 선택시만 표시)
-                    episode_type_choices = [
-                        (v["name"], k) for k, v in BUDDHIST_LECTURE_EPISODE_TYPES.items()
-                    ]
-                    episode_type_input = gr.Dropdown(
-                        choices=episode_type_choices,
-                        value="sutra_origin",
-                        label="📚 에피소드 타입 (불교강의 전용)",
-                        info="경전/선사일화/논쟁/수행/유물 중 선택",
-                        visible=True
-                    )
-
                     # 이미지 스타일 선택 (불교강의/불교명상 전용)
                     image_style_input = gr.Dropdown(
                         choices=[
@@ -2291,13 +2279,11 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
                     )
 
                     def toggle_style_options(style):
-                        """스타일에 따라 에피소드 타입과 이미지 스타일 드롭다운 표시/숨김"""
-                        show_episode = (style == "불교강의")
+                        """스타일에 따라 이미지 스타일 드롭다운 표시/숨김"""
                         show_image_style = (style in ("불교강의", "불교명상"))
                         show_japan_options = (style == "일본텔링")
                         show_english_options = (style == "영어디보셔널")
                         return (
-                            gr.update(visible=show_episode),
                             gr.update(visible=show_image_style),
                             gr.update(visible=show_japan_options),
                             gr.update(visible=show_japan_options),
@@ -2690,12 +2676,12 @@ with gr.Blocks(title="AI 콘텐츠 생성기") as app:
 
     # 스타일 변경시 가이드 업데이트 + 에피소드 타입 토글
     style_input.change(update_style_guide, [style_input], [style_guide])
-    style_input.change(toggle_style_options, [style_input], [episode_type_input, image_style_input, japan_series_input, japan_twopass_input, english_prayer_input, english_cta_input, english_twopass_input])
+    style_input.change(toggle_style_options, [style_input], [image_style_input, japan_series_input, japan_twopass_input, english_prayer_input, english_cta_input, english_twopass_input])
 
-    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 + 에피소드 타입 + 일본텔링/영어디보셔널 옵션 추가)
+    # Tab 1: 스크립트 생성 + AI 제목/썸네일 (언어 파라미터 + 일본텔링/영어디보셔널 옵션 추가)
     generate_btn.click(
         generate_script_and_images,
-        [topic_input, duration_input, style_input, script_language, episode_type_input, japan_series_input, japan_twopass_input, english_prayer_input, english_cta_input, english_twopass_input],
+        [topic_input, duration_input, style_input, script_language, japan_series_input, japan_twopass_input, english_prayer_input, english_cta_input, english_twopass_input],
         [status, script_preview, image_prompts, yt_title_input, yt_thumbnail_input]
     )
 
