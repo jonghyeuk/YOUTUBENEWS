@@ -9,10 +9,9 @@ from .buddhist import PROMPT as BUDDHIST_PROMPT
 from .buddhist_meditation import PROMPT as BUDDHIST_MEDITATION_PROMPT
 from .buddhist_meditation import IMAGE_STYLE_GUIDE as BUDDHIST_MEDITATION_IMAGE_GUIDE
 
-# 불교강의 v2 (역사 미스터리형)
+# 불교강의 (대본작가용)
 from .buddhist_lecture import PROMPT as BUDDHIST_LECTURE_PROMPT
 from .buddhist_lecture import WORLD_STYLE_GUIDE as BUDDHIST_LECTURE_WORLD_GUIDE
-from .buddhist_lecture import EPISODE_TYPES as BUDDHIST_LECTURE_EPISODE_TYPES
 from .buddhist_lecture import get_full_prompt as get_buddhist_lecture_prompt
 
 # 스토리텔링 지역별 버전
@@ -81,7 +80,6 @@ WORLD_STYLE_GUIDES = {
 __all__ = [
     "STYLE_PROMPTS",
     "WORLD_STYLE_GUIDES",
-    "BUDDHIST_LECTURE_EPISODE_TYPES",
     "get_buddhist_lecture_prompt",
     # 일본텔링 전용
     "JAPAN_SERIES_CONFIG",
