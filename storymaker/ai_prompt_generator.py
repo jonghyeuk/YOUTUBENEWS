@@ -164,7 +164,7 @@ class AIPromptGenerator:
     대본 씬을 분석하여 세계관에 맞는 이미지 프롬프트를 동적으로 생성
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, model: str = "claude-sonnet-4-6"):
         self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         self.model = model
         print(f"[AIPromptGenerator] 초기화 완료 - 모델: {model}")

@@ -552,7 +552,7 @@ class ThumbnailEngine:
             # Anthropic API 호출
             client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=200,
                 system=THUMBNAIL_HOOK_PROMPT,
                 messages=[
