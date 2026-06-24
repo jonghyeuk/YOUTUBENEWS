@@ -272,7 +272,7 @@ SCENE_TEXT_1: [번역된 나레이션]
 중요: 이미지 프롬프트는 번역하지 마세요 (이미 영어입니다)."""
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-sonnet-4-6",
         max_tokens=8192,
         messages=[{"role": "user", "content": prompt}]
     )
@@ -520,7 +520,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             client = Anthropic()
 
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=8192,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -674,7 +674,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             client = Anthropic()
 
             response = client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 max_tokens=8192,
                 messages=[{"role": "user", "content": prompt}]
             )
@@ -789,7 +789,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         client = Anthropic()
 
         response = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-6",
             max_tokens=8192,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -833,7 +833,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                 review_input = review_prompt + "\n\n" + json.dumps(data, ensure_ascii=False, indent=2)
 
                 review_response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=8192,
                     messages=[{"role": "user", "content": review_input}]
                 )
@@ -879,7 +879,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                 review_input = review_prompt + "\n\n" + json.dumps(data, ensure_ascii=False, indent=2)
 
                 review_response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-6",
                     max_tokens=8192,
                     messages=[{"role": "user", "content": review_input}]
                 )

@@ -117,7 +117,7 @@ class ScriptEngine:
 
     def __init__(self):
         self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.model = "claude-sonnet-4-20250514"
+        self.model = "claude-sonnet-4-6"
 
     def generate(self, topic: str, duration_min: int) -> Script:
         """
