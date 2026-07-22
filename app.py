@@ -21,6 +21,18 @@ from pipeline import Pipeline
 MAX_SCRIPT_TOKENS = 32000
 
 
+def _create_script_message(client, **kwargs):
+    """스크립트 생성용 Claude 호출.
+
+    max_tokens가 크면 응답이 10분을 넘길 수 있어 SDK가 스트리밍을 요구한다
+    (ValueError: Streaming is required...). 스트리밍으로 받되, 호출부는 기존
+    messages.create()와 동일하게 최종 Message 객체(.content, .stop_reason)를
+    돌려받도록 감싼다.
+    """
+    with client.messages.stream(**kwargs) as stream:
+        return stream.get_final_message()
+
+
 def _sanitize_json_control_chars(s: str) -> str:
     """JSON 문자열 값 안의 이스케이프되지 않은 제어문자(줄바꿈 등)를 이스케이프 처리.
 
@@ -277,7 +289,7 @@ SCENE_TEXT_1: [번역된 나레이션]
 
 중요: 이미지 프롬프트는 번역하지 마세요 (이미 영어입니다)."""
 
-    response = client.messages.create(
+    response = _create_script_message(client,
         model="claude-sonnet-4-6",
         max_tokens=MAX_SCRIPT_TOKENS,
         messages=[{"role": "user", "content": prompt}]
@@ -525,7 +537,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             from anthropic import Anthropic
             client = Anthropic()
 
-            response = client.messages.create(
+            response = _create_script_message(client,
                 model="claude-sonnet-4-6",
                 max_tokens=MAX_SCRIPT_TOKENS,
                 messages=[{"role": "user", "content": prompt}]
@@ -679,7 +691,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
             from anthropic import Anthropic
             client = Anthropic()
 
-            response = client.messages.create(
+            response = _create_script_message(client,
                 model="claude-sonnet-4-6",
                 max_tokens=MAX_SCRIPT_TOKENS,
                 messages=[{"role": "user", "content": prompt}]
@@ -794,7 +806,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
         from anthropic import Anthropic
         client = Anthropic()
 
-        response = client.messages.create(
+        response = _create_script_message(client,
             model="claude-sonnet-4-6",
             max_tokens=MAX_SCRIPT_TOKENS,
             messages=[{"role": "user", "content": prompt}]
@@ -846,7 +858,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                 review_prompt = get_japan_review_prompt()
                 review_input = review_prompt + "\n\n" + json.dumps(data, ensure_ascii=False, indent=2)
 
-                review_response = client.messages.create(
+                review_response = _create_script_message(client,
                     model="claude-sonnet-4-6",
                     max_tokens=MAX_SCRIPT_TOKENS,
                     messages=[{"role": "user", "content": review_input}]
@@ -892,7 +904,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
                 review_prompt = get_english_review_prompt()
                 review_input = review_prompt + "\n\n" + json.dumps(data, ensure_ascii=False, indent=2)
 
-                review_response = client.messages.create(
+                review_response = _create_script_message(client,
                     model="claude-sonnet-4-6",
                     max_tokens=MAX_SCRIPT_TOKENS,
                     messages=[{"role": "user", "content": review_input}]
