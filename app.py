@@ -15,6 +15,12 @@ import traceback
 from pipeline import Pipeline
 
 
+# 스크립트 생성 시 응답 최대 토큰 수.
+# 20분 이상(12씬, 3600자+ 나레이션 + 영어 이미지 프롬프트)은 8192로는 잘려서
+# JSON이 중간에 끊기고 파싱에 실패한다. 40분(18씬)까지 여유있게 담기도록 설정.
+MAX_SCRIPT_TOKENS = 32000
+
+
 def _sanitize_json_control_chars(s: str) -> str:
     """JSON 문자열 값 안의 이스케이프되지 않은 제어문자(줄바꿈 등)를 이스케이프 처리.
 
@@ -273,7 +279,7 @@ SCENE_TEXT_1: [번역된 나레이션]
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=8192,
+        max_tokens=MAX_SCRIPT_TOKENS,
         messages=[{"role": "user", "content": prompt}]
     )
 
@@ -521,7 +527,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
             response = client.messages.create(
                 model="claude-sonnet-4-6",
-                max_tokens=8192,
+                max_tokens=MAX_SCRIPT_TOKENS,
                 messages=[{"role": "user", "content": prompt}]
             )
 
@@ -675,7 +681,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
             response = client.messages.create(
                 model="claude-sonnet-4-6",
-                max_tokens=8192,
+                max_tokens=MAX_SCRIPT_TOKENS,
                 messages=[{"role": "user", "content": prompt}]
             )
 
@@ -790,11 +796,19 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
         response = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=8192,
+            max_tokens=MAX_SCRIPT_TOKENS,
             messages=[{"role": "user", "content": prompt}]
         )
 
         result_text = response.content[0].text
+
+        # 응답이 max_tokens로 잘렸는지 확인 (잘리면 JSON이 불완전해 파싱 실패함)
+        if getattr(response, "stop_reason", None) == "max_tokens":
+            print(f"[스크립트] ⚠️ 응답이 max_tokens({MAX_SCRIPT_TOKENS})에서 잘림 - 분량을 줄이거나 MAX_SCRIPT_TOKENS를 늘리세요")
+            return (
+                f"⚠️ 응답이 잘렸습니다 (max_tokens 초과). 영상 길이를 줄이거나 다시 시도해 주세요.",
+                result_text, "", "", ""
+            )
 
         # JSON 파싱 (더 robust하게)
         try:
@@ -834,7 +848,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
                 review_response = client.messages.create(
                     model="claude-sonnet-4-6",
-                    max_tokens=8192,
+                    max_tokens=MAX_SCRIPT_TOKENS,
                     messages=[{"role": "user", "content": review_input}]
                 )
 
@@ -880,7 +894,7 @@ def generate_script_and_images(topic: str, duration: int, style: str, language: 
 
                 review_response = client.messages.create(
                     model="claude-sonnet-4-6",
-                    max_tokens=8192,
+                    max_tokens=MAX_SCRIPT_TOKENS,
                     messages=[{"role": "user", "content": review_input}]
                 )
 
