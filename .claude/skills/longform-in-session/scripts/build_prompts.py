@@ -48,7 +48,7 @@ def main(visual_path, work_dir):
         beats = [b if any(n in b for n in names) or "people" in b.lower() else b + ", no people, no human figures"
                  for b in beats]
         prompt = LAYOUT + style + "".join(f"Panel {i+1} ({POS[i]}): {b}. " for i, b in enumerate(beats))
-        json.dump({"out": os.path.join(sheets, f"sheet_{k+1}.jpg"), "prompt": prompt, "refs": [ref], "quality": "high"},
+        json.dump({"out": os.path.join(sheets, f"sheet_{k+1}.jpg"), "prompt": prompt, "refs": [ref], "quality": "high", "model": "gpt-image-2", "size": "3840x2160"},
                   open(os.path.join(jobs, f"sheet_{k+1}.json"), "w", encoding="utf-8"), ensure_ascii=False)
     print(f"ref + {n_sheets} sheets → {jobs}")
 

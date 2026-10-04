@@ -9,6 +9,9 @@
   2026-10 제작 때 원인 확인 없이 자동 재시도 3회 × 2번을 돌려 결과물 없이 최대 7장 분량이 과금됐다.
   실패하면 멈추고 원인(HTTP 코드·메시지)을 확인한 뒤 다시 실행한다.
 
+기본은 싼 설정(종혁님 요청): gpt-image-1-mini / 1536x1024 / medium.
+4K 2x2 시트는 job에 "model":"gpt-image-2","size":"3840x2160","quality":"high"를 명시할 때만.
+
 사용: python imggen.py job.json
 job.json: {"prompt": "...", "out": "path.jpg", "size": "3840x2160", "quality": "high",
            "refs": ["ref.jpg", ...]}   # refs가 있으면 /images/edits (참조 이미지로 화풍·인물 고정)
@@ -45,7 +48,7 @@ def _read_stream(resp, out_path):
     return True
 
 
-def generate(prompt, out, size="3840x2160", refs=None, quality="high", model="gpt-image-2", tries=1):
+def generate(prompt, out, size="1536x1024", refs=None, quality="medium", model="gpt-image-1-mini", tries=1):
     for attempt in range(tries):
         try:
             if refs:
@@ -76,6 +79,6 @@ def generate(prompt, out, size="3840x2160", refs=None, quality="high", model="gp
 
 if __name__ == "__main__":
     job = json.load(open(sys.argv[1], encoding="utf-8"))
-    ok = generate(job["prompt"], job["out"], job.get("size", "3840x2160"),
-                  job.get("refs"), job.get("quality", "high"))
+    ok = generate(job["prompt"], job["out"], job.get("size", "1536x1024"),
+                  job.get("refs"), job.get("quality", "medium"), job.get("model", "gpt-image-1-mini"))
     sys.exit(0 if ok else 1)

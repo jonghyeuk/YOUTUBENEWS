@@ -55,7 +55,19 @@ fal은 환경 변수 `FAL_KEY`가 필요하다: 세션 제목 표시줄의 클�
 `예상 초 = 총 글자수 / 4.4 + 1.5 + 2 × 씬수`. 10분이면 20씬 기준 약 2,450자, 25씬이면 약 2,400자.
 전체 합성 전에 씬 1~2개만 합성해 속도를 확인하면 낭비가 없다.
 
-### 3. 그림 프롬프트
+### 3. 그림 프롬프트 — 잘 쓰기
+
+싼 모델일수록 프롬프트가 결과를 좌우한다. 컷마다 영어로, 아래 순서로 한두 문장:
+1. **주제 하나**: 무엇이 화면 중심인가 (사람이면 나이·옷·자세, 사물이면 재질·상태)
+2. **장소·시대**: 고대 인도 라자그리하의 바위산, 조선 산사, 기원전 2세기 그리스풍 궁전 … — 경전 배경과 맞게
+3. **시간·빛**: dawn / golden hour / moonlight / single oil lamp — 분위기는 빛이 만든다
+4. **구도**: wide shot / medium shot / close-up / from behind / low angle — 앞뒤 컷과 겹치지 않게 섞는다
+5. **분위기 한 단어**: serene, contemplative, solemn …
+- 사람이 없어야 하는 컷은 `no people` 을 쓴다. 모든 컷 끝에 `no text, no letters`.
+- 추상 개념(공·무아·연기)은 직접 그리려 하지 말고 그것을 보여 주는 장면(파도, 등불, 낙엽, 흩어지는 구름)으로 바꾼다.
+- 화풍 문장은 쓰지 않는다 — 스크립트가 저장소 화풍 블록을 앞에 붙인다(4-A) / visual.json의 style을 쓴다(4-B).
+- 예: `An elderly monk in a saffron robe sitting alone on a seaside rock at sunset, seen from behind, watching the waves, serene, no text, no letters`
+
 
 **A(기본, fal)**: `prompts.json` = 컷별 영어 장면 묘사 리스트(컷 수 = `images` 합계). 화풍은 스크립트가 붙이니 장면·분위기·조명만 쓴다.
 
@@ -77,7 +89,13 @@ python $S/fal_images.py $W --region korea      # korea 수묵담채 / china 도�
 - 실패하면 멈춘다. 다시 실행하면 이미 만든 컷은 건너뛰니 재과금이 없다.
 - 생성 후 밀착 시트로 분위기·내용이 맞는지 확인하고, 엉뚱한 컷만 지우고 다시 실행한다.
 
-### 4-B. 그림 생성 — gpt-image-2 2×2 시트 (인물 일관성이 꼭 필요할 때만)
+### 4-B. 그림 생성 — OpenAI (fal을 못 쓸 때 / 인물 일관성이 필요할 때)
+
+**기본은 싼 설정**(종혁님 요청): `gpt-image-1-mini`, `1536x1024`, `quality: medium`, 컷당 1장.
+`{"prompt": "<화풍 문장>. <컷 묘사>", "out": "panels/panel_01.jpg"}` job을 컷마다 만들어 `imggen.py`로 돌린다.
+인물을 맞추고 싶으면 job에 `"refs": [기준 이미지]`를 넣는다(편집 API, 같은 싼 모델).
+
+아래 4K 2×2 시트 방식은 **종혁님이 고품질·인물 일관성을 명시적으로 원할 때만** 쓴다(장당 비용이 훨씬 큼):
 
 ```bash
 python $S/build_prompts.py $W/visual.json $W
