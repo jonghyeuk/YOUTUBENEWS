@@ -5,7 +5,9 @@
   4K 고품질 이미지는 1~2분 걸리므로 stream=true(SSE)로 연결을 유지해야 한다.
 - PNG 4K 결과는 base64로 수십 MB라 마지막 이벤트 수신 중 연결이 끊긴 적이 있다 →
   output_format=jpeg(품질 92)로 전송량을 줄인다.
-- 크레딧 소진(429 credit_balance_exhausted)은 재시도해도 소용없으니 즉시 중단한다.
+- 기본은 재시도 없음(tries=1). 4K 이미지는 실패해도 서버에서 생성이 끝나 과금될 수 있다 —
+  2026-10 제작 때 원인 확인 없이 자동 재시도 3회 × 2번을 돌려 결과물 없이 최대 7장 분량이 과금됐다.
+  실패하면 멈추고 원인(HTTP 코드·메시지)을 확인한 뒤 다시 실행한다.
 
 사용: python imggen.py job.json
 job.json: {"prompt": "...", "out": "path.jpg", "size": "3840x2160", "quality": "high",
@@ -43,7 +45,7 @@ def _read_stream(resp, out_path):
     return True
 
 
-def generate(prompt, out, size="3840x2160", refs=None, quality="high", model="gpt-image-2", tries=3):
+def generate(prompt, out, size="3840x2160", refs=None, quality="high", model="gpt-image-2", tries=1):
     for attempt in range(tries):
         try:
             if refs:

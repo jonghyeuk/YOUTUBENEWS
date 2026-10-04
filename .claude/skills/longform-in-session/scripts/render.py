@@ -1,7 +1,7 @@
 """YOUTUBENEWS 파이프라인 step5~7로 렌더 (자막 → 줌/크로스페이드 클립 + BGM → 자막 번인).
 
 work_dir에 필요한 것: script.json, audio_full.mp3, audio_segments.json, panels/panel_01.jpg..., bgm.mp3(선택)
-사용: python render.py <work_dir> [--style 불교종교] [--bgm-volume 0.18]
+사용: python render.py <work_dir> [--style 불교강의] [--bgm-volume 0.18]
 결과: <work_dir>/final.mp4  (파이프라인 산출물은 <work_dir>/project/ 아래)
 """
 import sys, os, json, time, shutil, argparse
@@ -15,7 +15,7 @@ from models.types import Script, Scene, AudioSegment
 from engines.tts_engine import SubtitleSegment
 
 ap = argparse.ArgumentParser()
-ap.add_argument("work_dir"); ap.add_argument("--style", default="불교종교"); ap.add_argument("--bgm-volume", type=float, default=0.18)
+ap.add_argument("work_dir"); ap.add_argument("--style", default="불교강의"); ap.add_argument("--bgm-volume", type=float, default=0.18)
 a = ap.parse_args()
 W = os.path.abspath(a.work_dir)
 d = json.load(open(f"{W}/script.json", encoding="utf-8"))
