@@ -12,9 +12,10 @@ description: Claude Code 세션 안에서 YOUTUBENEWS 엔진으로 롱폼 영상
 
 - **사실 기반**: 픽션 금지. 경전 본문·경전 속 일화·문답만 쓴다. 현대 해설(예: 파도 비유)은 "오늘날 자주 쓰는 설명"이라고 밝힌다. 원문이 확실하지 않은 구절·숫자는 쓰지 않는다.
 - **이야기 흐름**: 질문으로 열고(후킹) → 경전 배경 → 핵심 구절 → 비유·해설 → 오해 바로잡기 → 다른 경전 연결 → 정리·맺음.
-- **목소리**: 종혁님이 앱에서 쓰는 그 여성 음성 = 엔진 `elevenlabs2.5`(Turbo v2.5) + 스타일 `불교강의`(voice `4p0HBzAAGyju0nYfNntV`, 한국어 기본 음성) + 속도 0.9. `scripts/tts.py`의 기본값이 이것이다.
+- **목소리**: 종혁님이 앱에서 쓰는 그 여성 음성 = 엔진 `elevenlabs2.5`(Turbo v2.5) + 스타일 `불교강의`(voice `4p0HBzAAGyju0nYfNntV`, 한국어 기본 음성) + **속도 1.0**(앱 기본 0.9보다 조금 빠르게 — 종혁님 요청). `scripts/tts.py`의 기본값이 이것이다.
   ※ 첫 제작 때 config의 `불교종교`(voice `zgDzx5jL…`, v3 엔진)를 잘못 골랐다가 다시 만들었다. `불교종교`는 앱 스타일 목록에 없다.
-- **그림**: 시대와 내용에 맞고 **인물이 일관**돼야 한다. 그림 장수는 Claude가 정하고, **한 번에 그리드로 뽑아 잘라 쓴다**.
+- **그림 — 돈을 아낀다**: 상황·분위기만 맞으면 된다(인물이 조금 달라도 괜찮음). 기본은 **fal FLUX-schnell(장당 약 0.003달러) + 저장소의 종혁님 화풍 프롬프트**(4-A). 인물 일관성이 꼭 필요하다고 할 때만 gpt-image-2 2×2 시트(4-B, 장당 수백 배 비쌈)를 쓰고, 그때도 먼저 예상 비용을 알린다.
+- **실패는 돈이다**: 유료 API가 실패하면 자동 재시도하지 말고 원인부터 확인한다.
 - **연출**: 그림을 그대로 두지 말고 줌인/줌아웃·팬으로 움직이고, 그림 사이는 크로스페이드(엔진 기본 1초).
 - **배경음**: 사색적·명상적 불교 배경음을 처음부터 끝까지 깐다.
 - **길이**: 요청 길이(예: 10분)에 맞춘다.
@@ -26,7 +27,7 @@ description: Claude Code 세션 안에서 YOUTUBENEWS 엔진으로 롱폼 영상
 ```
 1. 대본 script.json 작성 ─┐
 2. 길이 맞추기(샘플 TTS)  │
-3. 그림 설계 visual.json  ├→ 4. 그림 생성·자르기 → 5. 전체 TTS → 6. BGM → 7. 렌더 → 8. 검증 → 9. 전달
+3. 그림 프롬프트         ├→ 4. 그림 생성(A: fal / B: 시트) → 5. 전체 TTS → 6. BGM → 7. 렌더 → 8. 검증 → 9. 전달
 ```
 
 ### 0. 환경 준비 (새 컨테이너마다)
@@ -38,6 +39,7 @@ pip install -q "moviepy==1.0.3" pydub elevenlabs python-dotenv anthropic openai 
 ```
 시스템 pip로는 moviepy 1.0.3 빌드가 `install_layout` 오류로 실패한다 → venv를 쓴다.
 키는 프록시가 주입한다(OpenAI·ElevenLabs). Gemini 키는 무효였다.
+fal은 환경 변수 `FAL_KEY`가 필요하다: 세션 제목 표시줄의 클라우드 환경 메뉴 → Edit → 환경 변수에 등록(새 세션부터 적용). 키를 채팅으로 받지 않는다. `pip install fal-client`도 venv에 추가한다.
 
 ### 1. 대본 — `script.json`
 
@@ -48,22 +50,36 @@ pip install -q "moviepy==1.0.3" pydub elevenlabs python-dotenv anthropic openai 
 
 ### 2. 길이 맞추기
 
-기본 음성(불교강의 / elevenlabs2.5 / 0.9)은 실측 **초당 약 3.9자**(공백 포함)다. 음성·속도를 바꾸면 `--sample 1`로 다시 잰다.
+기본 음성(불교강의 / elevenlabs2.5 / 1.0)은 실측 **초당 약 4.4자**(공백 포함, 3,326자 → 말 762초)다. 음성·속도를 바꾸면 `--sample 1`로 다시 잰다.
 (첫 제작 때 다른 음성 기준 5.7자/초로 대본을 써서, 목소리를 바꾸자 10분 → 15분이 됐다.) 엔진이 시작 1.5초 + 씬마다 2초 무음을 넣는다.
-`예상 초 = 총 글자수 / 3.9 + 1.5 + 2 × 씬수`. 10분이면 20씬 기준 약 2,150자, 25씬이면 약 2,100자.
+`예상 초 = 총 글자수 / 4.4 + 1.5 + 2 × 씬수`. 10분이면 20씬 기준 약 2,450자, 25씬이면 약 2,400자.
 전체 합성 전에 씬 1~2개만 합성해 속도를 확인하면 낭비가 없다.
 
-### 3. 그림 설계 — `visual.json`
+### 3. 그림 프롬프트
+
+**A(기본, fal)**: `prompts.json` = 컷별 영어 장면 묘사 리스트(컷 수 = `images` 합계). 화풍은 스크립트가 붙이니 장면·분위기·조명만 쓴다.
+
+**B(인물 일관성 필요할 때만)**: `visual.json` — 아래 형식.
 
 `examples/heart_sutra_visual.json` 형식: `style`(화풍 한 문단), `characters`(이름 → 외모·옷), `panels`(컷 설명, 영상 순서).
 - `panels` 수 = `script.json`의 `images` 합계, **4의 배수**로 맞춘다(2×2 시트 단위).
 - 컷 설명에 인물을 넣을 때는 `characters`의 **대문자 이름 그대로** 쓴다. 이름이 없는 컷은 자동으로 "no people"이 붙는다.
 - 인물은 외모가 서로 확실히 구분되게(나이·체형·옷 색) 정한다.
 
-### 4. 그림 생성·자르기
+### 4-A. 그림 생성 — fal (기본)
 
 ```bash
 S=.claude/skills/longform-in-session/scripts; W=projects/<이름>
+python $S/fal_images.py $W --region korea      # korea 수묵담채 / china 도상화 / india 연필 스케치
+```
+- 화풍은 저장소 `storymaker/ai_prompt_generator.py`의 `REGIONAL_ENGINE_STYLES[region]["fal"]`(앱의 이미지 스타일 드롭다운과 같은 것)를 쓴다.
+- 결과는 1024×576 정도라 1080p에서 약간 부드럽다 — 종혁님 기준으로 충분하다.
+- 실패하면 멈춘다. 다시 실행하면 이미 만든 컷은 건너뛰니 재과금이 없다.
+- 생성 후 밀착 시트로 분위기·내용이 맞는지 확인하고, 엉뚱한 컷만 지우고 다시 실행한다.
+
+### 4-B. 그림 생성 — gpt-image-2 2×2 시트 (인물 일관성이 꼭 필요할 때만)
+
+```bash
 python $S/build_prompts.py $W/visual.json $W
 python $S/imggen.py $W/jobs/ref.json                 # 인물 기준 시트 → 반드시 눈으로 확인
 for j in $W/jobs/sheet_*.json; do python $S/imggen.py $j & done; wait   # 4개씩 병렬이면 충분
@@ -81,7 +97,7 @@ python $S/split_sheet.py $W/sheets/sheet_1.jpg 1 $W/panels          # 시트 k �
 
 ```bash
 python $S/tts.py $W --sample 1     # 첫 씬만 → sample.mp3 를 종혁님께 보내 목소리 확인
-python $S/tts.py $W                # 기본값: elevenlabs2.5 / 불교강의 / 0.9
+python $S/tts.py $W                # 기본값: elevenlabs2.5 / 불교강의 / 1.0
 ```
 `불교강의`는 v2.5 감정표에 없어 전 구간 neutral 톤으로 나간다(앱과 동일).
 결과 `audio_full.mp3` 길이를 확인하고 요청 길이와 크게 다르면 대본을 다듬어 다시 합성한다.
