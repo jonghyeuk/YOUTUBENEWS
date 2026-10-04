@@ -6,7 +6,7 @@ set -euo pipefail
 IN=$(realpath "$1"); OUT=$(realpath -m "$2")
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$IN")
 # 28MB 목표: 총 비트레이트(kbps) = 28*8*1024/DUR, 오디오 64k 제외
-VB=$(python3 -c "print(max(150, int(28*8*1024/$DUR - 64)))")
+VB=$(python3 -c "print(max(150, min(2500, int(28*8*1024/$DUR - 64))))")  # 짧은 영상은 2.5Mbps 상한
 TMP=$(mktemp -d)
 ( cd "$TMP" && ffmpeg -v error -y -i "$IN" -vf scale=854:480 -c:v libx264 -preset slow -b:v ${VB}k -pass 1 -an -f mp4 /dev/null \
   && ffmpeg -v error -y -i "$IN" -vf scale=854:480 -c:v libx264 -preset slow -b:v ${VB}k -pass 2 -c:a aac -b:a 64k -movflags +faststart "$OUT" )
