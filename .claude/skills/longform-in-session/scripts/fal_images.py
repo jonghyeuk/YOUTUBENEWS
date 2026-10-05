@@ -11,7 +11,8 @@ FalGenerator는 style="default"로 만든다. 앱 기본 엔진 fal-anime는 "an
 
 준비: 환경 변수 FAL_KEY (세션 환경 설정 → Edit → 환경 변수. 새 세션부터 적용, 키는 채팅에 붙여 넣지 않음).
 입력: <work_dir>/prompts.json = ["영어 장면 묘사", ...]  (컷 순서 = 영상 순서, 개수 = script.json images 합계)
-사용: python fal_images.py <work_dir> [--region korea] [--model flux-schnell]
+사용: python fal_images.py <work_dir> [--style "직접 쓴 화풍 문장"] [--region korea] [--model flux-schnell]
+  --style을 주면 그것을 쓰고, 없으면 --region의 저장소 화풍 블록을 쓴다(화풍은 Claude가 내용에 맞게 정함).
 결과: <work_dir>/panels/panel_01.jpg … (render.py가 그대로 읽음). 이미 있는 컷은 건너뛴다(재실행해도 재과금 없음).
 """
 import sys, os, json, argparse
@@ -22,14 +23,14 @@ from engines.image_engine import FalGenerator
 from storymaker.ai_prompt_generator import get_regional_style_block
 
 ap = argparse.ArgumentParser()
-ap.add_argument("work_dir"); ap.add_argument("--region", default="korea"); ap.add_argument("--model", default="flux-schnell")
+ap.add_argument("work_dir"); ap.add_argument("--style", default=""); ap.add_argument("--region", default="korea"); ap.add_argument("--model", default="flux-schnell")
 a = ap.parse_args()
 if not os.getenv("FAL_KEY"):
     sys.exit("FAL_KEY 환경 변수가 없습니다 — 세션 환경 설정에 등록 후 새 세션에서 실행하세요.")
 
 W = os.path.abspath(a.work_dir)
 prompts = json.load(open(f"{W}/prompts.json", encoding="utf-8"))
-style = get_regional_style_block(a.region, "fal")
+style = a.style or get_regional_style_block(a.region, "fal")
 gen = FalGenerator(model=a.model, style="default")
 os.makedirs(f"{W}/panels", exist_ok=True)
 print(f"{len(prompts)}장 예정 (모델 {a.model}), 화풍: {style[:60]}...")

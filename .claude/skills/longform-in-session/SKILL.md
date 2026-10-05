@@ -14,7 +14,8 @@ description: Claude Code 세션 안에서 YOUTUBENEWS 엔진으로 롱폼 영상
 - **이야기 흐름**: 질문으로 열고(후킹) → 경전 배경 → 핵심 구절 → 비유·해설 → 오해 바로잡기 → 다른 경전 연결 → 정리·맺음.
 - **목소리**: 종혁님이 앱에서 쓰는 그 여성 음성 = 엔진 `elevenlabs2.5`(Turbo v2.5) + 스타일 `불교강의`(voice `4p0HBzAAGyju0nYfNntV`, 한국어 기본 음성) + **속도 1.0**(앱 기본 0.9보다 조금 빠르게 — 종혁님 요청). `scripts/tts.py`의 기본값이 이것이다.
   ※ 첫 제작 때 config의 `불교종교`(voice `zgDzx5jL…`, v3 엔진)를 잘못 골랐다가 다시 만들었다. `불교종교`는 앱 스타일 목록에 없다.
-- **그림 — 돈을 아낀다**: 상황·분위기만 맞으면 된다(인물이 조금 달라도 괜찮음). 기본은 **fal FLUX-schnell(장당 약 0.003달러) + 저장소의 종혁님 화풍 프롬프트**(4-A). 인물 일관성이 꼭 필요하다고 할 때만 gpt-image-2 2×2 시트(4-B, 장당 수백 배 비쌈)를 쓰고, 그때도 먼저 예상 비용을 알린다.
+- **그림 — 돈을 아낀다**: 상황·분위기만 맞으면 된다(인물이 조금 달라도 괜찮음). 기본은 **fal FLUX-schnell(장당 약 0.003달러)**(4-A). 인물 일관성이 꼭 필요하다고 할 때만 OpenAI(4-B)를 쓰고, 그때도 싼 설정이 기본이며 비싼 4K 시트는 먼저 예상 비용을 알린다.
+- **화풍은 Claude가 정한다**: 종혁님이 화풍을 말하지 않으면 경전의 시대·장소와 분위기에 맞춰 Claude가 고른다(필요하면 한 줄로 물어봐도 된다). 저장소의 화풍 블록(korea 수묵담채 / china 도상화 / india 스케치)은 출발점일 뿐 꼭 따를 필요는 없다 — `fal_images.py --style "..."`로 직접 쓴 화풍 문장을 줄 수 있다.
 - **실패는 돈이다**: 유료 API가 실패하면 자동 재시도하지 말고 원인부터 확인한다.
 - **연출**: 그림을 그대로 두지 말고 줌인/줌아웃·팬으로 움직이고, 그림 사이는 크로스페이드(엔진 기본 1초).
 - **배경음**: 사색적·명상적 불교 배경음을 처음부터 끝까지 깐다.
@@ -23,6 +24,7 @@ description: Claude Code 세션 안에서 YOUTUBENEWS 엔진으로 롱폼 영상
 ## 전체 순서
 
 작업 폴더는 `projects/<영문이름>/`(gitignore 대상). 스크립트는 모두 이 스킬의 `scripts/`에 있다.
+롱폼은 이 저장소(YOUTUBENEWS)에서만 만든다. youtubemaker는 숏 전용이니 롱폼 작업으로 건드리지 않는다.
 
 ```
 1. 대본 script.json 작성 ─┐
@@ -82,7 +84,7 @@ fal은 환경 변수 `FAL_KEY`가 필요하다: 세션 제목 표시줄의 클�
 
 ```bash
 S=.claude/skills/longform-in-session/scripts; W=projects/<이름>
-python $S/fal_images.py $W --region korea      # korea 수묵담채 / china 도상화 / india 연필 스케치
+python $S/fal_images.py $W --style "<Claude가 정한 화풍 문장>"   # 또는 --region korea|china|india (저장소 화풍 블록)
 ```
 - 화풍은 저장소 `storymaker/ai_prompt_generator.py`의 `REGIONAL_ENGINE_STYLES[region]["fal"]`(앱의 이미지 스타일 드롭다운과 같은 것)를 쓴다.
 - 결과는 1024×576 정도라 1080p에서 약간 부드럽다 — 종혁님 기준으로 충분하다.
