@@ -1,24 +1,27 @@
 ---
 name: longform-in-session
-description: Claude Code 세션 안에서 YOUTUBENEWS 엔진으로 롱폼 영상(특히 부처님 말씀·경전·불교 해설, 명상 콘텐츠)을 처음부터 끝까지 만드는 절차. 대본은 Claude가 직접 쓰고(Anthropic API 호출 없음), TTS·자막·줌/크로스페이드 렌더·BGM 믹싱은 저장소 엔진(pipeline step5~7)을 그대로 쓴다. 종혁님이 "이 주제로 영상 만들어줘", "부처님 말씀 영상", "경전 내용으로 10분짜리", "반야심경/금강경/법구경 … 영상", "숏 만들듯 여기서 만들어줘"처럼 주제·경전·길이를 주고 영상 제작을 요청하면 앱(Gradio)을 띄우지 말고 반드시 이 스킬을 따른다.
+description: Claude Code 세션 안에서 YOUTUBENEWS 엔진으로 롱폼 영상(부처님 말씀·경전·불교 해설·명상, 그리고 야화 채널의 조선왕조실록 미스터리·괴이·공포 이야기)을 처음부터 끝까지 만드는 절차. 대본은 Claude가 직접 쓰고(Anthropic API 호출 없음), TTS·자막·줌/크로스페이드 렌더·BGM 믹싱은 저장소 엔진(pipeline step5~7)을 그대로 쓴다. 종혁님이 "이 주제로 영상 만들어줘", "부처님 말씀 영상", "경전 내용으로 10분짜리", "반야심경/금강경/법구경 … 영상", "실록에서 미스터리한 사건 하나 해봐", "야화 하나 만들어", "숏 만들듯 여기서 만들어줘"처럼 주제·경전·길이를 주고 영상 제작을 요청하면 앱(Gradio)을 띄우지 말고 반드시 이 스킬을 따른다.
 ---
 
 # 세션 안에서 롱폼 영상 만들기 (YOUTUBENEWS)
 
 2026-10 반야심경 「불생불멸」 10분 영상을 이 방식으로 만들었고 종혁님이 "이 방식 딱 좋다"고 확정했다.
 그 결과물의 대본·그림 설계가 `examples/`에 있으니 처음이면 먼저 열어 본다.
+두 번째로 야화 채널용 「1609년 강원도 하늘의 괴물체」(광해군일기, 약 9분)를 만들었다 — 화자별 목소리·싼 2×2 시트·미스터리 배경음이 이때 정해졌다.
 
 ## 종혁님이 기대하는 결과 (요구사항)
 
-- **사실 기반**: 픽션 금지. 경전 본문·경전 속 일화·문답만 쓴다. 현대 해설(예: 파도 비유)은 "오늘날 자주 쓰는 설명"이라고 밝힌다. 원문이 확실하지 않은 구절·숫자는 쓰지 않는다.
-- **이야기 흐름**: 질문으로 열고(후킹) → 경전 배경 → 핵심 구절 → 비유·해설 → 오해 바로잡기 → 다른 경전 연결 → 정리·맺음.
+- **사실 기반**: 픽션 금지. 경전 본문·경전 속 일화·문답, 실록 기사 원문만 쓴다. 실록은 국사편찬위원회 sillok.history.go.kr 기사 원문·국역을 직접 받아(WebFetch는 요약해 버리니 curl로 받아 텍스트 추출) 그대로 인용한다. 현대 해설(예: 파도 비유)은 "오늘날 자주 쓰는 설명"이라고 밝힌다. 원문이 확실하지 않은 구절·숫자는 쓰지 않는다.
+- **이야기 흐름**: 경전 — 질문으로 열고(후킹) → 경전 배경 → 핵심 구절 → 비유·해설 → 오해 바로잡기 → 다른 경전 연결 → 정리·맺음.
+  실록 야화 — 장면으로 열기 → "지어낸 이야기가 아니다" + 기록 소개 → 원문을 화자별 목소리로 낭독(나레이터가 사이사이 시각·단위 풀이) → 기록의 디테일 → 오늘날 해석(해석이라고 밝힘) → 풀리지 않는 부분 → 맺음.
 - **목소리**: 종혁님이 앱에서 쓰는 그 여성 음성 = 엔진 `elevenlabs2.5`(Turbo v2.5) + 스타일 `불교강의`(voice `4p0HBzAAGyju0nYfNntV`, 한국어 기본 음성) + **속도 1.0**(앱 기본 0.9보다 조금 빠르게 — 종혁님 요청). `scripts/tts.py`의 기본값이 이것이다.
   ※ 첫 제작 때 config의 `불교종교`(voice `zgDzx5jL…`, v3 엔진)를 잘못 골랐다가 다시 만들었다. `불교종교`는 앱 스타일 목록에 없다.
-- **그림 — 돈을 아낀다**: 상황·분위기만 맞으면 된다(인물이 조금 달라도 괜찮음). 기본은 **fal FLUX-schnell(장당 약 0.003달러)**(4-A). 인물 일관성이 꼭 필요하다고 할 때만 OpenAI(4-B)를 쓰고, 그때도 싼 설정이 기본이며 비싼 4K 시트는 먼저 예상 비용을 알린다.
+- **그림 — 돈을 아끼고, 한 번에 뽑아 잘라 쓴다**: 품질은 좀 떨어져도 되지만 일관성은 지킨다. 기본은 **`build_prompts.py --cheap`의 2×2 시트**(gpt-image-1-mini 1536×1024 medium, 시트 1장=출력 1,668토큰=컷 4개, 2번 시트부터 1번 시트를 참조). fal 키가 있으면 컷별 fal(4-A)도 싸지만 컷마다 따로 그려 일관성은 시트보다 약하다. 4K gpt-image-2 시트는 종혁님이 고품질을 명시할 때만, 비용을 먼저 알리고.
 - **화풍은 Claude가 정한다**: 종혁님이 화풍을 말하지 않으면 경전의 시대·장소와 분위기에 맞춰 Claude가 고른다(필요하면 한 줄로 물어봐도 된다). 저장소의 화풍 블록(korea 수묵담채 / china 도상화 / india 스케치)은 출발점일 뿐 꼭 따를 필요는 없다 — `fal_images.py --style "..."`로 직접 쓴 화풍 문장을 줄 수 있다.
 - **실패는 돈이다**: 유료 API가 실패하면 자동 재시도하지 말고 원인부터 확인한다.
 - **연출**: 그림을 그대로 두지 말고 줌인/줌아웃·팬으로 움직이고, 그림 사이는 크로스페이드(엔진 기본 1초).
-- **배경음**: 사색적·명상적 불교 배경음을 처음부터 끝까지 깐다.
+- **목소리 — 화자마다 따로**: 나레이터는 위 기본 음성. 인용·보고·대사 등 다른 화자가 있으면 화자마다 다른 목소리를 Claude가 골라 `script.json`의 `voices`에 넣는다(5번 참고). ElevenLabs 글자 수는 넉넉하다.
+- **배경음 — 내용 분위기에 맞춘다**: 불교·명상은 `meditation`, 야화·괴이·공포는 `mystery` 프리셋. 처음부터 끝까지 깐다.
 - **길이**: 요청 길이(예: 10분)에 맞춘다.
 
 ## 전체 순서
@@ -73,14 +76,14 @@ fal은 환경 변수 `FAL_KEY`가 필요하다: 세션 제목 표시줄의 클�
 
 **A(기본, fal)**: `prompts.json` = 컷별 영어 장면 묘사 리스트(컷 수 = `images` 합계). 화풍은 스크립트가 붙이니 장면·분위기·조명만 쓴다.
 
-**B(인물 일관성 필요할 때만)**: `visual.json` — 아래 형식.
+**B(기본, 2×2 시트)**: `visual.json` — 아래 형식. 사람 무리(마을 사람들 등)도 `characters`에 이름(예: VILLAGERS)으로 넣어야 한다 — 이름이 없는 컷은 자동으로 'no people'이 붙는다.
 
 `examples/heart_sutra_visual.json` 형식: `style`(화풍 한 문단), `characters`(이름 → 외모·옷), `panels`(컷 설명, 영상 순서).
 - `panels` 수 = `script.json`의 `images` 합계, **4의 배수**로 맞춘다(2×2 시트 단위).
 - 컷 설명에 인물을 넣을 때는 `characters`의 **대문자 이름 그대로** 쓴다. 이름이 없는 컷은 자동으로 "no people"이 붙는다.
 - 인물은 외모가 서로 확실히 구분되게(나이·체형·옷 색) 정한다.
 
-### 4-A. 그림 생성 — fal (기본)
+### 4-A. 그림 생성 — fal (FAL_KEY가 있을 때, 컷별)
 
 ```bash
 S=.claude/skills/longform-in-session/scripts; W=projects/<이름>
@@ -91,7 +94,18 @@ python $S/fal_images.py $W --style "<Claude가 정한 화풍 문장>"   # 또는
 - 실패하면 멈춘다. 다시 실행하면 이미 만든 컷은 건너뛰니 재과금이 없다.
 - 생성 후 밀착 시트로 분위기·내용이 맞는지 확인하고, 엉뚱한 컷만 지우고 다시 실행한다.
 
-### 4-B. 그림 생성 — OpenAI (fal을 못 쓸 때 / 인물 일관성이 필요할 때)
+### 4-B. 그림 생성 — 싼 2×2 시트 (기본)
+
+```bash
+python $S/build_prompts.py $W/visual.json $W --cheap
+python $S/imggen.py $W/jobs/sheet_1.json          # 1번 먼저 → 눈으로 확인(화풍·시대·구분선)
+for k in 2 3 4 5 6; do python $S/imggen.py $W/jobs/sheet_$k.json & done; wait   # 1번을 참조
+for k in 1 2 3 4 5 6; do python $S/split_sheet.py $W/sheets/sheet_$k.jpg $((4*k-3)) $W/panels; done
+```
+- 컷은 약 760×500(3:2)이다. 엔진이 16:9로 위아래를 조금 잘라 1080p로 키운다 — 부드럽지만 종혁님이 감수한 품질.
+- 구분선이 흰색으로 나오기도 한다 → `split_sheet.py`는 색이 아니라 '균일함'(표준편차 최소)으로 선을 찾는다.
+
+### 4-C. 그림 생성 — OpenAI 컷별 / 4K 시트 (특별한 경우)
 
 **기본은 싼 설정**(종혁님 요청): `gpt-image-1-mini`, `1536x1024`, `quality: medium`, 컷당 1장.
 `{"prompt": "<화풍 문장>. <컷 묘사>", "out": "panels/panel_01.jpg"}` job을 컷마다 만들어 `imggen.py`로 돌린다.
@@ -113,7 +127,27 @@ python $S/split_sheet.py $W/sheets/sheet_1.jpg 1 $W/panels          # 시트 k �
 - 429 `credit_balance_exhausted`가 나오면 즉시 멈추고 종혁님께 충전을 요청한다.
 - 시트를 뽑기 전에 예상 호출 수와 비용을 종혁님께 먼저 알린다.
 
-### 5. 전체 TTS
+### 5. 전체 TTS — 화자별 목소리
+
+`script.json`에 화자 목소리를 넣고, 씬 텍스트 안에 `[@화자]` 태그로 바꾼다(태그 앞은 narrator, `[@narrator]`로 되돌림). 태그는 자막에서 자동으로 지워진다.
+```json
+"voices": {"narrator": "4p0HBzAAGyju0nYfNntV", "강릉": "K3qo7ugXmpT87FDhLBbN", "양양": "ZZ4xhVcc83kZBfNIlIIz"},
+"voice_speed": {"강릉": 0.9, "양양": 0.9}
+```
+쓸 수 있는 음성(이 키는 voices_read 권한이 없어 목록 조회 불가 → 저장소 config·youtubemaker에 있던 ID). 같은 문장으로 잰 값:
+
+| 이름 | voice_id | 음높이 | 속도(1.0) | 쓰임 |
+|---|---|---|---|---|
+| 나레이터(종혁님 기본, 여성) | 4p0HBzAAGyju0nYfNntV | ~176Hz | 4.2자/초 | 해설 |
+| kr_male | 1W00IGEmNmwmsDeYy7ag | ~121Hz | 6.7 | 굵은 남성 |
+| Harry Kim | pb3lVZVjdFWbkhPKlelB | ~120Hz | 6.8 | 대화형 남성 |
+| K3qo7u | K3qo7ugXmpT87FDhLBbN | ~149Hz | 6.6 | 스토리텔링 |
+| Im Pildu (암행어사) | ZZ4xhVcc83kZBfNIlIIz | ~173Hz | 7.7 | 권위 있는 인물 |
+| Taehyung | m3gJBS8OofDJfycyA2Ip | ~213Hz | 8.5 | 젊은 남성 |
+| Dolsoi | IAETYMYM3nJvjnlkVTKI | ~173Hz | 5.9 | 코믹 — 진지한 이야기엔 쓰지 않음 |
+
+남성 음성들은 나레이터보다 1.6배쯤 빨라 `voice_speed` 0.9를 준다. 길이 계산 때 화자 부분은 약 6자/초로 잡는다.
+
 
 ```bash
 python $S/tts.py $W --sample 1     # 첫 씬만 → sample.mp3 를 종혁님께 보내 목소리 확인
@@ -125,15 +159,15 @@ python $S/tts.py $W                # 기본값: elevenlabs2.5 / 불교강의 / 1
 ### 6. 배경음
 
 ```bash
-python $S/make_bgm.py $W <오디오길이+20초>
+python $S/make_bgm.py $W <오디오길이+20초> --preset meditation|mystery
 ```
-ElevenLabs 키에 음악 생성 권한이 없어서 효과음(드론·싱잉볼·피리·종)을 생성해 배치한다. 결과는 `bgm.mp3`.
+ElevenLabs 키에 음악 생성 권한이 없어서 효과음을 생성해 배치한다 — meditation: 드론·싱잉볼·피리·종 / mystery: 어두운 드론·찬 바람·먼 천둥·북·징. 새 분위기가 필요하면 `PRESETS`에 추가한다. 결과는 `bgm.mp3`.
 종혁님께는 "효과음으로 구성한 배경음"이라고 사실대로 말한다.
 
 ### 7. 렌더
 
 ```bash
-nohup python $S/render.py $W --style 불교강의 --bgm-volume 0.18 > $W/render.log 2>&1 &
+nohup python $S/render.py $W --bgm-volume 0.18   # mystery는 0.2 > $W/render.log 2>&1 &
 ```
 10분 영상에 약 30분 걸린다(4코어). 기다릴 때는 `render.log`를 확인하는 until 루프를 쓴다.
 

@@ -22,7 +22,10 @@ LAYOUT = ("Create ONE image that is a storyboard sheet: a perfect 2 by 2 grid of
 POS = ["top-left", "top-right", "bottom-left", "bottom-right"]
 
 
-def main(visual_path, work_dir):
+def main(visual_path, work_dir, cheap=False):
+    """cheap=True (종혁님 기본 요청): gpt-image-1-mini 1536x1024 medium 2x2 시트, 기준 인물 시트 없이
+    1번 시트를 2번 이후 시트의 참조 이미지로 쓴다(한 번에 뽑아 잘라 쓰는 일관성 + 최저 비용).
+    컷 해상도는 약 760x500이라 1080p에서 부드러워진다 — 종혁님이 감수하기로 한 품질."""
     v = json.load(open(visual_path, encoding="utf-8"))
     names = list(v["characters"].keys())
     sheets = os.path.join(work_dir, "sheets"); os.makedirs(sheets, exist_ok=True)
@@ -30,13 +33,17 @@ def main(visual_path, work_dir):
     ref = os.path.join(sheets, "ref_characters.jpg")
 
     chars_txt = "; ".join(f"({i+1}) {n}: {d}" for i, (n, d) in enumerate(v["characters"].items()))
-    json.dump({"out": ref, "quality": "high", "prompt":
+    if cheap:
+        ref = os.path.join(sheets, "sheet_1.jpg")
+    else:
+      json.dump({"out": ref, "quality": "high", "prompt":
                f"Character reference sheet. ART STYLE (defines the whole series): {v['style']} "
                f"Plain warm parchment background. Characters standing full body side by side, evenly spaced, clearly "
                f"separated, front three-quarter view: {chars_txt}. Absolutely no text, labels or numbers."},
               open(os.path.join(jobs, "ref.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    ref_word = "the attached image (an earlier sheet of the same series)" if cheap else "the attached reference sheet"
 
-    style = (f"Use EXACTLY the same art style and the same character designs as the attached reference sheet: {v['style']} "
+    style = (f"Art style: {v['style']} Use EXACTLY the same art style and character designs as {ref_word}. "
              f"Characters (only when named): " + "; ".join(f"{n} = {d}" for n, d in v["characters"].items()) +
              ". Keep their faces, ages and clothing identical to the reference. "
              "IMPORTANT: draw a character ONLY in a panel where that character is explicitly named. Panels that do not "
@@ -48,10 +55,18 @@ def main(visual_path, work_dir):
         beats = [b if any(n in b for n in names) or "people" in b.lower() else b + ", no people, no human figures"
                  for b in beats]
         prompt = LAYOUT + style + "".join(f"Panel {i+1} ({POS[i]}): {b}. " for i, b in enumerate(beats))
-        json.dump({"out": os.path.join(sheets, f"sheet_{k+1}.jpg"), "prompt": prompt, "refs": [ref], "quality": "high", "model": "gpt-image-2", "size": "3840x2160"},
+        if cheap:
+            job = {"out": os.path.join(sheets, f"sheet_{k+1}.jpg"), "prompt": prompt, "quality": "medium",
+                   "model": "gpt-image-1-mini", "size": "1536x1024"}
+            if k > 0:
+                job["refs"] = [ref]
+        else:
+            job = {"out": os.path.join(sheets, f"sheet_{k+1}.jpg"), "prompt": prompt, "refs": [ref], "quality": "high",
+                   "model": "gpt-image-2", "size": "3840x2160"}
+        json.dump(job,
                   open(os.path.join(jobs, f"sheet_{k+1}.json"), "w", encoding="utf-8"), ensure_ascii=False)
-    print(f"ref + {n_sheets} sheets → {jobs}")
+    print(("" if cheap else "ref + ") + f"{n_sheets} sheets → {jobs}")
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2])
+    main(sys.argv[1], sys.argv[2], cheap="--cheap" in sys.argv[3:])
