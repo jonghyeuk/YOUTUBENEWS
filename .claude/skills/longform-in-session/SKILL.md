@@ -178,11 +178,15 @@ nohup python $S/render.py $W --bgm-volume 0.18   # mystery는 0.2 > $W/render.lo
 ```
 10분 영상에 약 30분 걸린다(4코어). 기다릴 때는 `render.log`를 확인하는 until 루프를 쓴다.
 
-### 7-1. 채널 오프닝·엔딩 붙이기 (야화 채널은 항상)
+### 7-1. 썸네일 + 채널 오프닝·엔딩 붙이기 (야화 채널은 항상)
 
 ```bash
-python $S/brand.py $W --channel yahwa --intro-image panels/panel_XX.jpg --outro-image panels/panel_YY.jpg
+# 썸네일: thumb.json(배경 컷, 인물 위치, 태그, 줄별 글자·색, 소제목) → thumbnail.jpg(1920) + thumbnail_yt.jpg(1280, 업로드용)
+python $S/thumbnail.py $W
+python $S/brand.py $W --channel yahwa --intro-image panels/panel_XX.jpg --outro-image panels/panel_YY.jpg --thumbnail thumbnail.jpg --thumb-sec 3
 ```
+- 썸네일(종혁님 기준): 유튜브 제목과 달라도 된다(소제목 가능). 눈에 띄게 — 인물 얼굴이 큰 컷을 배경으로, 반대쪽에 큰 글씨, 핵심 단어는 노란색, 상단 빨간 태그("실록에 적힌 실화"), 하단 고딕 소제목. 제목 글씨는 시대감 있는 정자체(나눔명조 ExtraBold), 태그·소제목은 굵은 고딕(Pretendard Black). 사실과 다른 과장(예: 기록에 없는 "집이 무너졌다")은 쓰지 않는다.
+- 영상 맨 앞에 썸네일을 3초 보여 주고(찬 바람 소리 아주 작게) 번개 오프닝으로 크로스페이드한다.
 - 본편(final.mp4)은 다시 렌더하지 않고 앞뒤에 붙인다 → `final_branded.mp4`. 이후 검증·전달은 이 파일로.
 - 오프닝: 채널 고정 효과음(번개+천둥, `assets/channels/yahwa/opening.mp3`) + 흰 번개 섬광 + 어둡게 줌. 오프닝 그림은 이 편의 어두운 하늘/밤 장면이 잘 어울린다.
 - 엔딩: 나레이터 멘트 "…좋아요와 구독 부탁드립니다. 오늘도 신비한 실록의 이야기를 찾아서…" + 채널 고정 엔딩 음악(대금·장구) + 자막 + 페이드아웃.

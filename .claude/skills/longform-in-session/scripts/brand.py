@@ -25,6 +25,8 @@ import engines.tts_engine as te
 ap = argparse.ArgumentParser()
 ap.add_argument("work_dir"); ap.add_argument("--channel", default="yahwa")
 ap.add_argument("--intro-image"); ap.add_argument("--outro-image")
+ap.add_argument("--thumbnail", help="영상 맨 앞에 몇 초 보여 줄 썸네일 이미지(예: thumbnail.jpg, thumbnail.py로 생성)")
+ap.add_argument("--thumb-sec", type=float, default=3.0)
 a = ap.parse_args()
 W = os.path.abspath(a.work_dir)
 cfg = json.load(open(os.path.join(ASSETS, f"{a.channel}.json"), encoding="utf-8"))
@@ -70,11 +72,14 @@ print(f"본편 기준 음량 {REF:.1f} dBFS")
 # ── 1. 오프닝 ─────────────────────────────────────────
 snd = A.from_file(asset(cfg["opening_sound"]))
 snd = snd.apply_gain((REF + 18) - snd.max_dBFS)[:6000]          # 천둥 피크 = 나레이션 평균보다 18dB 위
+# 앞에 썸네일이 오면 그 크로스페이드(XF초) 동안 천둥·섬광이 묻히므로, 그만큼 늦춰 시작한다
+lead_in = XF if a.thumbnail else 0.0
+snd = A.silent(int(lead_in * 1000)) + snd
 intro_len = max(3.0, len(snd) / 1000)
 snd = (snd + A.silent(int((intro_len + XF) * 1000) - len(snd))).fade_out(800)
 snd.export(f"{B}/intro.wav", format="wav")
 ve._create_scene_clip_smooth_zoom([intro_img], intro_len, f"{B}/intro_raw.mp4", tail_overlap=XF, effect_offset=1)
-flash = "+".join(f"between(t,{s},{e})" for s, e in cfg.get("opening_flashes", []))
+flash = "+".join(f"between(t,{s + lead_in:.2f},{e + lead_in:.2f})" for s, e in cfg.get("opening_flashes", []))
 vf = f"eq=brightness='if({flash},0.55,-0.12)':eval=frame" if flash else "null"   # 평소엔 조금 어둡게, 번개 때 번쩍
 run(["ffmpeg", "-y", "-v", "error", "-i", f"{B}/intro_raw.mp4", "-i", f"{B}/intro.wav", "-vf", vf,
      "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
@@ -107,15 +112,35 @@ run(["ffmpeg", "-y", "-v", "error", "-i", f"{B}/outro_raw.mp4", "-i", f"{B}/outr
      "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-shortest", f"{B}/outro_nosub.mp4"])
 ve.burn_subtitles(f"{B}/outro_nosub.mp4", f"{B}/outro.ass", f"{B}/outro.mp4")
 
-# ── 3. 오프닝 + 본편 + 엔딩 ─────────────────────────────
-L = [get_audio_duration(p) for p in (f"{B}/intro.mp4", main, f"{B}/outro.mp4")]
-fc = ("[0:a]aformat=sample_rates=44100:channel_layouts=stereo[a0];"
-      "[1:a]aformat=sample_rates=44100:channel_layouts=stereo[a1];"
-      "[2:a]aformat=sample_rates=44100:channel_layouts=stereo[a2];"
-      f"[0:v][1:v]xfade=transition=fade:duration={XF}:offset={L[0] - XF:.3f}[v01];"
-      f"[v01][2:v]xfade=transition=fade:duration={XF}:offset={L[0] + L[1] - 2 * XF:.3f}[v];"
-      f"[a0][a1]acrossfade=d={XF}[a01];[a01][a2]acrossfade=d={XF}[a]")
-run(["ffmpeg", "-y", "-v", "error", "-i", f"{B}/intro.mp4", "-i", main, "-i", f"{B}/outro.mp4",
-     "-filter_complex", fc, "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "fast", "-crf", "18",
-     "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", f"{W}/final_branded.mp4"])
-print("BRANDED", f"{W}/final_branded.mp4", f"오프닝 {L[0]:.1f}s + 본편 {L[1]:.1f}s + 엔딩 {L[2]:.1f}s")
+# ── 2-1. 맨 앞 썸네일 (선택) ─────────────────────────────
+parts = [f"{B}/intro.mp4", main, f"{B}/outro.mp4"]
+if a.thumbnail:
+    tlen = a.thumb_sec + XF
+    # 썸네일이 떠 있는 동안 찬 바람 소리를 아주 작게(있으면) — 오프닝 천둥 전의 정적
+    wind = os.path.join(W, "bgm_parts", "mystery_wind.mp3")
+    amb = A.from_file(wind).apply_gain(REF - 6 - A.from_file(wind).dBFS) if os.path.exists(wind) else A.silent(1000)
+    while len(amb) < tlen * 1000:
+        amb += amb
+    amb[:int(tlen * 1000)].fade_in(300).fade_out(900).export(f"{B}/thumb.wav", format="wav")
+    run(["ffmpeg", "-y", "-v", "error", "-loop", "1", "-i", os.path.join(W, a.thumbnail), "-i", f"{B}/thumb.wav",
+         "-vf", f"scale={ve.width}:{ve.height}:force_original_aspect_ratio=increase,crop={ve.width}:{ve.height},fps={ve.fps}",
+         "-t", f"{tlen:.3f}", "-c:v", "libx264", "-preset", "fast", "-crf", "18", "-pix_fmt", "yuv420p",
+         "-c:a", "aac", "-b:a", "192k", f"{B}/thumb.mp4"])
+    parts.insert(0, f"{B}/thumb.mp4")
+
+# ── 3. (썸네일) + 오프닝 + 본편 + 엔딩 ───────────────────────
+L = [get_audio_duration(p) for p in parts]
+fc = "".join(f"[{i}:a]aformat=sample_rates=44100:channel_layouts=stereo[a{i}];" for i in range(len(parts)))
+vprev, aprev, off = "0:v", "a0", 0.0
+for i in range(1, len(parts)):
+    off += L[i - 1] - XF
+    vout, aout = ("v" if i == len(parts) - 1 else f"v{i}"), ("a" if i == len(parts) - 1 else f"ax{i}")
+    fc += f"[{vprev}][{i}:v]xfade=transition=fade:duration={XF}:offset={off:.3f}[{vout}];"
+    fc += f"[{aprev}][a{i}]acrossfade=d={XF}[{aout}];"
+    vprev, aprev = vout, aout
+cmd = ["ffmpeg", "-y", "-v", "error"]
+for p in parts:
+    cmd += ["-i", p]
+run(cmd + ["-filter_complex", fc.rstrip(";"), "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "fast",
+           "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", f"{W}/final_branded.mp4"])
+print("BRANDED", f"{W}/final_branded.mp4", " + ".join(f"{os.path.basename(p)} {l:.1f}s" for p, l in zip(parts, L)))
