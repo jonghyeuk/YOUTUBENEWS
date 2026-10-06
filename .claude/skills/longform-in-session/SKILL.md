@@ -178,6 +178,17 @@ nohup python $S/render.py $W --bgm-volume 0.18   # mystery는 0.2 > $W/render.lo
 ```
 10분 영상에 약 30분 걸린다(4코어). 기다릴 때는 `render.log`를 확인하는 until 루프를 쓴다.
 
+### 7-1. 채널 오프닝·엔딩 붙이기 (야화 채널은 항상)
+
+```bash
+python $S/brand.py $W --channel yahwa --intro-image panels/panel_XX.jpg --outro-image panels/panel_YY.jpg
+```
+- 본편(final.mp4)은 다시 렌더하지 않고 앞뒤에 붙인다 → `final_branded.mp4`. 이후 검증·전달은 이 파일로.
+- 오프닝: 채널 고정 효과음(번개+천둥, `assets/channels/yahwa/opening.mp3`) + 흰 번개 섬광 + 어둡게 줌. 오프닝 그림은 이 편의 어두운 하늘/밤 장면이 잘 어울린다.
+- 엔딩: 나레이터 멘트 "…좋아요와 구독 부탁드립니다. 오늘도 신비한 실록의 이야기를 찾아서…" + 채널 고정 엔딩 음악(대금·장구) + 자막 + 페이드아웃.
+- 채널 고정 소리는 처음 한 번 생성해 저장소에 넣어 두었다(종혁님 요청: 한 번 정한 오프닝 소리를 계속 쓴다). 바꾸려면 파일을 지우고 다시 실행한다. 멘트는 `assets/channels/yahwa.json`의 `outro_text`.
+- 음량: 본편 최종 믹스의 나레이션 음량을 재서 엔딩 목소리를 거기에 맞춘다(고정값을 쓰면 엔딩이 10dB 커졌었다).
+
 ### 8. 검증 (보내기 전에 반드시)
 
 - `ffprobe`로 영상과 오디오 길이가 0.2초 이내로 같은지 확인한다.
