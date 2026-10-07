@@ -4,6 +4,7 @@
 import os
 import random
 import subprocess
+from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Optional
 
 # Pillow 10+ 호환성 패치 (ANTIALIAS → LANCZOS)
@@ -29,6 +30,10 @@ class VideoEngine:
         self.codec = VIDEO_CONFIG["codec"]
         # 부드러운 이미지 효과 옵션
         self.image_effects = ["zoom_in", "zoom_out"]
+        # 이미지 전환 크로스페이드 길이 (초)
+        self.crossfade = float(VIDEO_CONFIG.get("crossfade_sec", 1.0))
+        # 직전 render_scene_clips가 클립 꼬리에 붙인 겹침 길이 (concat_clips가 사용)
+        self._clip_overlap = 0.0
 
     def render_scene_clips(
         self,
@@ -36,7 +41,8 @@ class VideoEngine:
         audio_segments: List[AudioSegment],
         output_dir: str,
         use_ken_burns: bool = True,  # 하위 호환용 파라미터명 유지
-        key_sentences: Optional[Dict[int, str]] = None  # 영어Saying전용: 씬별 핵심 문장
+        key_sentences: Optional[Dict[int, str]] = None,  # 영어Saying전용: 씬별 핵심 문장
+        total_audio_duration: Optional[float] = None  # 마지막 씬을 오디오 끝까지 채우기 위함
     ) -> List[str]:
         """
         씬별 영상 클립 생성 (부드러운 줌 효과 적용)
@@ -52,31 +58,51 @@ class VideoEngine:
             씬 클립 경로 리스트
         """
         os.makedirs(output_dir, exist_ok=True)
-        clip_paths = []
 
-        for segment in audio_segments:
+        # ★ 씬 클립 길이 = 오디오 타임라인상의 씬 구간 (말 + 뒤따르는 무음)
+        #   TTS는 시작 무음 1.5초 + 씬마다 2초 무음을 넣는데, 예전에는 말 길이(duration)만
+        #   클립으로 만들어 영상이 오디오보다 짧았고 → 뒤로 갈수록 그림이 앞서가다
+        #   마지막엔 -stream_loop로 영상이 처음부터 반복됐다.
+        spans = self._scene_spans(audio_segments, total_audio_duration)
+
+        # ★ 각 클립은 크로스페이드 겹침만큼 꼬리를 더 가진다 (concat_clips에서 겹쳐짐)
+        overlap = self.crossfade if use_ken_burns else 0.0
+        self._clip_overlap = overlap
+
+        jobs = []
+        prev_images = None
+        image_counter = 0
+        for segment, span in zip(audio_segments, spans):
             scene_id = segment.scene_id
             images = scene_images.get(scene_id, [])
 
             if not images:
-                print(f"[VideoEngine] Scene {scene_id}: No images, skipping")
-                continue
+                if not prev_images:
+                    print(f"[VideoEngine] Scene {scene_id}: No images, skipping")
+                    continue
+                # 건너뛰면 이후 씬이 전부 앞당겨지므로, 직전 씬의 마지막 이미지로 구간을 채운다
+                print(f"[VideoEngine] Scene {scene_id}: No images → 직전 이미지 유지 (싱크 보존)")
+                images = prev_images[-1:]
 
             clip_path = os.path.join(output_dir, f"scene_{scene_id:02d}.mp4")
+            jobs.append((scene_id, images, span, clip_path, image_counter))
+            image_counter += len(images)
+            prev_images = images
 
-            # 이미지별 노출 시간
-            duration_per_image = segment.duration / len(images)
-
+        def _render(job):
+            scene_id, images, span, clip_path, effect_offset = job
             if use_ken_burns:
                 self._create_scene_clip_smooth_zoom(
                     images=images,
-                    duration_per_image=duration_per_image,
-                    output_path=clip_path
+                    scene_duration=span,
+                    output_path=clip_path,
+                    tail_overlap=overlap,
+                    effect_offset=effect_offset
                 )
             else:
                 self._create_scene_clip_simple(
                     images=images,
-                    duration_per_image=duration_per_image,
+                    duration_per_image=span / len(images),
                     output_path=clip_path
                 )
 
@@ -87,10 +113,45 @@ class VideoEngine:
                     self._add_key_sentence_overlay(clip_path, key_text)
                     print(f"[VideoEngine] Scene {scene_id} key_sentence: '{key_text}'")
 
-            clip_paths.append(clip_path)
-            print(f"[VideoEngine] Scene {scene_id} clip: {clip_path}")
+            print(f"[VideoEngine] Scene {scene_id} clip: {clip_path} ({span:.2f}s + {overlap:.1f}s)")
+            return clip_path
+
+        # 씬 클립은 서로 독립이므로 병렬 렌더 (PIL 리샘플링·ffmpeg 인코딩 모두 GIL 밖에서 동작)
+        workers = max(1, min(len(jobs), VIDEO_CONFIG.get("render_workers", os.cpu_count() or 2)))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            clip_paths = list(pool.map(_render, jobs))
 
         return clip_paths
+
+    def _scene_spans(
+        self,
+        audio_segments: List[AudioSegment],
+        total_audio_duration: Optional[float] = None
+    ) -> List[float]:
+        """씬별 화면 노출 시간 계산 (오디오 타임라인 기준).
+
+        - 첫 씬: 0초(시작 무음 포함) ~ 다음 씬 시작
+        - 중간 씬: 자기 시작 ~ 다음 씬 시작 (씬 사이 무음 포함)
+        - 마지막 씬: 자기 시작 ~ 오디오 끝
+        start_time이 없는 예전 프로젝트는 기존처럼 duration을 그대로 쓴다.
+        """
+        n = len(audio_segments)
+        if n == 0:
+            return []
+        if not any(seg.start_time > 0 for seg in audio_segments):
+            return [seg.duration for seg in audio_segments]
+
+        spans = []
+        for i, seg in enumerate(audio_segments):
+            start = 0.0 if i == 0 else seg.start_time
+            if i < n - 1:
+                end = audio_segments[i + 1].start_time
+            elif total_audio_duration and total_audio_duration > seg.end_time:
+                end = total_audio_duration
+            else:
+                end = seg.end_time
+            spans.append(max(end - start, 1.0 / self.fps))
+        return spans
 
     def _add_key_sentence_overlay(self, video_path: str, text: str):
         """
@@ -161,151 +222,146 @@ class VideoEngine:
     def _create_scene_clip_smooth_zoom(
         self,
         images: List[str],
-        duration_per_image: float,
-        output_path: str
+        scene_duration: float,
+        output_path: str,
+        tail_overlap: float = 0.0,
+        effect_offset: int = 0
     ):
-        """FFmpeg zoompan을 사용한 빠른 줌 효과 씬 클립 생성"""
-        temp_clips = []
+        """서브픽셀 줌/팬 + 이미지 간 크로스페이드로 씬 클립 생성.
 
-        for i, img_path in enumerate(images):
-            # 효과 선택 (줌인/줌아웃 교대)
-            effect = self.image_effects[i % len(self.image_effects)]
-            temp_clip = output_path.replace(".mp4", f"_temp_{i:02d}.mp4")
+        예전 방식(ffmpeg zoompan)은 크롭 좌표가 정수 픽셀로 반올림돼 천천히 확대할 때
+        화면이 앞뒤로 떨렸다(측정: 300프레임 중 67프레임이 역방향 이동).
+        여기서는 PIL resize(box=실수 좌표)로 매 프레임을 원본에서 직접 리샘플링하므로
+        이동이 연속적이다.
 
-            # FFmpeg zoompan 필터로 줌 효과 생성
-            self._create_zoom_clip_ffmpeg(
-                img_path=img_path,
-                duration=duration_per_image,
-                effect=effect,
-                output_path=temp_clip
-            )
-            temp_clips.append(temp_clip)
-
-        # 클립들 합치기 (크로스페이드)
-        if len(temp_clips) == 1:
-            # Windows 호환: 대상 파일이 이미 있으면 삭제 후 rename
-            if os.path.exists(output_path):
-                os.remove(output_path)
-            os.rename(temp_clips[0], output_path)
-        else:
-            self._concat_with_crossfade(temp_clips, output_path)
-            # 임시 파일 삭제
-            for tc in temp_clips:
-                if os.path.exists(tc):
-                    os.remove(tc)
-
-    def _create_zoom_clip_ffmpeg(
-        self,
-        img_path: str,
-        duration: float,
-        effect: str,
-        output_path: str
-    ):
+        클립 길이 = scene_duration + tail_overlap.
+        씬 안의 이미지들은 경계마다 self.crossfade 동안 겹쳐서(블렌드) 넘어가고,
+        꼬리 tail_overlap 구간은 다음 씬과의 크로스페이드(concat_clips)에 쓰인다.
         """
-        FFmpeg zoompan 필터로 단일 이미지 줌 클립 생성
-        - Cinematic Pan: 한 방향으로 부드럽게 이동 (흔들림 제로)
-        - 시작=끝 위치 일치로 씬 전환 시 끊김 없음
-        """
-        # 총 프레임 수
-        total_frames = int(duration * self.fps)
+        fps = self.fps
+        n = len(images)
+        total_frames = max(1, int(round((scene_duration + tail_overlap) * fps)))
+        tail_frames = int(round(tail_overlap * fps))
+        xf_frames = max(1, int(round(self.crossfade * fps)))
 
-        # ========================================
-        # Cinematic Pan 로직 (흔들림 제로)
-        # - 한 방향으로만 부드럽게 이동 (왕복 없음)
-        # - sin(PI/2 * progress): 0→1 가속 곡선
-        # ========================================
+        # 이미지 k의 시작 프레임 (씬 길이를 균등 분배, 누적 반올림으로 드리프트 없음)
+        body_frames = total_frames - tail_frames
+        starts = [int(round(body_frames * k / n)) for k in range(n)]
+        # 이미지 k의 노출 구간: [starts[k], 다음 이미지 시작 + 겹침) — 마지막은 클립 끝까지
+        ends = [min(starts[k + 1] + xf_frames, total_frames) for k in range(n - 1)] + [total_frames]
 
-        # 진행률: 0.0 → 1.0
-        progress = f"(on/{total_frames})"
-
-        # 줌: 1.0 → 1.22 (한 방향 확대, 더 역동적)
-        zoom_expr = f"1.0+0.22*{progress}"
-
-        # 기본 중앙 위치
-        center_x = f"(iw/2-(iw/zoom/2))"
-        center_y = f"(ih/2-(ih/zoom/2))"
-
-        # ========================================
-        # X축: 왼쪽→오른쪽 한 방향 이동 (sin으로 가감속)
-        # sin(PI/2 * progress) = 0에서 시작 → 1로 끝 (가속 곡선)
-        # ========================================
-        pan_x = f"(iw-ow)*sin(PI/2*{progress})*0.25"
-
-        # ========================================
-        # Y축: 위→아래 이동 (대각선 느낌)
-        # X와 동일한 방향
-        # ========================================
-        tilt_y = f"(ih-oh)*sin(PI/2*{progress})*0.15"
-
-        # 최종 좌표 = 중앙 + Pan(좌우) + Tilt(상하)
-        x_expr = f"{center_x}+{pan_x}"
-        y_expr = f"{center_y}+{tilt_y}"
-
-        # zoompan 필터 (bicubic 보간, 부드러운 줌)
-        filter_complex = (
-            f"zoompan=z='{zoom_expr}':x='{x_expr}':y='{y_expr}':"
-            f"d={total_frames}:s={self.width}x{self.height}:fps={self.fps},"
-            f"fade=t=in:st=0:d=0.3,fade=t=out:st={duration-0.3}:d=0.3"
-        )
+        sources = [self._load_cover_source(p) for p in images]
 
         cmd = [
-            "ffmpeg", "-y",
-            "-loop", "1",
-            "-i", img_path.replace("\\", "/"),
-            "-vf", filter_complex,
-            "-c:v", self.codec,
-            "-t", str(duration),
+            "ffmpeg", "-y", "-v", "error",
+            "-f", "rawvideo", "-pix_fmt", "rgb24",
+            "-s", f"{self.width}x{self.height}", "-r", str(fps),
+            "-i", "-",
+            "-c:v", self.codec, "-preset", "fast", "-crf", "18",
             "-pix_fmt", "yuv420p",
-            "-preset", "fast",  # 빠른 인코딩
             output_path.replace("\\", "/")
         ]
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        try:
+            for f in range(total_frames):
+                frame = None
+                for k in range(n):
+                    if not (starts[k] <= f < ends[k]):
+                        continue
+                    progress = (f - starts[k]) / max(1, ends[k] - starts[k] - 1)
+                    effect = self.image_effects[(effect_offset + k) % len(self.image_effects)]
+                    img = self._zoom_frame(sources[k], progress, effect, effect_offset + k)
+                    if frame is None:
+                        frame = img
+                    else:
+                        # 다음 이미지가 겹치는 구간: 선형 크로스페이드
+                        alpha = (f - starts[k] + 1) / (xf_frames + 1)
+                        frame = PIL.Image.blend(frame, img, min(1.0, alpha))
+                proc.stdin.write(frame.tobytes())
+            proc.stdin.close()
+        except BrokenPipeError:
+            pass
+        err = proc.stderr.read().decode("utf-8", errors="ignore")
+        if proc.wait() != 0:
+            print(f"[VideoEngine] FFmpeg encode error: {err}")
+            raise RuntimeError(f"FFmpeg encode failed: {err}")
 
-        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
-        if result.returncode != 0:
-            print(f"[VideoEngine] FFmpeg zoompan error: {result.stderr}")
-            raise RuntimeError(f"FFmpeg zoompan failed: {result.stderr}")
+    def _load_cover_source(self, img_path: str):
+        """이미지를 RGB로 열고, 출력 비율(16:9)을 꽉 채우는 중앙 영역 박스를 계산한다.
 
-    def _concat_with_crossfade(self, clip_paths: List[str], output_path: str):
-        """클립들을 크로스페이드로 합치기"""
-        if len(clip_paths) < 2:
+        원본 해상도는 그대로 두고 매 프레임 원본에서 직접 리샘플링한다 (화질 손실 최소화).
+        """
+        img = PIL.Image.open(img_path).convert("RGB")
+        iw, ih = img.size
+        target = self.width / self.height
+        if iw / ih > target:
+            bw, bh = ih * target, float(ih)
+        else:
+            bw, bh = float(iw), iw / target
+        box = ((iw - bw) / 2, (ih - bh) / 2, bw, bh)  # (x0, y0, w, h)
+        return img, box
+
+    def _zoom_frame(self, source, progress: float, effect: str, index: int):
+        """progress(0→1)에 해당하는 줌/팬 프레임 1장 (서브픽셀 정밀도)."""
+        img, (bx, by, bw, bh) = source
+        zoom_range = float(VIDEO_CONFIG.get("zoom_range", 0.18))
+        p = min(1.0, max(0.0, progress))
+        zoom = 1.0 + zoom_range * (p if effect == "zoom_in" else 1.0 - p)
+
+        # 팬: 이미지마다 방향을 바꿔 단조롭지 않게 (확대된 만큼의 여유폭 안에서만 이동)
+        directions = [(0.25, 0.10), (-0.25, 0.10), (0.25, -0.10), (-0.25, -0.10)]
+        dx, dy = directions[index % len(directions)]
+        px = 0.5 + dx * p
+        py = 0.5 + dy * p
+
+        cw, ch = bw / zoom, bh / zoom
+        x0 = bx + (bw - cw) * px
+        y0 = by + (bh - ch) * py
+        return img.resize(
+            (self.width, self.height),
+            PIL.Image.BICUBIC,
+            box=(x0, y0, x0 + cw, y0 + ch)
+        )
+
+    def _concat_with_crossfade(self, clip_paths: List[str], output_path: str, overlap: float):
+        """클립들을 크로스페이드로 합치기 (한 번의 ffmpeg 패스).
+
+        각 클립은 꼬리에 overlap초를 더 가지고 있다고 가정한다.
+        k번째 전환 offset = 앞 클립들의 (길이 - overlap) 합 → 다음 클립의 시작이
+        정확히 원래 씬 경계에 오고, 전체 길이는 overlap 한 번만큼만 길어진다.
+        (예전 구현은 offset=0으로 호출해 앞 클립이 통째로 버려졌다.)
+        """
+        if len(clip_paths) < 2 or overlap <= 0:
+            self._concat_clips_simple(clip_paths, output_path)
             return
 
-        # 첫 번째 클립부터 시작
-        current = clip_paths[0]
-        crossfade_duration = 0.3  # 0.3초 크로스페이드
+        inputs = []
+        filters = []
+        offset = 0.0
+        prev_label = "0:v"
+        for i, clip in enumerate(clip_paths):
+            inputs += ["-i", clip.replace("\\", "/")]
+            if i == 0:
+                continue
+            offset += get_audio_duration(clip_paths[i - 1]) - overlap
+            out_label = f"v{i}" if i < len(clip_paths) - 1 else "vout"
+            filters.append(
+                f"[{prev_label}][{i}:v]xfade=transition=fade:duration={overlap}:offset={offset:.4f}[{out_label}]"
+            )
+            prev_label = out_label
 
-        for i, next_clip in enumerate(clip_paths[1:], 1):
-            temp_output = output_path.replace(".mp4", f"_xfade_{i}.mp4")
-
-            # xfade 필터로 크로스페이드
-            cmd = [
-                "ffmpeg", "-y",
-                "-i", current.replace("\\", "/"),
-                "-i", next_clip.replace("\\", "/"),
-                "-filter_complex", f"xfade=transition=fade:duration={crossfade_duration}:offset=0",
-                "-c:v", self.codec,
-                "-preset", "fast",
-                "-pix_fmt", "yuv420p",
-                temp_output.replace("\\", "/")
-            ]
-
-            result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
-            if result.returncode != 0:
-                # 크로스페이드 실패 시 단순 concat
-                print(f"[VideoEngine] xfade failed, using simple concat")
-                self._concat_clips_simple(clip_paths, output_path)
-                return
-
-            # 이전 임시 파일 삭제
-            if i > 1 and os.path.exists(current):
-                os.remove(current)
-
-            current = temp_output
-
-        # 최종 파일 이동 (Windows 호환: 대상 파일이 이미 있으면 삭제)
-        if os.path.exists(output_path):
-            os.remove(output_path)
-        os.rename(current, output_path)
+        cmd = [
+            "ffmpeg", "-y", *inputs,
+            "-filter_complex", ";".join(filters),
+            "-map", "[vout]",
+            "-c:v", self.codec, "-preset", "fast", "-crf", "18",
+            "-pix_fmt", "yuv420p",
+            output_path.replace("\\", "/")
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding='utf-8', errors='ignore')
+        if result.returncode != 0:
+            print(f"[VideoEngine] xfade error: {result.stderr[-2000:]}")
+            raise RuntimeError(f"FFmpeg xfade failed: {result.stderr[-2000:]}")
 
     def _create_scene_clip_simple(
         self,
@@ -394,27 +450,11 @@ class VideoEngine:
         Returns:
             최종 영상 경로
         """
-        # 비디오 합치기
-        list_path = output_path.replace(".mp4", "_concat.txt")
-
-        with open(list_path, "w", encoding="utf-8") as f:
-            for clip_path in clip_paths:
-                # Windows 호환: 경로를 forward slash로 변환
-                abs_path = os.path.abspath(clip_path).replace("\\", "/")
-                f.write(f"file '{abs_path}'\n")
-
         temp_video = output_path.replace(".mp4", "_temp.mp4").replace("\\", "/")
 
-        cmd_concat = [
-            "ffmpeg", "-y",
-            "-f", "concat",
-            "-safe", "0",
-            "-i", list_path.replace("\\", "/"),
-            "-c", "copy",
-            temp_video
-        ]
-
-        subprocess.run(cmd_concat, check=True, capture_output=True)
+        # 비디오 합치기: 클립에 겹침 꼬리가 있으면 씬 사이를 크로스페이드로, 없으면 단순 이어붙이기
+        # (_concat_with_crossfade는 겹침이 없으면 _concat_clips_simple로 위임)
+        self._concat_with_crossfade(clip_paths, temp_video, self._clip_overlap)
 
         # 오디오 추가 (BGM 믹싱 여부에 따라)
         if bgm_path and os.path.exists(bgm_path):
@@ -425,7 +465,6 @@ class VideoEngine:
             self._add_audio_simple(temp_video, audio_path, output_path)
 
         # 임시 파일 삭제
-        os.remove(list_path)
         os.remove(temp_video)
 
         print(f"[VideoEngine] Video created: {output_path}")
@@ -557,10 +596,17 @@ class VideoEngine:
         for char in ["'", ",", ";", "[", "]", ":"]:
             subtitle_path_escaped = subtitle_path_escaped.replace(char, f"\\{char}")
 
+        # 자막 폰트(NanumMyeongjo 등)는 저장소 fonts/ 에 동봉 → libass가 시스템 설치 없이 찾도록 지정
+        # (지정하지 않으면 시스템에 없는 폰트는 다른 폰트로 대체돼 정자체가 나오지 않았다)
+        fonts_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "fonts")
+        fonts_dir_escaped = fonts_dir.replace("\\", "/")
+        for char in ["'", ",", ";", "[", "]", ":"]:
+            fonts_dir_escaped = fonts_dir_escaped.replace(char, f"\\{char}")
+
         cmd = [
             "ffmpeg", "-y",
             "-i", video_path.replace("\\", "/"),
-            "-vf", f"subtitles={subtitle_path_escaped}:force_style='{force_style}'",
+            "-vf", f"subtitles={subtitle_path_escaped}:fontsdir={fonts_dir_escaped}:force_style='{force_style}'",
             "-c:a", "copy",
             output_path.replace("\\", "/")
         ]

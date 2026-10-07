@@ -1,0 +1,10 @@
+{
+ "name": "야화 — 신비한 실록 이야기",
+ "narrator": "ksaI0TCD9BstzEzlxj4q",
+ "opening_sound": {"file": "yahwa/opening.mp3",
+   "prompt": {"text": "A sudden blinding lightning strike with a sharp electric crack, immediately followed by a huge deep thunderclap that rolls away into the distance, dramatic cinematic horror opening", "duration_seconds": 5, "prompt_influence": 0.7}},
+ "opening_flashes": [[0.10, 0.18], [0.32, 0.40]],
+ "outro_music": {"file": "yahwa/outro_music.mp3",
+   "prompt": {"text": "Short mysterious yet warm ending theme, a slow Korean daegeum bamboo flute melody over a soft low pad and a gentle distant janggu drum, calm resolving close, no vocals", "duration_seconds": 22, "prompt_influence": 0.6}},
+ "outro_text": "오늘의 이야기, 어떠셨나요. 이야기가 좋으셨다면 좋아요와 구독 부탁드립니다. 오늘도 신비한 실록의 이야기를 찾아서. 다음 밤에, 또 찾아뵙겠습니다."
+}

@@ -19,6 +19,7 @@ from engines import (
     TranscriptEngine,
 )
 from config import DURATION_SPECS
+from engines.audio_utils import get_audio_duration
 
 
 class Pipeline:
@@ -401,7 +402,8 @@ class Pipeline:
             audio_segments=self.project.audio_segments,
             output_dir=clips_dir,
             use_ken_burns=use_ken_burns,
-            key_sentences=key_sentences  # 영어Saying전용에만 전달됨
+            key_sentences=key_sentences,  # 영어Saying전용에만 전달됨
+            total_audio_duration=get_audio_duration(self.project.audio_path)  # 마지막 씬을 오디오 끝까지
         )
 
         # BGM 경로 로깅

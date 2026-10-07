@@ -177,6 +177,9 @@ VIDEO_CONFIG = {
     "resolution": "1920x1080",
     "fps": 30,
     "codec": "libx264",
+    "crossfade_sec": 1.0,   # 이미지/씬 전환 크로스페이드 길이 (초)
+    "zoom_range": 0.18,     # 이미지당 줌 변화량 (1.0 ↔ 1.18)
+    "render_workers": 4,    # 씬 클립 병렬 렌더 수
 }
 
 # FFmpeg 필터 설정 (오디오 믹싱, 자막 스타일)
