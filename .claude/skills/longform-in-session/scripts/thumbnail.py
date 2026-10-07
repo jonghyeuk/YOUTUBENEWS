@@ -3,7 +3,11 @@
 종혁님 기준: 제목은 유튜브 제목과 달라도 되고(소제목 가능), 눈에 띄어야 한다.
 글씨체는 시대상을 반영해 제목은 정자체(나눔명조 ExtraBold), 태그·소제목은 굵은 고딕(Pretendard Black).
 
-thumb.json 예:
+기본 디자인(layout "yadam") = 종혁님 youtubemaker 썸네일 그대로:
+{"layout": "yadam", "bg": "panels/panel_15.jpg", "darken": 0.45,
+ "sub": "실록에 적힌 실화", "main": "떠난 다음 날\n처가에 닥친 화", "bottom": "앞날을 미리 본 사람, 토정 이지함"}
+
+다른 디자인(layout "side") 예:
 {"bg": "panels/panel_15.jpg", "focus": "left",          # 배경에서 인물이 있는 쪽 (글씨는 반대쪽 어둡게 깔고 올림)
  "tag": "실록에 적힌 실화",
  "lines": [["떠난 다음 날,", "#FFFFFF"], ["그 집에 ", "#FFFFFF", "화가 닥쳤다", "#FFD400"]],
@@ -37,8 +41,48 @@ def fit_size(draw, segs, font_path, max_w, start):
     return ImageFont.truetype(font_path, size)
 
 
+def yadam(work, spec):
+    """종혁님이 youtubemaker(engines/thumbnail_engine.py)에서 만든 '야담' 썸네일 디자인을 그대로 옮긴 것.
+    1280x720, 배경 어둡게, 가운데 정렬 — 상단 흰 글씨(sub) / 메인 금색 #FFD700 2줄(외곽선+그림자) / 하단 연금색.
+    글씨체는 가평한석봉체(붓글씨, 시대감). 종혁님 기준 기본 썸네일은 이 디자인이다."""
+    font_b = os.path.join(REPO, "fonts", "GapyeongHanseokbongB.ttf")
+    font_r = os.path.join(REPO, "fonts", "GapyeongHanseokbongR.ttf")
+    img = cover(Image.open(os.path.join(work, spec["bg"])).convert("RGB"), 1280, 720)
+    img = ImageEnhance.Brightness(img).enhance(1.0 - spec.get("darken", 0.45))
+    d = ImageDraw.Draw(img)
+
+    def put(text, font, y, fill, ow, shadow=False):
+        w = d.textbbox((0, 0), text, font=font)[2]
+        x = (1280 - w) // 2
+        if shadow:
+            for i in range(4):
+                d.text((x + i, y + i), text, font=font, fill=(51, 51, 51))
+        for dx in range(-ow, ow + 1):
+            for dy in range(-ow, ow + 1):
+                if dx or dy:
+                    d.text((x + dx, y + dy), text, font=font, fill=(0, 0, 0))
+        d.text((x, y), text, font=font, fill=fill)
+
+    if spec.get("sub"):
+        put(spec["sub"], ImageFont.truetype(font_r, 50), 80, (255, 255, 255), 2)
+    lines = spec["main"].split("\n")
+    mf = ImageFont.truetype(font_b, 90)
+    if len(lines) == 1:
+        put(lines[0], mf, 280, (255, 215, 0), 4, True)
+    else:
+        for i, line in enumerate(lines[:3]):
+            put(line, mf, 220 + i * 110, (255, 215, 0), 4, True)
+    if spec.get("bottom"):
+        put(spec["bottom"], ImageFont.truetype(font_r, 36), 620, (255, 204, 0), 2)
+    img.save(os.path.join(work, "thumbnail_yt.jpg"), quality=95)
+    img.resize((W, H), Image.LANCZOS).save(os.path.join(work, "thumbnail.jpg"), quality=95)
+    print("thumbnail (yadam):", os.path.join(work, "thumbnail_yt.jpg"))
+
+
 def main(work):
     spec = json.load(open(os.path.join(work, "thumb.json"), encoding="utf-8"))
+    if spec.get("layout", "yadam") == "yadam":
+        return yadam(work, spec)
     bg = cover(Image.open(os.path.join(work, spec["bg"])).convert("RGB"), W, H)
     bg = ImageEnhance.Contrast(ImageEnhance.Color(bg).enhance(1.15)).enhance(1.12)
 
